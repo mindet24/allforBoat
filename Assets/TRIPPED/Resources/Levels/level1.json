@@ -1,0 +1,100 @@
+{
+  "id": 1,
+  "title": "Morning Tea",
+  "teaches": "Load is a sum",
+  "intro": "Mum wants tea. Dad wants toast. One kitchen breaker.",
+  "dayLengthSec": 35,
+  "mainCapacity": 0,
+  "fridgeSocket": "",
+  "fridgeSpoilSec": 0,
+  "lampCount": 0,
+  "cordCount": 1,
+  "rooms": [
+    {
+      "id": "kitchen",
+      "name": "Kitchen"
+    },
+    {
+      "id": "living",
+      "name": "Living room"
+    }
+  ],
+  "circuits": [
+    {
+      "id": "A",
+      "label": "KITCHEN",
+      "capacity": 8
+    },
+    {
+      "id": "B",
+      "label": "LIVING",
+      "capacity": 8
+    }
+  ],
+  "sockets": [
+    {
+      "id": "K1",
+      "room": "kitchen",
+      "circuit": "A",
+      "assumed": "",
+      "revealed": true
+    },
+    {
+      "id": "K2",
+      "room": "kitchen",
+      "circuit": "A",
+      "assumed": "",
+      "revealed": true
+    },
+    {
+      "id": "L1",
+      "room": "living",
+      "circuit": "B",
+      "assumed": "",
+      "revealed": true
+    }
+  ],
+  "requests": [
+    {
+      "owner": "Mum",
+      "appliance": "kettle",
+      "room": "kitchen",
+      "durationSec": 8,
+      "dueSec": 30
+    },
+    {
+      "owner": "Dad",
+      "appliance": "toaster",
+      "room": "kitchen",
+      "durationSec": 10,
+      "dueSec": 30
+    }
+  ],
+  "routines": [],
+  "reference": [
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "kettle",
+      "b": "K1"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "toaster",
+      "b": "K2"
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "kettle",
+      "b": ""
+    },
+    {
+      "tick": 80,
+      "cmd": "on",
+      "a": "toaster",
+      "b": ""
+    }
+  ]
+}

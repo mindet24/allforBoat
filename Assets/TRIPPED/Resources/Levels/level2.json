@@ -1,0 +1,179 @@
+{
+  "id": 2,
+  "title": "Mystery Panel",
+  "teaches": "Find out which socket is on which breaker",
+  "intro": "Nobody labelled the breakers. Everyone needs power before work.",
+  "dayLengthSec": 50,
+  "mainCapacity": 0,
+  "fridgeSocket": "K3",
+  "fridgeSpoilSec": 12,
+  "lampCount": 1,
+  "cordCount": 1,
+  "rooms": [
+    {
+      "id": "bedroom",
+      "name": "Bedroom"
+    },
+    {
+      "id": "bathroom",
+      "name": "Bathroom"
+    },
+    {
+      "id": "kitchen",
+      "name": "Kitchen"
+    },
+    {
+      "id": "living",
+      "name": "Living room"
+    }
+  ],
+  "circuits": [
+    {
+      "id": "A",
+      "label": "?",
+      "capacity": 10
+    },
+    {
+      "id": "B",
+      "label": "?",
+      "capacity": 10
+    },
+    {
+      "id": "C",
+      "label": "?",
+      "capacity": 6
+    }
+  ],
+  "sockets": [
+    {
+      "id": "BR1",
+      "room": "bedroom",
+      "circuit": "C",
+      "assumed": "",
+      "revealed": false
+    },
+    {
+      "id": "BA1",
+      "room": "bathroom",
+      "circuit": "A",
+      "assumed": "",
+      "revealed": false
+    },
+    {
+      "id": "K1",
+      "room": "kitchen",
+      "circuit": "A",
+      "assumed": "",
+      "revealed": false
+    },
+    {
+      "id": "K2",
+      "room": "kitchen",
+      "circuit": "B",
+      "assumed": "",
+      "revealed": false
+    },
+    {
+      "id": "K3",
+      "room": "kitchen",
+      "circuit": "B",
+      "assumed": "",
+      "revealed": false
+    },
+    {
+      "id": "L1",
+      "room": "living",
+      "circuit": "B",
+      "assumed": "",
+      "revealed": false
+    },
+    {
+      "id": "L2",
+      "room": "living",
+      "circuit": "C",
+      "assumed": "",
+      "revealed": false
+    }
+  ],
+  "requests": [
+    {
+      "owner": "Sis",
+      "appliance": "dryer",
+      "room": "bathroom",
+      "durationSec": 10,
+      "dueSec": 30
+    },
+    {
+      "owner": "Mum",
+      "appliance": "kettle",
+      "room": "kitchen",
+      "durationSec": 8,
+      "dueSec": 18
+    },
+    {
+      "owner": "Dad",
+      "appliance": "microwave",
+      "room": "kitchen",
+      "durationSec": 12,
+      "dueSec": 18
+    },
+    {
+      "owner": "Kid",
+      "appliance": "phone",
+      "room": "bedroom",
+      "durationSec": 20,
+      "dueSec": 45
+    }
+  ],
+  "routines": [],
+  "reference": [
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "dryer",
+      "b": "BA1"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "microwave",
+      "b": "K1"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "kettle",
+      "b": "K2"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "phone",
+      "b": "BR1"
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "dryer",
+      "b": ""
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "microwave",
+      "b": ""
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "kettle",
+      "b": ""
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "phone",
+      "b": ""
+    }
+  ]
+}

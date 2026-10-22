@@ -1,0 +1,213 @@
+{
+  "id": 4,
+  "title": "Lying Labels",
+  "teaches": "Labels are claims, not facts",
+  "intro": "The previous owner labelled the breakers. Confidently.",
+  "dayLengthSec": 75,
+  "mainCapacity": 0,
+  "fridgeSocket": "K3",
+  "fridgeSpoilSec": 10,
+  "lampCount": 1,
+  "cordCount": 1,
+  "rooms": [
+    {
+      "id": "laundry",
+      "name": "Laundry"
+    },
+    {
+      "id": "kitchen",
+      "name": "Kitchen"
+    },
+    {
+      "id": "living",
+      "name": "Living room"
+    },
+    {
+      "id": "bathroom",
+      "name": "Bathroom"
+    }
+  ],
+  "circuits": [
+    {
+      "id": "A",
+      "label": "KITCHEN",
+      "capacity": 12
+    },
+    {
+      "id": "B",
+      "label": "BATHROOM",
+      "capacity": 8
+    },
+    {
+      "id": "C",
+      "label": "LAUNDRY",
+      "capacity": 10
+    }
+  ],
+  "sockets": [
+    {
+      "id": "LA1",
+      "room": "laundry",
+      "circuit": "C",
+      "assumed": "C",
+      "revealed": false
+    },
+    {
+      "id": "LA2",
+      "room": "laundry",
+      "circuit": "C",
+      "assumed": "C",
+      "revealed": false
+    },
+    {
+      "id": "K1",
+      "room": "kitchen",
+      "circuit": "B",
+      "assumed": "A",
+      "revealed": false
+    },
+    {
+      "id": "K2",
+      "room": "kitchen",
+      "circuit": "B",
+      "assumed": "A",
+      "revealed": false
+    },
+    {
+      "id": "K3",
+      "room": "kitchen",
+      "circuit": "B",
+      "assumed": "A",
+      "revealed": false
+    },
+    {
+      "id": "L1",
+      "room": "living",
+      "circuit": "A",
+      "assumed": "",
+      "revealed": true
+    },
+    {
+      "id": "L2",
+      "room": "living",
+      "circuit": "A",
+      "assumed": "",
+      "revealed": false
+    },
+    {
+      "id": "BA1",
+      "room": "bathroom",
+      "circuit": "A",
+      "assumed": "B",
+      "revealed": false
+    }
+  ],
+  "requests": [
+    {
+      "owner": "Mum",
+      "appliance": "kettle",
+      "room": "kitchen",
+      "durationSec": 8,
+      "dueSec": 35
+    },
+    {
+      "owner": "Dad",
+      "appliance": "microwave",
+      "room": "kitchen",
+      "durationSec": 12,
+      "dueSec": 35
+    },
+    {
+      "owner": "Sis",
+      "appliance": "dryer",
+      "room": "bathroom",
+      "durationSec": 10,
+      "dueSec": 35
+    },
+    {
+      "owner": "Gran",
+      "appliance": "washer",
+      "room": "laundry",
+      "durationSec": 30,
+      "dueSec": 70
+    },
+    {
+      "owner": "Dad",
+      "appliance": "iron",
+      "room": "laundry",
+      "durationSec": 10,
+      "dueSec": 70
+    }
+  ],
+  "routines": [
+    {
+      "owner": "Grandpa",
+      "appliance": "tv",
+      "socket": "L1",
+      "startSec": 0,
+      "durationSec": 75
+    }
+  ],
+  "reference": [
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "kettle",
+      "b": "K1"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "microwave",
+      "b": "K2"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "dryer",
+      "b": "BA1"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "washer",
+      "b": "LA1"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "iron",
+      "b": "LA2"
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "kettle",
+      "b": ""
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "dryer",
+      "b": ""
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "washer",
+      "b": ""
+    },
+    {
+      "tick": 80,
+      "cmd": "on",
+      "a": "microwave",
+      "b": ""
+    },
+    {
+      "tick": 300,
+      "cmd": "on",
+      "a": "iron",
+      "b": ""
+    }
+  ]
+}

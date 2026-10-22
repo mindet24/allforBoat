@@ -1,0 +1,18 @@
+{
+    "ticksPerSecond": 10,
+    "overTripTicks": 10,
+    "overCoolEvery": 3,
+    "breakerToggleResetsCounter": false,
+    "walkSpeed": 3.0,
+    "interactTicks": 3,
+    "doorOpenTicks": 5,
+    "stairsTicks": 20,
+    "actionQueueSize": 3,
+    "planningIsFree": true,
+    "sightDepth": 1,
+    "sightThroughStairs": false,
+    "revealRequiresSight": true,
+    "cordThroughStairs": false,
+    "breakerHudMode": "Always",
+    "autoRoomWidth": 6.0
+}

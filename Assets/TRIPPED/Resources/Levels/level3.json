@@ -1,0 +1,157 @@
+{
+  "id": 3,
+  "title": "Save Point",
+  "teaches": "Other people run on a schedule",
+  "intro": "The kid is mid-boss-fight. Grandpa gets cold at 0:20.",
+  "dayLengthSec": 55,
+  "mainCapacity": 0,
+  "fridgeSocket": "K2",
+  "fridgeSpoilSec": 10,
+  "lampCount": 1,
+  "cordCount": 1,
+  "rooms": [
+    {
+      "id": "bedroom",
+      "name": "Bedroom"
+    },
+    {
+      "id": "living",
+      "name": "Living room"
+    },
+    {
+      "id": "kitchen",
+      "name": "Kitchen"
+    }
+  ],
+  "circuits": [
+    {
+      "id": "A",
+      "label": "KITCHEN",
+      "capacity": 10
+    },
+    {
+      "id": "B",
+      "label": "LIVING",
+      "capacity": 8
+    },
+    {
+      "id": "C",
+      "label": "BEDROOM",
+      "capacity": 8
+    }
+  ],
+  "sockets": [
+    {
+      "id": "BR1",
+      "room": "bedroom",
+      "circuit": "B",
+      "assumed": "",
+      "revealed": false
+    },
+    {
+      "id": "BR2",
+      "room": "bedroom",
+      "circuit": "C",
+      "assumed": "",
+      "revealed": false
+    },
+    {
+      "id": "L1",
+      "room": "living",
+      "circuit": "B",
+      "assumed": "",
+      "revealed": true
+    },
+    {
+      "id": "L2",
+      "room": "living",
+      "circuit": "C",
+      "assumed": "",
+      "revealed": false
+    },
+    {
+      "id": "K1",
+      "room": "kitchen",
+      "circuit": "A",
+      "assumed": "",
+      "revealed": true
+    },
+    {
+      "id": "K2",
+      "room": "kitchen",
+      "circuit": "A",
+      "assumed": "",
+      "revealed": true
+    }
+  ],
+  "requests": [
+    {
+      "owner": "Kid",
+      "appliance": "console",
+      "room": "bedroom",
+      "durationSec": 30,
+      "dueSec": 45
+    },
+    {
+      "owner": "Dad",
+      "appliance": "iron",
+      "room": "living",
+      "durationSec": 10,
+      "dueSec": 50
+    },
+    {
+      "owner": "Mum",
+      "appliance": "kettle",
+      "room": "kitchen",
+      "durationSec": 8,
+      "dueSec": 40
+    }
+  ],
+  "routines": [
+    {
+      "owner": "Grandpa",
+      "appliance": "heater",
+      "socket": "L1",
+      "startSec": 20,
+      "durationSec": 20
+    }
+  ],
+  "reference": [
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "console",
+      "b": "BR2"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "iron",
+      "b": "L2"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "kettle",
+      "b": "K1"
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "console",
+      "b": ""
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "iron",
+      "b": ""
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "kettle",
+      "b": ""
+    }
+  ]
+}

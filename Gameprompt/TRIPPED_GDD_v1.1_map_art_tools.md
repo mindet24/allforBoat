@@ -197,7 +197,7 @@ Step():
   "routines": [
     { "owner": "Grandpa", "appliance": "heater", "socket": "L1", "startSec": 20, "durationSec": 20 }
   ],
-  "rulesOverride": { "sightDepth": 1 },
+  "rulesOverride": [ { "key": "sightDepth", "value": "1" } ],
   "scenarios": [
     { "name": "pump-breaker", "expect": "notFasterThanReference", "commands": [] }
   ]
@@ -205,7 +205,7 @@ Step():
 ```
 
 - `pos` = ตำแหน่งปลั๊กแนวนอนในห้อง 0..1 (ไม่มี = เรียงห่างเท่ากัน)
-- `rulesOverride` = ค่าใดๆ จาก `rules.json` ที่ด่านนี้ใช้ต่างจากค่ากลาง
+- `rulesOverride` = ค่าใดๆ จาก `rules.json` ที่ด่านนี้ใช้ต่างจากค่ากลาง · เป็น **รายการ key/value** (value เป็นข้อความ) เพราะ `JsonUtility` อ่าน object ที่ key ไม่ตายตัวไม่ได้ และแยก "ไม่ได้ใส่" กับ "ใส่ 0" ไม่ออก
 - `scenarios` = สถานการณ์ทดสอบเพิ่มเติมที่ Run Sim รันทุกครั้ง (ทางแก้ทางเลือก กับดัก ปั๊ม) พร้อมผลที่คาดหวัง
 - คำสั่งใน `reference` เพิ่ม `move(a=ห้อง)` และ `door(a=Door)` · คำสั่งหลัง tick 0 = "สั่งตอนนี้" ตัวละครเดินไปทำเอง
 - ด่านที่ไม่มี `rooms[].x/width/floor` หรือ `doors` → สร้างอัตโนมัติ: ชั้นเดียว กว้าง 6 ม. Door เปิดระหว่างห้องที่ติดกันในลำดับ (ไฟล์ v1.0 จึงโหลดได้ทันที)
@@ -353,7 +353,7 @@ Step():
 | `Assets/TRIPPED/Resources/Levels/level{n}.json` | A | Sim | ด่าน + `rulesOverride` + `scenarios` |
 | `TrippedViewConfig.asset` (ScriptableObject) | B | View | สี (3.3) · กล้อง (2.6) · ขนาด UI · ความดังเสียง · fps แอนิเมชัน · สลับ placeholder/อาร์ตจริง |
 
-ซิมเป็น C# ล้วนไม่มี UnityEngine (D1) จึงอ่านเป็นสตริง JSON ที่ชั้น Game ส่งให้ · ค่าฝั่งภาพใช้ ScriptableObject เพื่อแก้ใน Inspector ตอน Play ได้สด
+ซิมเป็น C# ล้วนไม่มี UnityEngine (D1) จึงรับข้อมูลเป็นออบเจกต์ที่ชั้น Game/Editor อ่านจาก JSON แล้ว · ค่าฝั่งภาพใช้ ScriptableObject เพื่อแก้ใน Inspector ตอน Play ได้สด
 
 ### 4.3 Level Editor (`Tools > TRIPPED > Level Editor`) — เจ้าของ A
 
@@ -405,7 +405,9 @@ Assets/TRIPPED/
 
 | กติกา | รายละเอียด |
 | --- | --- |
-| สัญญา | **API ของ `HouseSim`** (8.4 ของ v1.0 + ตัวละคร + Sight) · A ส่ง **stub ที่คอมไพล์ได้** ภายใน **23 ต.ค. 11:00** · เปลี่ยน API หลังจากนั้นต้องบอกอีกฝ่ายก่อน |
+| สัญญา | **API สาธารณะของ `HouseSim`** ใน `Assets/TRIPPED/Scripts/Sim/` คือสัญญา (มาแทน 8.4 ของ v1.0) · เปลี่ยน API ต้องบอกอีกฝ่ายก่อน |
+| คำสั่งผู้เล่น | **`Submit(Command, out string reason)` เมธอดเดียว** แทน `TryApply` + `Enqueue` ของ v1.0 · ซิมตัดสินเองว่าทำทันที (ช่วงวางแผน) หรือเข้าคิวตัวละคร · View เรียก `Start()` ตอนกด Space ครั้งแรก และ `SetPaused()` หลังจากนั้น |
+| โหลดข้อมูล | ชั้น Game/Editor อ่าน JSON ด้วย `JsonUtility` เป็น `LevelData`, `RulesConfig`, `CatalogData` แล้วส่งให้ `new HouseSim(level, rules, new Catalog(catalog))` |
 | แก้ไฟล์ของอีกฝ่าย | ห้าม ถ้าต้องการให้ขอ |
 | สถานะซิม | B ห้ามแก้เอง ส่งผ่าน `Command` เท่านั้น (D8) |
 | คลิกในโลก 3D | `PhysicsRaycaster` + `BoxCollider` เพื่อคลิกเท่านั้น ไม่มีฟิสิกส์ |
