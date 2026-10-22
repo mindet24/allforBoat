@@ -118,7 +118,7 @@ namespace Trouble.Sim
     /// <summary>
     /// One scripted player command. tick -1 = applied during planning.
     /// cmd: plug(a=appliance, b=socket), unplug(a), on(a), off(a), breaker(a=circuit),
-    /// cord(a=source socket, b=room), uncord(a=cord socket), door(a=door), move(a=room).
+    /// cord(a=source socket, b=room), uncord(a=cord socket), door(a=door), move(a=room), cancel(a=queue index).
     /// </summary>
     [Serializable]
     public sealed class CommandData
@@ -127,6 +127,8 @@ namespace Trouble.Sim
         public string cmd = "";
         public string a = "";
         public string b = "";
+        /// <summary>true = clears the character's queue first (a plain click). false = joins the end (Shift+click), the default for scripts.</summary>
+        public bool replace;
     }
 
     /// <summary>An extra run that the Level Editor's Run Sim checks, with the result it expects.</summary>

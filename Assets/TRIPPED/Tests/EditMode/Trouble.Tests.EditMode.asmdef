@@ -3,6 +3,7 @@
     "rootNamespace": "Trouble.Tests",
     "references": [
         "Trouble.Sim",
+        "Trouble.Editor",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

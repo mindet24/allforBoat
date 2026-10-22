@@ -146,6 +146,9 @@ namespace Trouble.Sim
                     case "move":
                         if (!n.Rooms.Contains(c.a)) errors.Add($"{what} unknown room '{c.a}'.");
                         break;
+                    case "cancel":
+                        if (!int.TryParse(c.a, out int index) || index < 0) errors.Add($"{what} needs a queue position (0, 1, 2...).");
+                        break;
                     default:
                         errors.Add($"{what} is not a command.");
                         break;

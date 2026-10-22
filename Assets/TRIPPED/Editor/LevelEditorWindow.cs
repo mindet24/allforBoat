@@ -452,12 +452,13 @@ namespace Trouble.EditorTools
         private void DrawSolutions()
         {
             EditorGUILayout.HelpBox("Script format: commands separated by ';', each 'tick cmd a [b]'. tick -1 = during planning.\n" +
-                                    "cmd: plug, unplug, on, off, breaker, cord, uncord, door, move.\n" +
+                                    "cmd: plug, unplug, on, off, breaker, cord, uncord, door, move, cancel.\n" +
+                                    "Commands join the end of the character's queue; '!' before cmd clears the queue first (a plain click).\n" +
                                     "Example: -1 plug kettle K1; 0 on kettle; 80 on toaster", MessageType.None);
             _script = EditorGUILayout.TextArea(_script, GUILayout.MinHeight(60));
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button("Show reference as script")) _script = ToScript(_level.level.reference);
+                if (GUILayout.Button("Show reference as script")) _script = Replay.ToScript(_level.level.reference, ";\n");
                 if (GUILayout.Button("Replace reference with script") && TryParse(out var commands))
                 {
                     Undo.RecordObject(_level, "Replace reference");
@@ -493,13 +494,6 @@ namespace Trouble.EditorTools
                 commands = null;
                 return false;
             }
-        }
-
-        private static string ToScript(List<CommandData> commands)
-        {
-            var parts = new List<string>();
-            foreach (var c in commands) parts.Add($"{c.tick} {c.cmd} {c.a}{(string.IsNullOrEmpty(c.b) ? "" : " " + c.b)}");
-            return string.Join(";\n", parts);
         }
 
         // ---- Global --------------------------------------------------------------------

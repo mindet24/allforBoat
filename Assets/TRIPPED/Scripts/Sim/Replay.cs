@@ -67,6 +67,7 @@ namespace Trouble.Sim
         /// <summary>
         /// Reads a short script: commands separated by ';', each "tick cmd a [b]".
         /// Example: "-1 plug kettle K1; 0 on kettle; 80 on toaster".
+        /// A '!' before the cmd word marks a command that replaces the character's queue ("12 !on kettle").
         /// </summary>
         /// <exception cref="FormatException">A command has the wrong shape.</exception>
         public static List<CommandData> Parse(string script)
@@ -78,18 +79,20 @@ namespace Trouble.Sim
                 if (words.Length == 0) continue;
                 if (words.Length < 3 || words.Length > 4 || !int.TryParse(words[0], out int tick))
                     throw new FormatException($"Expected 'tick cmd a [b]' but got '{part.Trim()}'.");
-                list.Add(new CommandData { tick = tick, cmd = words[1], a = words[2], b = words.Length == 4 ? words[3] : "" });
+                bool replace = words[1].StartsWith("!", StringComparison.Ordinal);
+                list.Add(new CommandData { tick = tick, cmd = replace ? words[1].Substring(1) : words[1], a = words[2], b = words.Length == 4 ? words[3] : "", replace = replace });
             }
             return list;
         }
 
         /// <summary>
         /// Turns one scripted command (see <see cref="CommandData"/>) into a sim command. Scripts are sequences,
-        /// so by default each command joins the end of the character's queue instead of replacing it.
+        /// so a command joins the end of the character's queue unless it is marked <see cref="CommandData.replace"/>.
         /// </summary>
         /// <exception cref="ArgumentException">Unknown cmd word.</exception>
-        public static Command ToCommand(CommandData d, bool append = true)
+        public static Command ToCommand(CommandData d)
         {
+            bool append = !d.replace;
             switch (d.cmd)
             {
                 case "plug": return Command.Plug(d.a, d.b, append);
@@ -101,8 +104,40 @@ namespace Trouble.Sim
                 case "uncord": return Command.RemoveCord(d.a, append);
                 case "door": return Command.ToggleDoor(d.a, append);
                 case "move": return Command.MoveTo(d.a, append);
+                case "cancel": return Command.CancelAction(int.Parse(d.a));
                 default: throw new ArgumentException($"Unknown command '{d.cmd}'.");
             }
+        }
+
+        /// <summary>The scripted form of a sim command, as given at <paramref name="tick"/> (-1 = planning).</summary>
+        public static CommandData ToData(Command c, int tick)
+        {
+            var d = new CommandData { tick = tick, a = c.A, b = c.B, replace = !c.Append };
+            switch (c.Type)
+            {
+                case CommandType.Plug: d.cmd = "plug"; break;
+                case CommandType.Unplug: d.cmd = "unplug"; break;
+                case CommandType.SetSwitch: d.cmd = c.On ? "on" : "off"; break;
+                case CommandType.ToggleBreaker: d.cmd = "breaker"; break;
+                case CommandType.PlaceCord: d.cmd = "cord"; break;
+                case CommandType.RemoveCord: d.cmd = "uncord"; break;
+                case CommandType.ToggleDoor: d.cmd = "door"; break;
+                case CommandType.MoveTo: d.cmd = "move"; break;
+                case CommandType.CancelAction: d.cmd = "cancel"; d.a = c.Index.ToString(); d.replace = false; break;
+            }
+            return d;
+        }
+
+        /// <summary>
+        /// The short script form read by <see cref="Parse"/>. A command that replaces the queue is written
+        /// with a leading '!' on its cmd word, e.g. "12 !on kettle".
+        /// </summary>
+        public static string ToScript(IEnumerable<CommandData> commands, string separator = "; ")
+        {
+            var parts = new List<string>();
+            foreach (var c in commands)
+                parts.Add($"{c.tick} {(c.replace ? "!" : "")}{c.cmd} {c.a}{(string.IsNullOrEmpty(c.b) ? "" : " " + c.b)}");
+            return string.Join(separator, parts);
         }
 
         /// <summary>

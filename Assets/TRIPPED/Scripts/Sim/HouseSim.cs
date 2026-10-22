@@ -151,6 +151,22 @@ namespace Trouble.Sim
         /// <returns>false if the command was refused now; state did not change.</returns>
         public bool Submit(Command command, out string reason)
         {
+            bool accepted = SubmitInternal(command, out reason);
+            if (accepted) _recorded.Add(Replay.ToData(command, Phase == LevelPhase.Planning ? -1 : Now));
+            return accepted;
+        }
+
+        /// <summary>
+        /// Every command the sim accepted, with the tick it was given at (-1 = planning). Played back with
+        /// <see cref="Replay.Run"/> on a fresh sim of the same level and rules, it gives the same game.
+        /// Use it to turn a hand-played run into a reference solution or scenario.
+        /// </summary>
+        public IReadOnlyList<CommandData> Recorded => _recorded;
+
+        private readonly List<CommandData> _recorded = new List<CommandData>();
+
+        private bool SubmitInternal(Command command, out string reason)
+        {
             reason = "";
             if (Phase == LevelPhase.Won || Phase == LevelPhase.Lost)
                 return Reject("reject_level_over", out reason);
