@@ -1,0 +1,32 @@
+{
+    "entries": [
+        { "key": "trip", "text": "Breaker {id} ({label}) tripped: {terms} = {sum} > {cap}" },
+        { "key": "main_trip", "text": "MAIN breaker tripped: whole house {sum} > {cap}" },
+        { "key": "lost_deadline", "text": "{owner}'s {appliance} wasn't done by {time}." },
+        { "key": "lost_fridge", "text": "The fridge was off for more than {n} s. The food spoiled." },
+        { "key": "lost_day", "text": "The day is over." },
+        { "key": "save_lost", "text": "{owner}'s save was lost!" },
+        { "key": "label_wrong", "text": "The label was wrong! This socket is on Breaker {id}." },
+        { "key": "won", "text": "Everyone's happy! Finished at {time}." },
+        { "key": "pause_hint", "text": "PAUSED — plan, then press SPACE" },
+        { "key": "intro_line", "text": "Get everyone's requests done without wrecking the house." },
+
+        { "key": "reject_not_yours", "text": "That belongs to someone else." },
+        { "key": "reject_socket_in_use", "text": "Socket in use." },
+        { "key": "reject_reserved", "text": "Reserved for {owner}'s {appliance}." },
+        { "key": "reject_cord_here", "text": "A cord is plugged in here." },
+        { "key": "reject_wrong_room", "text": "{owner} needs it in the {room}." },
+        { "key": "reject_cant_unplug", "text": "Can't unplug that." },
+        { "key": "reject_unpause_switch", "text": "Unpause to switch." },
+        { "key": "reject_plug_first", "text": "Plug it in first." },
+        { "key": "reject_already_done", "text": "Already done." },
+        { "key": "reject_unpause_breaker", "text": "Unpause to flip breakers." },
+        { "key": "reject_no_cords", "text": "No cords left." },
+        { "key": "reject_cord_source", "text": "Can't run a cord from there." },
+        { "key": "reject_cord_too_far", "text": "Too far. Cords only reach the next room." },
+        { "key": "reject_not_a_cord", "text": "That isn't a cord." },
+        { "key": "reject_unknown", "text": "Nothing to do there." },
+        { "key": "reject_level_over", "text": "The level is over." },
+        { "key": "reject_not_implemented", "text": "Not implemented yet." }
+    ]
+}

@@ -1,0 +1,244 @@
+{
+  "id": 5,
+  "title": "Everyone's Home",
+  "teaches": "The whole house has a limit too",
+  "intro": "Saturday. Everyone is home. The main breaker has opinions.",
+  "dayLengthSec": 80,
+  "mainCapacity": 20,
+  "fridgeSocket": "K3",
+  "fridgeSpoilSec": 10,
+  "lampCount": 1,
+  "cordCount": 2,
+  "rooms": [
+    {
+      "id": "bedroom",
+      "name": "Bedroom"
+    },
+    {
+      "id": "bathroom",
+      "name": "Bathroom"
+    },
+    {
+      "id": "kitchen",
+      "name": "Kitchen"
+    },
+    {
+      "id": "laundry",
+      "name": "Laundry"
+    }
+  ],
+  "circuits": [
+    {
+      "id": "A",
+      "label": "KITCHEN",
+      "capacity": 10
+    },
+    {
+      "id": "B",
+      "label": "BEDROOM",
+      "capacity": 10
+    },
+    {
+      "id": "C",
+      "label": "BATHROOM",
+      "capacity": 10
+    },
+    {
+      "id": "D",
+      "label": "LAUNDRY",
+      "capacity": 10
+    }
+  ],
+  "sockets": [
+    {
+      "id": "BR1",
+      "room": "bedroom",
+      "circuit": "B",
+      "assumed": "",
+      "revealed": true
+    },
+    {
+      "id": "BR2",
+      "room": "bedroom",
+      "circuit": "B",
+      "assumed": "",
+      "revealed": true
+    },
+    {
+      "id": "BR3",
+      "room": "bedroom",
+      "circuit": "C",
+      "assumed": "",
+      "revealed": false
+    },
+    {
+      "id": "BA1",
+      "room": "bathroom",
+      "circuit": "C",
+      "assumed": "",
+      "revealed": true
+    },
+    {
+      "id": "K1",
+      "room": "kitchen",
+      "circuit": "A",
+      "assumed": "",
+      "revealed": true
+    },
+    {
+      "id": "K2",
+      "room": "kitchen",
+      "circuit": "A",
+      "assumed": "",
+      "revealed": true
+    },
+    {
+      "id": "K3",
+      "room": "kitchen",
+      "circuit": "A",
+      "assumed": "",
+      "revealed": true
+    },
+    {
+      "id": "LA1",
+      "room": "laundry",
+      "circuit": "D",
+      "assumed": "",
+      "revealed": true
+    },
+    {
+      "id": "LA2",
+      "room": "laundry",
+      "circuit": "D",
+      "assumed": "",
+      "revealed": true
+    }
+  ],
+  "requests": [
+    {
+      "owner": "Kid",
+      "appliance": "console",
+      "room": "bedroom",
+      "durationSec": 30,
+      "dueSec": 75
+    },
+    {
+      "owner": "Teen",
+      "appliance": "phone",
+      "room": "bedroom",
+      "durationSec": 20,
+      "dueSec": 60
+    },
+    {
+      "owner": "Mum",
+      "appliance": "kettle",
+      "room": "kitchen",
+      "durationSec": 8,
+      "dueSec": 30
+    },
+    {
+      "owner": "Dad",
+      "appliance": "microwave",
+      "room": "kitchen",
+      "durationSec": 12,
+      "dueSec": 40
+    },
+    {
+      "owner": "Sis",
+      "appliance": "dryer",
+      "room": "bathroom",
+      "durationSec": 10,
+      "dueSec": 45
+    },
+    {
+      "owner": "Gran",
+      "appliance": "washer",
+      "room": "laundry",
+      "durationSec": 30,
+      "dueSec": 75
+    }
+  ],
+  "routines": [
+    {
+      "owner": "Grandpa",
+      "appliance": "ac",
+      "socket": "BR2",
+      "startSec": 40,
+      "durationSec": 30
+    }
+  ],
+  "reference": [
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "kettle",
+      "b": "K1"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "console",
+      "b": "BR1"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "phone",
+      "b": "BR3"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "washer",
+      "b": "LA1"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "microwave",
+      "b": "K2"
+    },
+    {
+      "tick": -1,
+      "cmd": "plug",
+      "a": "dryer",
+      "b": "BA1"
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "kettle",
+      "b": ""
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "console",
+      "b": ""
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "phone",
+      "b": ""
+    },
+    {
+      "tick": 0,
+      "cmd": "on",
+      "a": "washer",
+      "b": ""
+    },
+    {
+      "tick": 80,
+      "cmd": "on",
+      "a": "microwave",
+      "b": ""
+    },
+    {
+      "tick": 200,
+      "cmd": "on",
+      "a": "dryer",
+      "b": ""
+    }
+  ]
+}

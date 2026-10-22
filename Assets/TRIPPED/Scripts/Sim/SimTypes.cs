@@ -48,6 +48,10 @@ namespace Trouble.Sim
         public int Load { get; internal set; }
         /// <summary>Overload counter. The breaker trips when it reaches RulesConfig.overTripTicks.</summary>
         public int OverTicks { get; internal set; }
+        /// <summary>Load is above capacity this tick.</summary>
+        public bool Overloading { get; internal set; }
+
+        internal int CoolTicks;
     }
 
     public sealed class SocketState

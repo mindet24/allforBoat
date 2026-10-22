@@ -42,6 +42,10 @@ namespace Trouble.Sim
     public struct SimEvent
     {
         public SimEventType Type;
+        /// <summary>
+        /// The tick being processed when the event happened (a trip "at tick 9").
+        /// LevelWon, LevelLost and FridgeSpoiled come after the clock moves, so theirs is the end tick.
+        /// </summary>
         public int Tick;
         public string Circuit;
         public string Socket;
