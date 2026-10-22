@@ -9,8 +9,9 @@ namespace Trouble.Sim
     /// Tick order: GDD v1.0 §3.4 with the v1.1 changes in §2.8–2.9.
     /// </summary>
     /// <remarks>
-    /// Not yet implemented: walking (MoveTo, CancelAction, action queue) and Sight. Until then every
-    /// action happens without walking and every room counts as visible.
+    /// Outside planning, every player command goes into the character's action queue: the character walks
+    /// to the right room, spends <see cref="RulesConfig.interactTicks"/>, then the command is checked and applied.
+    /// The character's position and Sight are sim state on purpose (docs/architecture/adr-0001).
     /// </remarks>
     public sealed class HouseSim
     {
@@ -27,8 +28,10 @@ namespace Trouble.Sim
         private readonly List<RequestState> _requests = new List<RequestState>();
         private readonly List<RoutineState> _routines = new List<RoutineState>();
 
-        private readonly List<Command> _queued = new List<Command>();
         private readonly List<SimEvent> _events = new List<SimEvent>();
+        /// <summary>Rooms still to walk through after the current segment, for the action at the front of the queue.</summary>
+        private readonly List<string> _path = new List<string>();
+        private readonly HashSet<string> _visibleBefore = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<SimEvent> _pending = new List<SimEvent>();
         private readonly HashSet<string> _prevPowered = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _lostPowerByCommand = new HashSet<string>(StringComparer.Ordinal);
@@ -122,10 +125,12 @@ namespace Trouble.Sim
 
         // ---- control -------------------------------------------------------------------
 
-        /// <summary>Planning → Running. Called once, when the player first presses Space.</summary>
+        /// <summary>Planning → Running. Called once, when the player first presses Space. Sight narrows to the character from here on.</summary>
         public void Start()
         {
-            if (Phase == LevelPhase.Planning) Phase = LevelPhase.Running;
+            if (Phase != LevelPhase.Planning) return;
+            Phase = LevelPhase.Running;
+            UpdateSight();
         }
 
         /// <summary>Running ↔ Paused. Ignored in Planning, Won and Lost.</summary>
@@ -137,9 +142,10 @@ namespace Trouble.Sim
 
         /// <summary>
         /// Hands a player command to the sim.
-        /// Planning: happens at once (breakers are refused; switches only when planningIsFree).
-        /// Paused: plugging, cords and doors happen at once; switches and breakers wait for the next tick.
-        /// Running: waits for the start of the next tick. If it is refused then, a CommandRejected event says why.
+        /// Planning with planningIsFree: happens at once, no walking (breakers and walking are refused).
+        /// Otherwise: goes into the character's queue (replacing it unless <see cref="Command.Append"/>); the
+        /// character walks there and does it while time runs. If it is refused then, a CommandRejected event says why.
+        /// CancelAction removes one queued action at once.
         /// </summary>
         /// <param name="reason">Rejection text for the toast when this returns false.</param>
         /// <returns>false if the command was refused now; state did not change.</returns>
@@ -148,20 +154,49 @@ namespace Trouble.Sim
             reason = "";
             if (Phase == LevelPhase.Won || Phase == LevelPhase.Lost)
                 return Reject("reject_level_over", out reason);
-            if (command.Type == CommandType.MoveTo || command.Type == CommandType.CancelAction)
-                return Reject("reject_not_implemented", out reason);
+            if (command.Type == CommandType.CancelAction)
+                return CancelAction(command.Index, out reason);
 
-            bool waitsForTick = Phase == LevelPhase.Running
-                || (Phase == LevelPhase.Paused && (command.Type == CommandType.SetSwitch || command.Type == CommandType.ToggleBreaker));
-            if (waitsForTick)
+            if (Phase == LevelPhase.Planning && Rules.planningIsFree)
             {
-                _queued.Add(command);
-                return true;
+                if (command.Type == CommandType.ToggleBreaker) return Reject("reject_unpause_breaker", out reason);
+                if (command.Type == CommandType.MoveTo) return Reject("reject_unpause_walk", out reason);
+                bool ok = Apply(command, out reason);
+                if (ok)
+                {
+                    RecomputePower();
+                    UpdateSight();
+                }
+                return ok;
             }
 
-            bool ok = Apply(command, out reason);
-            if (ok) RecomputePower();
-            return ok;
+            var queue = Character.QueueList;
+            if (!command.Append) ClearQueue();
+            else if (queue.Count >= Rules.actionQueueSize) return Reject("reject_queue_full", out reason);
+            queue.Add(new CharacterAction { Command = command });
+            return true;
+        }
+
+        private bool CancelAction(int index, out string reason)
+        {
+            var queue = Character.QueueList;
+            if (index < 0 || index >= queue.Count) return Reject("reject_unknown", out reason);
+            if (index == 0)
+            {
+                // The character finishes the door it is in, then stops.
+                _path.Clear();
+                Character.InteractTicksLeft = 0;
+            }
+            queue.RemoveAt(index);
+            reason = "";
+            return true;
+        }
+
+        private void ClearQueue()
+        {
+            Character.QueueList.Clear();
+            _path.Clear();
+            Character.InteractTicksLeft = 0;
         }
 
         /// <summary>
@@ -188,16 +223,10 @@ namespace Trouble.Sim
 
         private void StepInternal()
         {
-            // 1. Queued commands, in the order they arrived.
-            for (int i = 0; i < _queued.Count; i++)
-            {
-                var cmd = _queued[i];
-                if (!Apply(cmd, out var reason))
-                    Emit(new SimEvent { Type = SimEventType.CommandRejected, Message = reason, Command = cmd });
-            }
-            _queued.Clear();
+            // 1–2. Player commands are already in the character's queue; the character walks and acts.
+            CharacterTick();
 
-            // 2. Routines switch themselves on and off.
+            // 3. Routines switch themselves on and off.
             foreach (var r in _routines)
             {
                 var app = FindAppliance(r.ApplianceId);
@@ -205,10 +234,10 @@ namespace Trouble.Sim
                 if (Now == r.EndTick) app.SwitchedOn = false;
             }
 
-            // 3. Loads.
+            // 4. Loads.
             RecomputePower();
 
-            // 4. Each breaker, in id order.
+            // 5. Each breaker, in id order.
             foreach (var c in _circuitsById)
             {
                 bool over = c.IsOn && c.Load > c.Capacity;
@@ -219,7 +248,7 @@ namespace Trouble.Sim
                 if (trip) TripCircuit(c);
             }
 
-            // 5. Main breaker, on the load of the circuits still ON.
+            // 6. Main breaker, on the load of the circuits still ON.
             if (MainCapacity > 0)
             {
                 int total = 0;
@@ -238,7 +267,7 @@ namespace Trouble.Sim
 
             RecomputePower();
 
-            // 6. Lost power since the last tick.
+            // 7. Lost power since the last tick.
             foreach (var app in _appliancesById)
             {
                 bool lost = (_prevPowered.Contains(app.Id) && !app.Powered) || _lostPowerByCommand.Contains(app.Id);
@@ -251,7 +280,7 @@ namespace Trouble.Sim
             }
             _lostPowerByCommand.Clear();
 
-            // 7. Progress.
+            // 8. Progress.
             foreach (var app in _appliancesById)
             {
                 if (!app.Powered) continue;
@@ -270,18 +299,18 @@ namespace Trouble.Sim
             foreach (var app in _appliances)
                 if (app.Powered) _prevPowered.Add(app.Id);
 
-            // 8. Fridge.
+            // 9. Fridge.
             var fridge = FindAppliance(FridgeId);
             if (fridge != null && !fridge.Powered) SpoilTicks++;
 
-            // 9. Sight and reveals that need it.
+            // 10. Sight, and reveals that need it.
             UpdateSight();
             if (Rules.revealRequiresSight) RevealSeenDeadSockets();
 
-            // 10. Time.
+            // 11. Time.
             Now++;
 
-            // 11. Lose, checked before win.
+            // 12. Lose, checked before win (fridge, then deadline, then day).
             if (fridge != null && SpoilTicks > SpoilLimitTicks)
             {
                 Emit(new SimEvent { Type = SimEventType.FridgeSpoiled, Appliance = FridgeId });
@@ -302,7 +331,7 @@ namespace Trouble.Sim
                 return;
             }
 
-            // 12. Win.
+            // 13. Win.
             foreach (var req in _requests)
                 if (!req.Done) return;
             Phase = LevelPhase.Won;
@@ -422,7 +451,8 @@ namespace Trouble.Sim
                 case CommandType.PlaceCord: ok = ApplyPlaceCord(cmd.A, cmd.B, out reason); break;
                 case CommandType.RemoveCord: ok = ApplyRemoveCord(cmd.A, out reason); break;
                 case CommandType.ToggleDoor: ok = ApplyDoor(cmd.A, out reason); break;
-                default: ok = Reject("reject_not_implemented", out reason); break;
+                case CommandType.MoveTo: ok = FindRoom(cmd.A) != null || Reject("reject_no_path", out reason); break;
+                default: ok = Reject("reject_unknown", out reason); break;
             }
             if (ok) NoteLostPower();
             return ok;
@@ -850,15 +880,280 @@ namespace Trouble.Sim
             Character.ToRoomId = start;
         }
 
+        // ---- character -----------------------------------------------------------------
+
+        /// <summary>
+        /// One tick of the character (v1.1 §2.2). Walking or interacting spends the tick. Actions that take no
+        /// time (interactTicks 0, nothing to walk) chain within the tick, so several can happen at once.
+        /// </summary>
+        private void CharacterTick()
+        {
+            var ch = Character;
+            var queue = ch.QueueList;
+            // Each pass spends the tick (return), removes an action, or arrives at no cost (then the next
+            // pass removes an action), so two passes per action is enough.
+            int passes = 2 * queue.Count + 2;
+            for (int pass = 0; pass < passes; pass++)
+            {
+                if (ch.IsWalking)
+                {
+                    WalkOneTick();
+                    return;
+                }
+                if (queue.Count == 0) return;
+
+                var head = queue[0];
+                if (head.TargetRoomId == null) head.TargetRoomId = TargetRoomOf(head.Command);
+
+                if (ch.RoomId != head.TargetRoomId)
+                {
+                    if (!PlanPath(ch.RoomId, head.TargetRoomId))
+                    {
+                        queue.RemoveAt(0);
+                        Emit(new SimEvent { Type = SimEventType.CommandRejected, Message = _strings.Get("reject_no_path"), Command = head.Command });
+                        continue;
+                    }
+                    StartNextSegment();
+                    if (ch.IsWalking)
+                    {
+                        WalkOneTick();
+                        return;
+                    }
+                    continue; // the whole way cost nothing
+                }
+
+                if (!head.Started)
+                {
+                    head.Started = true;
+                    // Walking somewhere is done on arrival; everything else takes hands-on time.
+                    ch.InteractTicksLeft = head.Command.Type == CommandType.MoveTo ? 0 : Rules.interactTicks;
+                }
+                if (ch.InteractTicksLeft > 0) ch.InteractTicksLeft--;
+                if (ch.InteractTicksLeft > 0) return;
+
+                queue.RemoveAt(0);
+                if (Apply(head.Command, out var reason))
+                    Emit(new SimEvent { Type = SimEventType.ActionDone, Command = head.Command, Room = ch.RoomId });
+                else
+                    Emit(new SimEvent { Type = SimEventType.CommandRejected, Message = reason, Command = head.Command });
+                if (Rules.interactTicks > 0 && head.Command.Type != CommandType.MoveTo) return;
+            }
+        }
+
+        /// <summary>The room the character has to be in to do this command.</summary>
+        private string TargetRoomOf(Command cmd)
+        {
+            string here = Character.RoomId;
+            switch (cmd.Type)
+            {
+                case CommandType.Plug:
+                    return FindSocket(cmd.B)?.RoomId ?? here;
+                case CommandType.Unplug:
+                case CommandType.SetSwitch:
+                {
+                    var app = FindAppliance(cmd.A);
+                    return app != null && app.SocketId.Length > 0 ? FindSocket(app.SocketId).RoomId : here;
+                }
+                case CommandType.ToggleBreaker:
+                    return PanelRoomId;
+                case CommandType.PlaceCord:
+                case CommandType.RemoveCord:
+                    return FindSocket(cmd.A)?.RoomId ?? here;
+                case CommandType.ToggleDoor:
+                {
+                    var door = FindDoor(cmd.A);
+                    if (door == null || here == door.RoomA || here == door.RoomB) return here;
+                    return PathCost(here, door.RoomA) <= PathCost(here, door.RoomB) ? door.RoomA : door.RoomB;
+                }
+                case CommandType.MoveTo:
+                    return FindRoom(cmd.A) != null ? cmd.A : here;
+                default:
+                    return here;
+            }
+        }
+
+        private void WalkOneTick()
+        {
+            var ch = Character;
+            ch.SegmentElapsed++;
+            if (ch.RoomId != ch.ToRoomId && ch.SegmentElapsed * 2 >= ch.SegmentTicks) EnterRoom(ch.ToRoomId);
+            if (ch.SegmentElapsed < ch.SegmentTicks) return;
+            ch.IsWalking = false;
+            ch.SegmentDoorId = "";
+            if (_path.Count > 0) StartNextSegment();
+        }
+
+        /// <summary>
+        /// Starts walking to the next room on the path. Opens a closed door on the way (it stays open, R21).
+        /// Segments that cost nothing are crossed at once.
+        /// </summary>
+        private void StartNextSegment()
+        {
+            var ch = Character;
+            while (_path.Count > 0)
+            {
+                string next = _path[0];
+                _path.RemoveAt(0);
+                var door = BestDoor(ch.RoomId, next, out int ticks);
+                if (!door.IsOpen && !door.IsStairs)
+                {
+                    door.IsOpen = true;
+                    Emit(new SimEvent { Type = SimEventType.DoorToggled, Door = door.Id });
+                }
+
+                ch.FromRoomId = ch.RoomId;
+                ch.ToRoomId = next;
+                ch.SegmentDoorId = door.Id;
+                ch.SegmentTicks = ticks;
+                ch.SegmentElapsed = 0;
+                if (ticks > 0)
+                {
+                    ch.IsWalking = true;
+                    return;
+                }
+                EnterRoom(next);
+                ch.SegmentDoorId = "";
+            }
+            ch.IsWalking = false;
+        }
+
+        private void EnterRoom(string roomId)
+        {
+            Character.RoomId = roomId;
+            Emit(new SimEvent { Type = SimEventType.CharacterEnteredRoom, Room = roomId });
+        }
+
+        /// <summary>Fills <see cref="_path"/> with the quickest way from one room to another. False if there is none.</summary>
+        private bool PlanPath(string from, string to)
+        {
+            _path.Clear();
+            var previous = ShortestPaths(from, out var cost);
+            if (!cost.ContainsKey(to)) return false;
+            for (string room = to; room != from; room = previous[room]) _path.Insert(0, room);
+            return true;
+        }
+
+        /// <summary>Ticks to walk from one room to another, or int.MaxValue if unreachable.</summary>
+        private int PathCost(string from, string to)
+        {
+            ShortestPaths(from, out var cost);
+            return cost.TryGetValue(to, out int c) ? c : int.MaxValue;
+        }
+
+        /// <summary>Dijkstra over rooms. Ties go to the room that comes first in the level, so results never vary.</summary>
+        private Dictionary<string, string> ShortestPaths(string from, out Dictionary<string, int> cost)
+        {
+            cost = new Dictionary<string, int>(StringComparer.Ordinal) { [from] = 0 };
+            var previous = new Dictionary<string, string>(StringComparer.Ordinal);
+            var done = new HashSet<string>(StringComparer.Ordinal);
+            while (true)
+            {
+                string current = null;
+                foreach (var room in _rooms)
+                    if (!done.Contains(room.Id) && cost.ContainsKey(room.Id) && (current == null || cost[room.Id] < cost[current]))
+                        current = room.Id;
+                if (current == null) return previous;
+                done.Add(current);
+                foreach (var door in _doors)
+                {
+                    if (door.RoomA != current && door.RoomB != current) continue;
+                    string other = door.OtherRoom(current);
+                    int c = cost[current] + SegmentCost(door, current, other);
+                    if (!cost.TryGetValue(other, out int known) || c < known)
+                    {
+                        cost[other] = c;
+                        previous[other] = current;
+                    }
+                }
+            }
+        }
+
+        /// <summary>The cheapest door between two rooms next to each other.</summary>
+        private DoorState BestDoor(string from, string to, out int ticks)
+        {
+            DoorState best = null;
+            ticks = int.MaxValue;
+            foreach (var door in _doors)
+            {
+                if (!((door.RoomA == from && door.RoomB == to) || (door.RoomA == to && door.RoomB == from))) continue;
+                int c = SegmentCost(door, from, to);
+                if (c < ticks)
+                {
+                    best = door;
+                    ticks = c;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>Walking time between two room centres through one door (v1.1 §2.2).</summary>
+        private int SegmentCost(DoorState door, string from, string to)
+        {
+            float distance = Math.Abs(FindRoom(from).CenterX - FindRoom(to).CenterX);
+            int ticks = (int)Math.Round(distance / Rules.walkSpeed * Rules.ticksPerSecond, MidpointRounding.AwayFromZero);
+            if (door.IsStairs) ticks += Rules.stairsTicks;
+            else if (!door.IsOpen) ticks += Rules.doorOpenTicks;
+            return ticks;
+        }
+
         // ---- sight ---------------------------------------------------------------------
 
-        /// <summary>Every room counts as visible until the character and Sight rules (v1.1 §2.3) are added.</summary>
+        /// <summary>
+        /// Works out which rooms the player can see (v1.1 §2.3) and remembers what was seen in them.
+        /// Planning shows the whole house; after that the character's room plus rooms through open doors,
+        /// up to sightDepth doors away.
+        /// </summary>
         private void UpdateSight()
         {
+            _visibleBefore.Clear();
+            foreach (var room in _rooms)
+                if (room.Visible) _visibleBefore.Add(room.Id);
+
+            if (Phase == LevelPhase.Planning)
+            {
+                foreach (var room in _rooms) room.Visible = true;
+            }
+            else
+            {
+                foreach (var room in _rooms) room.Visible = false;
+                var frontier = new List<string> { Character.RoomId };
+                FindRoom(Character.RoomId).Visible = true;
+                for (int depth = 0; depth < Rules.sightDepth && frontier.Count > 0; depth++)
+                {
+                    var next = new List<string>();
+                    foreach (var roomId in frontier)
+                    {
+                        foreach (var door in _doors)
+                        {
+                            if (door.RoomA != roomId && door.RoomB != roomId) continue;
+                            bool seeThrough = door.IsStairs ? Rules.sightThroughStairs : door.IsOpen;
+                            if (!seeThrough) continue;
+                            var other = FindRoom(door.OtherRoom(roomId));
+                            if (other.Visible) continue;
+                            other.Visible = true;
+                            next.Add(other.Id);
+                        }
+                    }
+                    frontier = next;
+                }
+            }
+
+            bool changed = false;
             foreach (var room in _rooms)
             {
-                room.Visible = true;
-                room.LastSeenTick = Now;
+                if (room.Visible) room.LastSeenTick = Now;
+                if (room.Visible != _visibleBefore.Contains(room.Id)) changed = true;
+            }
+            if (changed && _inStep) Emit(new SimEvent { Type = SimEventType.SightChanged });
+
+            foreach (var app in _appliances)
+            {
+                bool seen = app.SocketId.Length == 0 || IsRoomVisible(FindSocket(app.SocketId).RoomId);
+                if (!seen) continue;
+                app.SeenSocketId = app.SocketId;
+                app.SeenSwitchedOn = app.SwitchedOn;
+                app.SeenPowered = app.Powered;
+                app.SeenTick = Now;
             }
         }
 

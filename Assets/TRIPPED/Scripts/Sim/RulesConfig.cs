@@ -24,6 +24,7 @@ namespace Trouble.Sim
 
         /// <summary>Metres per second.</summary>
         public float walkSpeed = 3f;
+        /// <summary>Ticks an action takes once the character is in the right room; it happens on the last one. 0 = at once.</summary>
         public int interactTicks = 3;
         /// <summary>Extra ticks to walk through a closed door.</summary>
         public int doorOpenTicks = 5;

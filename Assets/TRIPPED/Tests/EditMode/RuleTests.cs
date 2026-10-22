@@ -270,11 +270,11 @@ namespace Trouble.Tests
         [Test]
         public void BreakerFlippedOffWithSightRule_RevealsTheSeenDeadSocket()
         {
-            // Arrange: same as above with the v1.1 reveal rule (every room is visible until Sight exists).
+            // Arrange: same as above with the v1.1 reveal rule; the lamp is in the character's room, so it is seen.
             var sim = new LevelBuilder().Room("a").Circuit("A", 10)
                 .Socket("A1", "a", "A", revealed: false).Socket("A2", "a", "A", revealed: false)
                 .Lamps(1).Request("Mum", "kettle", "a", LongSec, DueSec)
-                .Sim(TestData.V11Rules());
+                .Sim(TestData.Instant(TestData.V11Rules()));
 
             // Act
             var events = TestData.Play(sim, "-1 plug lamp1 A2; 0 on lamp1; 1 breaker A", 3);
@@ -406,21 +406,20 @@ namespace Trouble.Tests
         [Test]
         public void IllegalCommands_AreRejectedWithTheirMessageAndChangeNothing()
         {
-            // Arrange
-            var rules = TestData.V10Rules();
-            rules.planningIsFree = false;
+            // Arrange: free planning, where commands are checked at once.
+            // (v1.0 also refused switching while paused; v1.1 queues it instead — see CharacterTests.)
             var sim = new LevelBuilder().Room("kitchen").Room("living").Circuit("A", 10).Circuit("B", 10)
                 .Socket("K1", "kitchen", "A").Socket("L1", "living", "B").Socket("L2", "living", "B")
                 .Routine("Grandpa", "heater", "L1", 20f, 20f)
                 .Lamps(1).Request("Mum", "kettle", "kitchen", LongSec, DueSec)
-                .Sim(rules);
+                .Sim();
             sim.Submit(Command.Plug("lamp1", "K1"), out _);
 
             // Act + Assert
             AssertRejected(sim, Command.Plug("kettle", "L1"), "Reserved for Grandpa's Space heater.");
             AssertRejected(sim, Command.Plug("kettle", "L2"), "Mum needs it in the kitchen.");
             AssertRejected(sim, Command.Plug("kettle", "K1"), "Socket in use.");
-            AssertRejected(sim, Command.SetSwitch("lamp1", true), "Unpause to switch.");
+            AssertRejected(sim, Command.SetSwitch("kettle", true), "Plug it in first.");
             AssertRejected(sim, Command.ToggleBreaker("A"), "Unpause to flip breakers.");
             AssertRejected(sim, Command.Unplug("heater"), "Can't unplug that.");
             Assert.AreEqual("", sim.FindAppliance("kettle").SocketId);
@@ -455,7 +454,7 @@ namespace Trouble.Tests
         public void FragileSwitchedOffAndOnInOneTick_StillLosesProgress()
         {
             // Arrange
-            var sim = OneRoom().Request("Kid", "console", "a", LongSec, DueSec).Sim(TestData.V11Rules());
+            var sim = OneRoom().Request("Kid", "console", "a", LongSec, DueSec).Sim(TestData.Instant(TestData.V11Rules()));
 
             // Act: off and back on within tick 20.
             var events = TestData.Play(sim, "-1 plug console A1; 0 on console; 20 off console; 20 on console", 21);
@@ -470,7 +469,7 @@ namespace Trouble.Tests
         {
             // Arrange: 10 > 8. The player flips A off on the 10th overloaded tick and straight back on.
             var sim = OneRoom(8).Request("Mum", "kettle", "a", LongSec, DueSec).Request("Dad", "toaster", "a", LongSec, DueSec)
-                .Sim(TestData.V11Rules());
+                .Sim(TestData.Instant(TestData.V11Rules()));
 
             // Act
             var events = TestData.Play(sim, "-1 plug kettle A1; -1 plug toaster A2; 0 on kettle; 0 on toaster; 9 breaker A; 10 breaker A", 11);
@@ -499,7 +498,7 @@ namespace Trouble.Tests
         {
             // Arrange: overloaded for ticks 0–4 (counter 5), calm from tick 5.
             var sim = OneRoom(8).Request("Mum", "kettle", "a", LongSec, DueSec).Request("Dad", "toaster", "a", LongSec, DueSec)
-                .Sim(TestData.V11Rules());
+                .Sim(TestData.Instant(TestData.V11Rules()));
 
             // Act: six calm ticks (5–10).
             TestData.Play(sim, "-1 plug kettle A1; -1 plug toaster A2; 0 on kettle; 0 on toaster; 5 off toaster", 11);

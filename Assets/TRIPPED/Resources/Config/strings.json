@@ -27,6 +27,9 @@
         { "key": "reject_not_a_cord", "text": "That isn't a cord." },
         { "key": "reject_unknown", "text": "Nothing to do there." },
         { "key": "reject_level_over", "text": "The level is over." },
+        { "key": "reject_queue_full", "text": "Too many things to do." },
+        { "key": "reject_unpause_walk", "text": "Unpause to walk." },
+        { "key": "reject_no_path", "text": "Can't get there." },
         { "key": "reject_not_implemented", "text": "Not implemented yet." }
     ]
 }

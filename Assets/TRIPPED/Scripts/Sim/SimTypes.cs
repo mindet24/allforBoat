@@ -95,6 +95,16 @@ namespace Trouble.Sim
         public string SocketId { get; internal set; }
         public bool SwitchedOn { get; internal set; }
         public bool Powered { get; internal set; }
+
+        // What the player last saw (V4). Views show these instead of the live values while the
+        // appliance's room is not visible.
+
+        /// <summary>Socket the appliance was in when last seen. Empty = in the tray.</summary>
+        public string SeenSocketId { get; internal set; }
+        public bool SeenSwitchedOn { get; internal set; }
+        public bool SeenPowered { get; internal set; }
+        /// <summary>Tick it was last seen. -1 = never.</summary>
+        public int SeenTick { get; internal set; } = -1;
     }
 
     public sealed class RequestState
@@ -121,8 +131,10 @@ namespace Trouble.Sim
     public sealed class CharacterAction
     {
         public Command Command { get; internal set; }
-        /// <summary>Room the character must reach before doing it.</summary>
+        /// <summary>Room the character must reach before doing it. Null until the action reaches the front of the queue.</summary>
         public string TargetRoomId { get; internal set; }
+
+        internal bool Started;
     }
 
     /// <summary>
@@ -138,6 +150,8 @@ namespace Trouble.Sim
         public string ToRoomId { get; internal set; }
         public int SegmentTicks { get; internal set; }
         public int SegmentElapsed { get; internal set; }
+        /// <summary>Door or stairs being used by the current segment. Empty when not walking.</summary>
+        public string SegmentDoorId { get; internal set; } = "";
         /// <summary>Ticks left of the current interaction. 0 = not interacting.</summary>
         public int InteractTicksLeft { get; internal set; }
         /// <summary>First entry is the action in progress.</summary>

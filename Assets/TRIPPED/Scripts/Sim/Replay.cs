@@ -81,21 +81,24 @@ namespace Trouble.Sim
             return list;
         }
 
-        /// <summary>Turns one scripted command (see <see cref="CommandData"/>) into a sim command.</summary>
+        /// <summary>
+        /// Turns one scripted command (see <see cref="CommandData"/>) into a sim command. Scripts are sequences,
+        /// so by default each command joins the end of the character's queue instead of replacing it.
+        /// </summary>
         /// <exception cref="ArgumentException">Unknown cmd word.</exception>
-        public static Command ToCommand(CommandData d)
+        public static Command ToCommand(CommandData d, bool append = true)
         {
             switch (d.cmd)
             {
-                case "plug": return Command.Plug(d.a, d.b);
-                case "unplug": return Command.Unplug(d.a);
-                case "on": return Command.SetSwitch(d.a, true);
-                case "off": return Command.SetSwitch(d.a, false);
-                case "breaker": return Command.ToggleBreaker(d.a);
-                case "cord": return Command.PlaceCord(d.a, d.b);
-                case "uncord": return Command.RemoveCord(d.a);
-                case "door": return Command.ToggleDoor(d.a);
-                case "move": return Command.MoveTo(d.a);
+                case "plug": return Command.Plug(d.a, d.b, append);
+                case "unplug": return Command.Unplug(d.a, append);
+                case "on": return Command.SetSwitch(d.a, true, append);
+                case "off": return Command.SetSwitch(d.a, false, append);
+                case "breaker": return Command.ToggleBreaker(d.a, append);
+                case "cord": return Command.PlaceCord(d.a, d.b, append);
+                case "uncord": return Command.RemoveCord(d.a, append);
+                case "door": return Command.ToggleDoor(d.a, append);
+                case "move": return Command.MoveTo(d.a, append);
                 default: throw new ArgumentException($"Unknown command '{d.cmd}'.");
             }
         }

@@ -30,14 +30,28 @@ namespace Trouble.Tests
             return new Catalog(data);
         }
 
-        /// <summary>The v1.0 rules the replay table was verified with: counter resets at once, flipping resets it, R16 reveals.</summary>
+        /// <summary>
+        /// The v1.0 rules the replay table was verified with: counter resets at once, flipping resets it,
+        /// R16 reveals, and no walking (every action happens the tick it is given).
+        /// </summary>
         public static RulesConfig V10Rules()
         {
-            return new RulesConfig { overCoolEvery = 0, breakerToggleResetsCounter = true, revealRequiresSight = false };
+            return Instant(new RulesConfig { overCoolEvery = 0, breakerToggleResetsCounter = true, revealRequiresSight = false });
         }
 
-        /// <summary>The v1.1 defaults.</summary>
+        /// <summary>The v1.1 defaults, walking included.</summary>
         public static RulesConfig V11Rules() => new RulesConfig();
+
+        /// <summary>Makes walking and acting take no time and lifts the queue limit, leaving every other rule as given.</summary>
+        public static RulesConfig Instant(RulesConfig rules)
+        {
+            rules.walkSpeed = 1_000_000f;
+            rules.interactTicks = 0;
+            rules.doorOpenTicks = 0;
+            rules.stairsTicks = 0;
+            rules.actionQueueSize = 1000;
+            return rules;
+        }
 
         public static Strings Strings() =>
             new Strings(JsonUtility.FromJson<StringsData>(Resources.Load<TextAsset>("Config/strings").text));
@@ -103,6 +117,13 @@ namespace Trouble.Tests
         public LevelBuilder Cords(int count) { _level.cordCount = count; return this; }
         public LevelBuilder Lamps(int count) { _level.lampCount = count; return this; }
         public LevelBuilder Day(float seconds) { _level.dayLengthSec = seconds; return this; }
+        /// <summary>Adding any door turns off the automatic doors between neighbouring rooms.</summary>
+        public LevelBuilder Door(string id, string a, string b, bool open = true, string kind = "door")
+        {
+            _level.doors.Add(new DoorData { id = id, a = a, b = b, open = open, kind = kind });
+            return this;
+        }
+        public LevelBuilder Panel(string room) { _level.panelRoom = room; return this; }
 
         public LevelData Build() => _level;
 
