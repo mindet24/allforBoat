@@ -136,22 +136,138 @@
       "b": "K1"
     },
     {
-      "tick": 0,
+      "tick": -1,
       "cmd": "on",
       "a": "console",
       "b": ""
     },
     {
-      "tick": 0,
+      "tick": -1,
       "cmd": "on",
       "a": "iron",
       "b": ""
     },
     {
-      "tick": 0,
+      "tick": -1,
       "cmd": "on",
       "a": "kettle",
       "b": ""
+    }
+  ],
+  "startRoom": "living",
+  "panelRoom": "kitchen",
+  "doors": [
+    {
+      "id": "D1",
+      "a": "bedroom",
+      "b": "living",
+      "kind": "door",
+      "open": false
+    },
+    {
+      "id": "D2",
+      "a": "living",
+      "b": "kitchen",
+      "kind": "door",
+      "open": true
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "cord L2 to the bedroom, iron later",
+      "expect": "won",
+      "commands": [
+        {
+          "tick": -1,
+          "cmd": "cord",
+          "a": "L2",
+          "b": "bedroom"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "console",
+          "b": "CORD-L2"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "kettle",
+          "b": "K1"
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "console",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "kettle",
+          "b": ""
+        },
+        {
+          "tick": 300,
+          "cmd": "uncord",
+          "a": "CORD-L2",
+          "b": ""
+        },
+        {
+          "tick": 300,
+          "cmd": "plug",
+          "a": "iron",
+          "b": "L2"
+        },
+        {
+          "tick": 300,
+          "cmd": "on",
+          "a": "iron",
+          "b": ""
+        }
+      ]
+    },
+    {
+      "name": "console on the obvious socket BR1 (trap)",
+      "expect": "lost",
+      "commands": [
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "console",
+          "b": "BR1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "iron",
+          "b": "L2"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "kettle",
+          "b": "K1"
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "console",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "iron",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "kettle",
+          "b": ""
+        }
+      ]
     }
   ]
 }

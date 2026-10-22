@@ -245,7 +245,8 @@ namespace Trouble.Sim
                 int count = c.OverTicks;
                 bool trip = CountOverload(ref count, ref c.CoolTicks, over);
                 c.OverTicks = count;
-                if (trip) TripCircuit(c);
+                // Only an overloaded tick trips: a hot counter on a breaker that is already OFF must not.
+                if (trip && over) TripCircuit(c);
             }
 
             // 6. Main breaker, on the load of the circuits still ON.
@@ -262,7 +263,7 @@ namespace Trouble.Sim
                 int count = MainOverTicks;
                 bool trip = CountOverload(ref count, ref _mainCool, over);
                 MainOverTicks = count;
-                if (trip) TripMain(total);
+                if (trip && over) TripMain(total);
             }
 
             RecomputePower();
@@ -401,18 +402,20 @@ namespace Trouble.Sim
                 Terms = TermsOn(null),
             });
             TripCount++;
-            MainOverTicks = 0;
+            if (!KeepCounterAfterTrip) MainOverTicks = 0;
             _mainCool = 0;
             MainOverloading = false;
             foreach (var c in _circuitsById)
                 if (c.IsOn) TurnOff(c);
         }
 
-        /// <summary>A breaker goes OFF by tripping. Its counter restarts.</summary>
+        private bool KeepCounterAfterTrip => Rules.counterAfterTrip == "keep";
+
+        /// <summary>A breaker goes OFF by tripping. Its counter stays hot or restarts, per counterAfterTrip.</summary>
         private void TurnOff(CircuitState c)
         {
             c.IsOn = false;
-            c.OverTicks = 0;
+            if (!KeepCounterAfterTrip) c.OverTicks = 0;
             c.CoolTicks = 0;
             c.Overloading = false;
             if (!Rules.revealRequiresSight) RevealSwitchedOnSockets(c.Id);

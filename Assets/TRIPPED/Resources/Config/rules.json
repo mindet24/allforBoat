@@ -3,6 +3,7 @@
     "overTripTicks": 10,
     "overCoolEvery": 3,
     "breakerToggleResetsCounter": false,
+    "counterAfterTrip": "keep",
     "walkSpeed": 3.0,
     "interactTicks": 3,
     "doorOpenTicks": 5,

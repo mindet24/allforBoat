@@ -36,7 +36,13 @@ namespace Trouble.Tests
         /// </summary>
         public static RulesConfig V10Rules()
         {
-            return Instant(new RulesConfig { overCoolEvery = 0, breakerToggleResetsCounter = true, revealRequiresSight = false });
+            return Instant(new RulesConfig
+            {
+                overCoolEvery = 0,
+                breakerToggleResetsCounter = true,
+                counterAfterTrip = "reset",
+                revealRequiresSight = false,
+            });
         }
 
         /// <summary>The v1.1 defaults, walking included.</summary>

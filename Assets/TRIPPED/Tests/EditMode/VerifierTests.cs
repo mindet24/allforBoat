@@ -11,6 +11,7 @@ namespace Trouble.Tests
         {
             // Arrange
             var level = TestData.Level(1);
+            level.scenarios.Clear();
             level.scenarios.Add(new ScenarioData { name = "cord", expect = Verifier.Won,
                 commands = Replay.Parse("-1 cord L1 kitchen; -1 plug kettle CORD-L1; -1 plug toaster K1; -1 on kettle; -1 on toaster") });
 
@@ -36,6 +37,7 @@ namespace Trouble.Tests
         {
             // Arrange: the cord solution (0:10) beats the reference (0:18).
             var level = TestData.Level(1);
+            level.scenarios.Clear();
             level.scenarios.Add(new ScenarioData { name = "too fast", expect = Verifier.NotFasterThanReference,
                 commands = Replay.Parse("-1 cord L1 kitchen; -1 plug kettle CORD-L1; -1 plug toaster K1; -1 on kettle; -1 on toaster") });
 
@@ -44,6 +46,24 @@ namespace Trouble.Tests
 
             // Assert
             Assert.IsFalse(rows[4].MetExpectation);
+        }
+
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        public void ShippedLevel_MeetsEveryRunSimExpectationUnderShippedRules(int n)
+        {
+            // Arrange: the real rules.json, catalog.json and strings.json the game loads.
+            var rules = UnityEngine.JsonUtility.FromJson<RulesConfig>(UnityEngine.Resources.Load<UnityEngine.TextAsset>("Config/rules").text);
+            var catalog = new Catalog(UnityEngine.JsonUtility.FromJson<CatalogData>(UnityEngine.Resources.Load<UnityEngine.TextAsset>("Config/catalog").text));
+
+            // Act
+            var rows = Verifier.RunAll(TestData.Level(n), rules, catalog, TestData.Strings());
+
+            // Assert
+            foreach (var row in rows)
+                Assert.IsTrue(row.MetExpectation, $"{row.Name}: expected {row.Expect}, got {row.Phase} at tick {row.EndTick}. {row.Cause} {row.Problem}");
         }
 
         [Test]

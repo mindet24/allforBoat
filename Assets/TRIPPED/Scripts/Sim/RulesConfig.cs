@@ -21,6 +21,11 @@ namespace Trouble.Sim
         public int overCoolEvery = 3;
         /// <summary>true = flipping a breaker sets its counter to 0 (v1.0 rule).</summary>
         public bool breakerToggleResetsCounter;
+        /// <summary>
+        /// "keep" = after a trip the counter stays full and cools like any other time, so a breaker reset while
+        /// still overloaded trips again almost at once (a hot breaker). "reset" = the counter goes to 0 (v1.0 rule).
+        /// </summary>
+        public string counterAfterTrip = "keep";
 
         /// <summary>Metres per second.</summary>
         public float walkSpeed = 3f;

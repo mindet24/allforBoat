@@ -507,6 +507,38 @@ namespace Trouble.Tests
             Assert.AreEqual(3, sim.FindCircuit("A").OverTicks);
         }
 
+        [Test]
+        public void HotBreakerResetWhileStillOverloaded_TripsAgainNextTick()
+        {
+            // Arrange: v1.1 counter, counterAfterTrip = keep. Trips at tick 9.
+            var sim = OneRoom(8).Request("Mum", "kettle", "a", LongSec, DueSec).Request("Dad", "toaster", "a", LongSec, DueSec)
+                .Sim(TestData.Instant(TestData.V11Rules()));
+
+            // Act: reset at tick 10 with 10 > 8 still plugged in.
+            var events = TestData.Play(sim, "-1 plug kettle A1; -1 plug toaster A2; -1 on kettle; -1 on toaster; 10 breaker A", 12);
+
+            // Assert
+            var trips = TestData.OfType(events, SimEventType.CircuitTripped);
+            Assert.AreEqual(2, trips.Count);
+            Assert.AreEqual(9, trips[0].Tick);
+            Assert.AreEqual(10, trips[1].Tick);
+        }
+
+        [Test]
+        public void HotBreakerLeftOff_CoolsWithoutTrippingAgain()
+        {
+            // Arrange
+            var sim = OneRoom(8).Request("Mum", "kettle", "a", LongSec, DueSec).Request("Dad", "toaster", "a", LongSec, DueSec)
+                .Sim(TestData.Instant(TestData.V11Rules()));
+
+            // Act: trips at tick 9, then left off for 30 ticks (cools one step per 3 ticks).
+            var events = TestData.Play(sim, "-1 plug kettle A1; -1 plug toaster A2; -1 on kettle; -1 on toaster", 40);
+
+            // Assert
+            Assert.AreEqual(1, TestData.OfType(events, SimEventType.CircuitTripped).Count, "an OFF breaker never trips");
+            Assert.AreEqual(0, sim.FindCircuit("A").OverTicks);
+        }
+
         private static void AssertRejected(HouseSim sim, Command command, string message)
         {
             bool ok = sim.Submit(command, out var reason);

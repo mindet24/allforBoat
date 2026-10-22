@@ -152,28 +152,349 @@
       "b": "BR1"
     },
     {
-      "tick": 0,
+      "tick": -1,
       "cmd": "on",
       "a": "dryer",
       "b": ""
     },
     {
-      "tick": 0,
+      "tick": -1,
       "cmd": "on",
       "a": "microwave",
       "b": ""
     },
     {
-      "tick": 0,
+      "tick": -1,
       "cmd": "on",
       "a": "kettle",
       "b": ""
     },
     {
-      "tick": 0,
+      "tick": -1,
       "cmd": "on",
       "a": "phone",
       "b": ""
+    }
+  ],
+  "startRoom": "kitchen",
+  "panelRoom": "living",
+  "doors": [
+    {
+      "id": "D1",
+      "a": "bedroom",
+      "b": "bathroom",
+      "kind": "door",
+      "open": true
+    },
+    {
+      "id": "D2",
+      "a": "bathroom",
+      "b": "kitchen",
+      "kind": "door",
+      "open": false
+    },
+    {
+      "id": "D3",
+      "a": "kitchen",
+      "b": "living",
+      "kind": "door",
+      "open": true
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "lamp test first",
+      "expect": "won",
+      "commands": [
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "lamp1",
+          "b": "K1"
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "lamp1",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "dryer",
+          "b": "BA1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "kettle",
+          "b": "K2"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "phone",
+          "b": "BR1"
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "dryer",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "kettle",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "phone",
+          "b": ""
+        },
+        {
+          "tick": 0,
+          "cmd": "breaker",
+          "a": "A",
+          "b": ""
+        },
+        {
+          "tick": 0,
+          "cmd": "breaker",
+          "a": "A",
+          "b": ""
+        },
+        {
+          "tick": 30,
+          "cmd": "unplug",
+          "a": "lamp1",
+          "b": ""
+        },
+        {
+          "tick": 30,
+          "cmd": "plug",
+          "a": "microwave",
+          "b": "K1"
+        },
+        {
+          "tick": 30,
+          "cmd": "on",
+          "a": "microwave",
+          "b": ""
+        }
+      ]
+    },
+    {
+      "name": "learn from the trip",
+      "expect": "won",
+      "commands": [
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "dryer",
+          "b": "BA1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "kettle",
+          "b": "K1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "microwave",
+          "b": "K2"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "phone",
+          "b": "BR1"
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "dryer",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "kettle",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "microwave",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "phone",
+          "b": ""
+        },
+        {
+          "tick": 10,
+          "cmd": "unplug",
+          "a": "microwave",
+          "b": ""
+        },
+        {
+          "tick": 10,
+          "cmd": "plug",
+          "a": "kettle",
+          "b": "K2"
+        },
+        {
+          "tick": 10,
+          "cmd": "plug",
+          "a": "microwave",
+          "b": "K1"
+        },
+        {
+          "tick": 20,
+          "cmd": "on",
+          "a": "kettle",
+          "b": ""
+        },
+        {
+          "tick": 20,
+          "cmd": "on",
+          "a": "microwave",
+          "b": ""
+        },
+        {
+          "tick": 20,
+          "cmd": "breaker",
+          "a": "A",
+          "b": ""
+        }
+      ]
+    },
+    {
+      "name": "cord gives the dryer circuit C",
+      "expect": "won",
+      "commands": [
+        {
+          "tick": -1,
+          "cmd": "cord",
+          "a": "BR1",
+          "b": "bathroom"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "dryer",
+          "b": "CORD-BR1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "microwave",
+          "b": "K1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "kettle",
+          "b": "K2"
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "dryer",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "microwave",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "kettle",
+          "b": ""
+        },
+        {
+          "tick": 100,
+          "cmd": "uncord",
+          "a": "CORD-BR1",
+          "b": ""
+        },
+        {
+          "tick": 100,
+          "cmd": "plug",
+          "a": "phone",
+          "b": "BR1"
+        },
+        {
+          "tick": 100,
+          "cmd": "on",
+          "a": "phone",
+          "b": ""
+        }
+      ]
+    },
+    {
+      "name": "kitchen one at a time (trap)",
+      "expect": "lost",
+      "commands": [
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "dryer",
+          "b": "BA1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "microwave",
+          "b": "K1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "kettle",
+          "b": "K2"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "phone",
+          "b": "BR1"
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "dryer",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "phone",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "kettle",
+          "b": ""
+        },
+        {
+          "tick": 80,
+          "cmd": "on",
+          "a": "microwave",
+          "b": ""
+        }
+      ]
     }
   ]
 }

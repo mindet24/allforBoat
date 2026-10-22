@@ -85,7 +85,7 @@
       "b": "K2"
     },
     {
-      "tick": 0,
+      "tick": -1,
       "cmd": "on",
       "a": "kettle",
       "b": ""
@@ -95,6 +95,55 @@
       "cmd": "on",
       "a": "toaster",
       "b": ""
+    }
+  ],
+  "startRoom": "kitchen",
+  "panelRoom": "kitchen",
+  "doors": [
+    {
+      "id": "D1",
+      "a": "kitchen",
+      "b": "living",
+      "kind": "door",
+      "open": true
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "cord from the living room",
+      "expect": "won",
+      "commands": [
+        {
+          "tick": -1,
+          "cmd": "cord",
+          "a": "L1",
+          "b": "kitchen"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "kettle",
+          "b": "CORD-L1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "toaster",
+          "b": "K1"
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "kettle",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "toaster",
+          "b": ""
+        }
+      ]
     }
   ]
 }

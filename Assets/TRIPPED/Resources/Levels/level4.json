@@ -180,19 +180,19 @@
       "b": "LA2"
     },
     {
-      "tick": 0,
+      "tick": -1,
       "cmd": "on",
       "a": "kettle",
       "b": ""
     },
     {
-      "tick": 0,
+      "tick": -1,
       "cmd": "on",
       "a": "dryer",
       "b": ""
     },
     {
-      "tick": 0,
+      "tick": -1,
       "cmd": "on",
       "a": "washer",
       "b": ""
@@ -208,6 +208,309 @@
       "cmd": "on",
       "a": "iron",
       "b": ""
+    }
+  ],
+  "startRoom": "kitchen",
+  "panelRoom": "laundry",
+  "doors": [
+    {
+      "id": "D1",
+      "a": "laundry",
+      "b": "kitchen",
+      "kind": "door",
+      "open": true
+    },
+    {
+      "id": "D2",
+      "a": "kitchen",
+      "b": "living",
+      "kind": "door",
+      "open": true
+    },
+    {
+      "id": "D3",
+      "a": "living",
+      "b": "bathroom",
+      "kind": "door",
+      "open": false
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "cord L2 to the kitchen for the microwave",
+      "expect": "won",
+      "commands": [
+        {
+          "tick": -1,
+          "cmd": "cord",
+          "a": "L2",
+          "b": "kitchen"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "microwave",
+          "b": "CORD-L2"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "kettle",
+          "b": "K1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "dryer",
+          "b": "BA1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "washer",
+          "b": "LA1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "iron",
+          "b": "LA2"
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "kettle",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "microwave",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "dryer",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "washer",
+          "b": ""
+        },
+        {
+          "tick": 300,
+          "cmd": "on",
+          "a": "iron",
+          "b": ""
+        }
+      ]
+    },
+    {
+      "name": "cord K1 to the laundry for the iron",
+      "expect": "won",
+      "commands": [
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "kettle",
+          "b": "K1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "microwave",
+          "b": "K2"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "dryer",
+          "b": "BA1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "washer",
+          "b": "LA1"
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "kettle",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "dryer",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "washer",
+          "b": ""
+        },
+        {
+          "tick": 80,
+          "cmd": "on",
+          "a": "microwave",
+          "b": ""
+        },
+        {
+          "tick": 200,
+          "cmd": "unplug",
+          "a": "kettle",
+          "b": ""
+        },
+        {
+          "tick": 200,
+          "cmd": "cord",
+          "a": "K1",
+          "b": "laundry"
+        },
+        {
+          "tick": 200,
+          "cmd": "plug",
+          "a": "iron",
+          "b": "CORD-K1"
+        },
+        {
+          "tick": 210,
+          "cmd": "on",
+          "a": "iron",
+          "b": ""
+        }
+      ]
+    },
+    {
+      "name": "trust the labels (trap)",
+      "expect": "lost",
+      "commands": [
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "kettle",
+          "b": "K1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "microwave",
+          "b": "K2"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "dryer",
+          "b": "BA1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "washer",
+          "b": "LA1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "iron",
+          "b": "LA2"
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "kettle",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "microwave",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "dryer",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "washer",
+          "b": ""
+        }
+      ]
+    },
+    {
+      "name": "washer and iron together (trap)",
+      "expect": "lost",
+      "commands": [
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "kettle",
+          "b": "K1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "microwave",
+          "b": "K2"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "dryer",
+          "b": "BA1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "washer",
+          "b": "LA1"
+        },
+        {
+          "tick": -1,
+          "cmd": "plug",
+          "a": "iron",
+          "b": "LA2"
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "kettle",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "dryer",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "washer",
+          "b": ""
+        },
+        {
+          "tick": -1,
+          "cmd": "on",
+          "a": "iron",
+          "b": ""
+        },
+        {
+          "tick": 80,
+          "cmd": "on",
+          "a": "microwave",
+          "b": ""
+        }
+      ]
     }
   ]
 }
