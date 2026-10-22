@@ -28,7 +28,8 @@ namespace Trouble.Sim
         /// Applies tick -1 commands during planning, starts the level, then before each tick submits the
         /// commands for that tick, until the level is won or lost.
         /// </summary>
-        public static ReplayResult Run(HouseSim sim, IReadOnlyList<CommandData> commands)
+        /// <param name="beforeEachTick">Optional player that reacts to the state before every tick (see <see cref="Strategies"/>).</param>
+        public static ReplayResult Run(HouseSim sim, IReadOnlyList<CommandData> commands, Action<HouseSim> beforeEachTick = null)
         {
             var result = new ReplayResult { Sim = sim };
             var ordered = new List<CommandData>(commands);
@@ -50,6 +51,7 @@ namespace Trouble.Sim
             {
                 while (next < indexed.Count && indexed[next].cmd.tick <= sim.Now)
                     sim.Submit(ToCommand(indexed[next++].cmd), out _);
+                beforeEachTick?.Invoke(sim);
                 foreach (var e in sim.Step()) result.Events.Add(e);
             }
 

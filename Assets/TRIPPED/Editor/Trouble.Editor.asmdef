@@ -1,0 +1,18 @@
+{
+    "name": "Trouble.Editor",
+    "rootNamespace": "Trouble.EditorTools",
+    "references": [
+        "Trouble.Sim"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
