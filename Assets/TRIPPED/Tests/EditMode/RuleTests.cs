@@ -522,6 +522,10 @@ namespace Trouble.Tests
             Assert.AreEqual(2, trips.Count);
             Assert.AreEqual(9, trips[0].Tick);
             Assert.AreEqual(10, trips[1].Tick);
+            Assert.IsFalse(trips[0].WasHot, "the first trip was not caused by a hot reset");
+            Assert.IsTrue(trips[1].WasHot, "the second trip came from resetting while hot");
+            Assert.IsTrue(sim.FindCircuit("A").IsHot);
+            Assert.AreEqual("Breaker A is still hot. Lower the load or wait.", new CauseFormatter(TestData.Strings()).Hint(trips[1]));
         }
 
         [Test]

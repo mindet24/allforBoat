@@ -86,7 +86,7 @@ namespace Trouble.Tests
         public void ReplayRow_MatchesVerifiedResult(Row row)
         {
             // Arrange
-            var level = TestData.Level(row.Level);
+            var level = TestData.LevelAsInV10(row.Level);
             var commands = row.Script == Ref ? level.reference : row.Script == Naive ? Replay.Naive(level) : Replay.Parse(row.Script);
             var sim = new HouseSim(level, TestData.V10Rules(), TestData.Catalog(), TestData.Strings());
 

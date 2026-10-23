@@ -62,6 +62,17 @@ namespace Trouble.Tests
         public static Strings Strings() =>
             new Strings(JsonUtility.FromJson<StringsData>(Resources.Load<TextAsset>("Config/strings").text));
 
+        /// <summary>
+        /// A level exactly as GDD v1.0 §5 wrote it, for the replay table (§9.2) that proves the C# port.
+        /// Only level 2 differs from the shipped file in a way that changes those rows (deadlines 18 → 20 s, Q31).
+        /// </summary>
+        public static LevelData LevelAsInV10(int n)
+        {
+            if (n != 2) return Level(n);
+            var asset = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/TRIPPED/Tests/EditMode/Fixtures/level2_v1.0.json");
+            return JsonUtility.FromJson<LevelData>(asset.text);
+        }
+
         /// <summary>Levels 1–4 from Resources; level 5 (cut from the game) from the test fixture.</summary>
         public static LevelData Level(int n)
         {

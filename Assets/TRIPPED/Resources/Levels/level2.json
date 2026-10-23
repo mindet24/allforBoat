@@ -108,14 +108,14 @@
       "appliance": "kettle",
       "room": "kitchen",
       "durationSec": 8,
-      "dueSec": 18
+      "dueSec": 20
     },
     {
       "owner": "Dad",
       "appliance": "microwave",
       "room": "kitchen",
       "durationSec": 12,
-      "dueSec": 18
+      "dueSec": 20
     },
     {
       "owner": "Kid",

@@ -50,8 +50,12 @@ namespace Trouble.Sim
         public int OverTicks { get; internal set; }
         /// <summary>Load is above capacity this tick.</summary>
         public bool Overloading { get; internal set; }
+        /// <summary>OFF with a counter that has not cooled to 0 yet: resetting now under the same load trips again at once (GDD v1.1 R5b). Show "HOT".</summary>
+        public bool IsHot => !IsOn && OverTicks > 0;
 
         internal int CoolTicks;
+        /// <summary>Set when the player switched this breaker ON while its counter was still above 0.</summary>
+        internal bool ResetWhileHot;
     }
 
     public sealed class SocketState

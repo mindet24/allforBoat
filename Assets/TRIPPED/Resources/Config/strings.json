@@ -10,6 +10,14 @@
         { "key": "won", "text": "Everyone's happy! Finished at {time}." },
         { "key": "pause_hint", "text": "PAUSED — plan, then press SPACE" },
         { "key": "intro_line", "text": "Get everyone's requests done without wrecking the house." },
+        { "key": "hot_retrip", "text": "Breaker {id} is still hot. Lower the load or wait." },
+        { "key": "hot_label", "text": "HOT" },
+
+        { "key": "tip_level1_start", "text": "Click an appliance, then a socket. Press SPACE to start." },
+        { "key": "tip_level1_first_trip", "text": "Too much on one breaker. Walk to the panel and click it to reset." },
+        { "key": "tip_level2_start", "text": "Tip: a lamp shows which breaker feeds a socket." },
+        { "key": "tip_first_reveal", "text": "Now you know that socket's breaker." },
+        { "key": "tip_level3_start", "text": "Grandpa's heater turns on by itself. Check the timeline." },
 
         { "key": "reject_not_yours", "text": "That belongs to someone else." },
         { "key": "reject_socket_in_use", "text": "Socket in use." },

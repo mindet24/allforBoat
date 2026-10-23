@@ -41,6 +41,16 @@ namespace Trouble.Sim
             }
         }
 
+        /// <summary>
+        /// A second line that tells the player what to do about this event, or null. Today: a breaker that tripped
+        /// because it was reset while still hot (GDD v1.1 R5b).
+        /// </summary>
+        public string Hint(SimEvent e)
+        {
+            if (e.Type == SimEventType.CircuitTripped && e.WasHot) return _strings.Format("hot_retrip", ("id", e.Circuit));
+            return null;
+        }
+
         private string Lost(SimEvent e, HouseSim sim)
         {
             switch (e.Reason)

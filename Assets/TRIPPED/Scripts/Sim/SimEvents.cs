@@ -58,6 +58,8 @@ namespace Trouble.Sim
         public List<LoadTerm> Terms;
         public bool ProgressLost;
         public bool AssumptionWasWrong;
+        /// <summary>CircuitTripped only: the player had reset this breaker while it was still hot.</summary>
+        public bool WasHot;
         public LoseReason Reason;
         /// <summary>Rejection text for CommandRejected.</summary>
         public string Message;

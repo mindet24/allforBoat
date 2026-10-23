@@ -261,6 +261,7 @@ namespace Trouble.Sim
                 int count = c.OverTicks;
                 bool trip = CountOverload(ref count, ref c.CoolTicks, over);
                 c.OverTicks = count;
+                if (count == 0) c.ResetWhileHot = false;
                 // Only an overloaded tick trips: a hot counter on a breaker that is already OFF must not.
                 if (trip && over) TripCircuit(c);
             }
@@ -402,8 +403,10 @@ namespace Trouble.Sim
                 Load = c.Load,
                 Capacity = c.Capacity,
                 Terms = TermsOn(c.Id),
+                WasHot = c.ResetWhileHot,
             });
             TripCount++;
+            c.ResetWhileHot = false;
             TurnOff(c);
         }
 
@@ -537,6 +540,7 @@ namespace Trouble.Sim
                 c.OverTicks = 0;
                 c.CoolTicks = 0;
             }
+            if (c.IsOn) c.ResetWhileHot = c.OverTicks > 0;
             Emit(new SimEvent { Type = SimEventType.BreakerSwitched, Circuit = c.Id });
             if (!c.IsOn && !Rules.revealRequiresSight) RevealSwitchedOnSockets(c.Id);
             reason = "";
