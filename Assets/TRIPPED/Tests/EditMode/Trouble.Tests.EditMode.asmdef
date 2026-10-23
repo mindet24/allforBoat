@@ -4,6 +4,7 @@
     "references": [
         "Trouble.Sim",
         "Trouble.Editor",
+        "Trouble.Game",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
