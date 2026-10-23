@@ -40,7 +40,8 @@ namespace Trouble.Game
         public Vector2 WallPoint { get; private set; }
 
         /// <summary>Builds the block under this object and places it on the wall.</summary>
-        public void Build(SocketState socket, HouseSim sim, TrippedViewConfig config)
+        /// <param name="kitPlate">Day mode with the 3D house kit: draw the kit's Socket_Plate on the wall instead of the greybox block.</param>
+        public void Build(SocketState socket, HouseSim sim, TrippedViewConfig config, bool kitPlate = false)
         {
             _socket = socket;
             _config = config;
@@ -62,7 +63,8 @@ namespace Trouble.Game
             _powerOut.sortingOrder = 8;
             _powerOut.enabled = false;
 
-            Prims.Box(transform, "Block", new Vector3(0f, 0f, -d * 0.5f), new Vector3(s, s, d), config.socketBody);
+            var plate = kitPlate ? HouseKitView.SocketPlate(config, transform) : null;
+            if (plate == null) Prims.Box(transform, "Block", new Vector3(0f, 0f, -d * 0.5f), new Vector3(s, s, d), config.socketBody);
 
             _faceRoot = new GameObject("FaceRoot").transform;
             _faceRoot.SetParent(transform, false);
@@ -71,6 +73,7 @@ namespace Trouble.Game
             _face = MakeSprite("Face", PlaceholderArt.WorldRounded, FaceOrder, _faceRoot);
             _face.drawMode = SpriteDrawMode.Sliced;
             _face.size = new Vector2(s * 0.92f, s * 0.92f);
+            if (plate != null) _face.enabled = false;
             _dashed = MakeSprite("Assumed", PlaceholderArt.DashedOutline, FaceOrder + 1, _faceRoot);
             _dashed.transform.localScale = Vector3.one * (s * 1.25f);
             _dashed.enabled = false;

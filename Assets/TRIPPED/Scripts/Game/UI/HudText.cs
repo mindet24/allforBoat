@@ -35,7 +35,7 @@ namespace Trouble.Game
             { "day_score", "Score {score}" },
             { "day_time_left", "{time} left" },
             { "day_blackout_banner", "BLACKOUT – reset the breaker in the {panel}" },
-            { "day_hint", "Click an appliance, then a socket: it is carried there. Click the panel to reset the breaker." },
+            { "day_hint", "A/D walk · W/S stairs · E pick up / plug in / reset breaker" },
             { "day_hint_start", "Press SPACE to start the day" },
             { "day_urgent", "URGENT" },
             { "day_normal", "NORMAL" },

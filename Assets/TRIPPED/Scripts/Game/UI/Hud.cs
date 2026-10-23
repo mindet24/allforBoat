@@ -72,12 +72,12 @@ namespace Trouble.Game
             _day = _sim.IsDayMode;
             if (_day)
             {
-                // Day: hearts, score and time left on top, request cards on the right, markers over rooms, the queue
-                // strip and a hint in the tray. No breaker cards, left request panel, timeline or alerts.
+                // Day: hearts, score and time left on top, request cards on the right, markers over rooms, the key
+                // hint in the tray. No queue strip, breaker cards, left request panel, timeline or alerts.
                 _dayBar.Build(root, controller, config, text);
                 _dayStack.Build(root, config, text);
                 _tray.Build(root, controller, config, text);
-                _queue.Build(_tray.Root, controller, config, text);
+                // No queue strip: day mode is played live with the keyboard, nothing is queued.
                 _dayMarkers.Build(root, controller, config);
                 _toasts.Build(root, config, 300f);
                 _result.Build(root, controller, config, text);
@@ -119,7 +119,6 @@ namespace Trouble.Game
                 _dayMarkers.Sync(_sim, _controller.HouseCam);
                 _tray.Sync(_sim);
                 _toasts.Sync(time);
-                _queue.Sync(_sim);
                 return;
             }
             _topBar.Sync(_sim);

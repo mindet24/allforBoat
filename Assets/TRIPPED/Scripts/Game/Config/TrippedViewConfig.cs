@@ -153,6 +153,49 @@ namespace Trouble.Game
         public Color blackoutOverlay = new Color(0f, 0f, 0f, 0.62f);
         public float cardExitSeconds = 0.7f;
 
+        [Header("Day mode keyboard (walk, stairs, E)")]
+        [Tooltip("Half the horizontal run of a flight of stairs, metres. The flight is centred on sim.StairsX.")]
+        public float stairsHalfRun = 1.0f;
+        [Tooltip("Part of a climb spent stepping from sim.StairsX to the foot of the stairs (and off the top).")]
+        [Range(0f, 0.45f)] public float stairsLanding = 0.15f;
+        [Tooltip("How fast the drawn character catches up with the sim's position, metres per second.")]
+        public float characterFollowSpeed = 6f;
+        [Tooltip("Height of the carried appliance's sprite above the head, metres.")]
+        public float carryIconHeight = 0.75f;
+        [Tooltip("z of day-mode labels, load bars and key prompts: in front of the house so stairs and walls never cover them.")]
+        public float dayOverlayZ = -0.45f;
+        public Color promptBack = Hex("#1E1E24E6");
+        public Color promptText = Hex("#FFE066");
+        [Tooltip("Size of a key prompt bubble (\"E\", \"W ↑\"), metres.")]
+        public Vector2 promptSize = new Vector2(0.5f, 0.42f);
+        public Vector2 stairsPromptSize = new Vector2(0.8f, 0.42f);
+        [Tooltip("Resources path of the breaker panel sprite (bottom-centre pivot, 1 unit tall).")]
+        public string panelArtPath = "Art/Props/panel";
+        [Tooltip("Height the panel sprite is drawn at, metres.")]
+        public float panelWorldHeight = 0.9f;
+        [Tooltip("Height of the panel's bottom edge above the floor, metres.")]
+        public float panelMountHeight = 1.0f;
+
+        [Header("3D house kit (day mode)")]
+        [Tooltip("true = build the rooms from the house kit FBX. false (or no kit assigned) = the greybox.")]
+        public bool useHouseKit = true;
+        [Tooltip("Assets/TRIPPED/Art/Models/HouseKit.fbx: room pieces 6 m wide, 4 m deep, 3 m tall.")]
+        public GameObject houseKit;
+        [Tooltip("Assets/TRIPPED/Art/Models/Room_Kitchen.fbx: a dressed kitchen, used for rooms with theme \"kitchen\".")]
+        public GameObject kitchenRoom;
+        [Tooltip("Width of one kit room module, metres. Pieces are scaled in x by room width / this.")]
+        public float kitModuleWidth = 6f;
+        [Tooltip("Yaw applied to every kit piece so it faces the camera. The FBX comes in turned 180° (x and depth negated).")]
+        public float kitYaw = 180f;
+        [Tooltip("Kitchen parts left out: the 3D fridge (the PNG fridge replaces it) and furniture standing in front of the sockets and the character.")]
+        public string[] kitchenSkipParts =
+        {
+            "Fridge", "Kitchen_Counter", "Kitchen_CounterItems", "Kitchen_Chair_01", "Kitchen_Chair_02",
+            "Kitchen_DiningTable", "Kitchen_Bin", "Kitchen_Pantry", "Kitchen_PendantLamp",
+        };
+        [Tooltip("Scale of the kit's Socket_Plate (0.26 m) on each socket.")]
+        public float socketPlateScale = 1.5f;
+
         [Header("Alerts (GDD v1.1 §2.5)")]
         public float deadlineWarnSeconds = 5f;
         public float routineWarnSeconds = 3f;

@@ -33,7 +33,15 @@ namespace Trouble.Game
         /// <summary>World rect of the whole house front (x right, y up), for the camera.</summary>
         public Rect Bounds { get; private set; }
         private bool _day;
+        private bool _kit;
         private SpriteRenderer _blackout;
+        private DayPromptView _prompts;
+
+        /// <summary>True when the rooms were built from the 3D house kit (day mode, useHouseKit), false = greybox.</summary>
+        public bool UsesHouseKit => _kit;
+
+        /// <summary>Day mode key prompts (null in other levels).</summary>
+        public DayPromptView Prompts => _prompts;
 
         /// <summary>Builds the house for the controller's current sim.</summary>
         public void Build(LevelController controller, TrippedViewConfig config, ArtLibrary art)
@@ -43,17 +51,27 @@ namespace Trouble.Game
             _config = config;
             Bounds = HouseLayout.HouseBounds(_sim.Rooms, config.roomHeight);
             _day = _sim.IsDayMode;
+            _kit = _day && HouseKitView.Available(config);
+            if (_kit)
+            {
+                var kitGo = new GameObject("HouseKit");
+                kitGo.transform.SetParent(transform, false);
+                kitGo.AddComponent<HouseKitView>().Build(_sim, config);
+                var b = Bounds;
+                Bounds = Rect.MinMaxRect(b.xMin, b.yMin - HouseKitView.FoundationDepth, b.xMax, b.yMax + HouseKitView.RoofHeight);
+            }
 
             foreach (var room in _sim.Rooms)
             {
                 var go = new GameObject("Room " + room.Id);
                 go.transform.SetParent(transform, false);
                 var view = go.AddComponent<RoomView>();
-                view.Build(room, room.Id == _sim.PanelRoomId, config, art, _sim.Rooms, _day);
+                bool panelRoom = room.Id == _sim.PanelRoomId;
+                view.Build(room, panelRoom, config, art, _sim.Rooms, _day, !_kit, _day && panelRoom ? _sim.PanelX : float.NaN);
                 _rooms.Add(view);
             }
 
-            BuildWalls();
+            if (!_kit) BuildWalls();
             BuildStairs();
 
             _wireRoot = new GameObject("Wires").transform;
@@ -95,6 +113,14 @@ namespace Trouble.Game
             _character = chGo.AddComponent<CharacterView>();
             _character.Build(config, art);
 
+            if (_day)
+            {
+                var promptGo = new GameObject("Prompts");
+                promptGo.transform.SetParent(transform, false);
+                _prompts = promptGo.AddComponent<DayPromptView>();
+                _prompts.Build(this, config);
+            }
+
             LateUpdate();
         }
 
@@ -105,6 +131,14 @@ namespace Trouble.Game
             if (_highlightedSocket != null && _sockets.TryGetValue(_highlightedSocket, out var old) && old != null) old.SetHighlight(false);
             _highlightedSocket = socketId;
             if (socketId != null && _sockets.TryGetValue(socketId, out var now) && now != null) now.SetHighlight(true);
+        }
+
+        /// <summary>The appliance view with this id, or null.</summary>
+        public ApplianceView FindApplianceView(string applianceId)
+        {
+            for (int i = 0; i < _appliances.Count; i++)
+                if (_appliances[i].Appliance.Id == applianceId) return _appliances[i];
+            return null;
         }
 
         /// <summary>The socket view with this id, or null.</summary>
@@ -143,6 +177,7 @@ namespace Trouble.Game
                 _appliances[i].Sync(_sim, selected != null && selected == _appliances[i].Appliance.Id, time);
 
             _character.Sync(_sim, _controller.TickFraction, time);
+            if (_prompts != null) _prompts.Sync(_sim);
         }
 
         /// <summary>Day mode: dims the whole house while any breaker is OFF (a blackout).</summary>
@@ -213,7 +248,7 @@ namespace Trouble.Game
                     var go = new GameObject("Socket " + s.Id);
                     go.transform.SetParent(_socketRoot, false);
                     view = go.AddComponent<SocketView>();
-                    view.Build(s, _sim, _config);
+                    view.Build(s, _sim, _config, _kit);
                     _sockets[s.Id] = view;
                     _socketList.Add(view);
                 }
@@ -246,23 +281,42 @@ namespace Trouble.Game
                 if (a == null || b == null || a.Floor == b.Floor) continue;
                 var lower = a.Floor < b.Floor ? a : b;
                 var upper = lower == a ? b : a;
-                var span = HouseLayout.OverlapSpan(lower, upper);
-                if (span.y - span.x < 1f) continue;
                 float yLow = HouseLayout.FloorY(lower.Floor, _config.roomHeight);
                 float yHigh = HouseLayout.FloorY(upper.Floor, _config.roomHeight);
-                var p0 = new Vector2(span.x + 0.8f, yLow + 0.1f);
-                var p1 = new Vector2(span.y - 0.8f, yHigh + 0.1f);
+                Vector2 p0, p1;
+                float z, depth;
+                if (_day)
+                {
+                    // Day mode: the flight is centred on sim.StairsX (where W/S work and the climb runs), drawn just
+                    // behind the character's walking line so a climbing character is in front of it.
+                    float sx = _sim.StairsX(door);
+                    p0 = HouseLayout.ClimbPoint(sx, yLow, yHigh, _config.stairsLanding, _config.stairsHalfRun, _config.stairsLanding);
+                    p1 = HouseLayout.ClimbPoint(sx, yLow, yHigh, 1f - _config.stairsLanding, _config.stairsHalfRun, _config.stairsLanding);
+                    p0.y += 0.05f;
+                    p1.y += 0.05f;
+                    depth = Mathf.Max(0.05f, _config.characterInset * 0.6f);
+                    z = _config.roomDepth - _config.characterInset * 0.5f + 0.02f;
+                }
+                else
+                {
+                    var span = HouseLayout.OverlapSpan(lower, upper);
+                    if (span.y - span.x < 1f) continue;
+                    p0 = new Vector2(span.x + 0.8f, yLow + 0.1f);
+                    p1 = new Vector2(span.y - 0.8f, yHigh + 0.1f);
+                    z = -0.3f;
+                    depth = 0.5f;
+                }
                 var delta = p1 - p0;
                 float length = delta.magnitude;
                 float angle = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
-                var plank = Prims.Box(root, "Stairs " + door.Id, new Vector3((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f, -0.3f),
-                    new Vector3(length, 0.09f, 0.5f), _config.doorColor);
+                var plank = Prims.Box(root, "Stairs " + door.Id, new Vector3((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f, z),
+                    new Vector3(length, 0.09f, depth), _config.doorColor);
                 plank.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
                 int rungs = Mathf.Max(3, Mathf.RoundToInt(length / 0.45f));
                 for (int i = 1; i < rungs; i++)
                 {
                     var at = Vector2.Lerp(p0, p1, (float)i / rungs);
-                    Prims.Box(root, "Rung", new Vector3(at.x, at.y + 0.12f, -0.3f), new Vector3(0.22f, 0.07f, 0.5f), _config.slabColor);
+                    Prims.Box(root, "Rung", new Vector3(at.x, at.y + 0.12f, z), new Vector3(0.22f, 0.07f, depth), _config.slabColor);
                 }
             }
         }

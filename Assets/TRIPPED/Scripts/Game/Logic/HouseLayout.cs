@@ -107,9 +107,12 @@ namespace Trouble.Game
         /// two room centres by the sim's segment progress; <paramref name="tickFraction"/> (0..1, how far the
         /// clock is into the next tick) smooths the motion between ticks without changing the sim.
         /// </summary>
-        public static Vector2 CharacterPoint(HouseSim sim, float tickFraction, float roomHeight)
+        /// <remarks>Day mode: the sim's own x (<see cref="CharacterState.X"/>), and the stairs path while climbing.</remarks>
+        public static Vector2 CharacterPoint(HouseSim sim, float tickFraction, float roomHeight,
+            float stairsHalfRun = 1f, float stairsLanding = 0.15f)
         {
             var ch = sim.Character;
+            if (sim.IsDayMode) return DayCharacterPoint(sim, tickFraction, roomHeight, stairsHalfRun, stairsLanding);
             if (ch.IsWalking)
             {
                 var from = sim.FindRoom(ch.FromRoomId);
@@ -124,6 +127,50 @@ namespace Trouble.Game
             }
             var room = sim.FindRoom(ch.RoomId);
             return room == null ? Vector2.zero : new Vector2(room.CenterX, FloorY(room.Floor, roomHeight));
+        }
+
+        /// <summary>
+        /// Day mode: the character's feet. Standing or walking it is at the sim's x on its room's floor; while
+        /// climbing it follows <see cref="ClimbPoint"/> along the stairs at sim.StairsX.
+        /// </summary>
+        public static Vector2 DayCharacterPoint(HouseSim sim, float tickFraction, float roomHeight, float stairsHalfRun, float stairsLanding)
+        {
+            var ch = sim.Character;
+            if (ch.IsClimbing)
+            {
+                var from = sim.FindRoom(ch.ClimbFromRoomId);
+                var to = sim.FindRoom(ch.ClimbToRoomId);
+                var door = from != null && to != null ? DayInteraction.StairsBetween(sim, from.Id, to.Id) : null;
+                if (door != null)
+                {
+                    float p = WalkProgress(ch.ClimbTicks - ch.ClimbTicksLeft, ch.ClimbTicks, tickFraction);
+                    return ClimbPoint(sim.StairsX(door), FloorY(from.Floor, roomHeight), FloorY(to.Floor, roomHeight), p, stairsHalfRun, stairsLanding);
+                }
+            }
+            var room = sim.FindRoom(ch.RoomId);
+            return new Vector2(ch.X, room == null ? 0f : FloorY(room.Floor, roomHeight));
+        }
+
+        /// <summary>
+        /// A point on a climb between two floors. The stairs rise left to right from (x − halfRun, low floor) to
+        /// (x + halfRun, high floor); the climb starts and ends at <paramref name="stairsX"/> (where the sim puts the
+        /// character), stepping to the foot of the stairs over the first <paramref name="landing"/> of the progress
+        /// and off the top over the last. Going down runs the same path backwards.
+        /// </summary>
+        /// <param name="progress">0 = at the start floor, 1 = arrived.</param>
+        public static Vector2 ClimbPoint(float stairsX, float yFrom, float yTo, float progress, float halfRun, float landing)
+        {
+            bool up = yTo >= yFrom;
+            float yLow = Mathf.Min(yFrom, yTo), yHigh = Mathf.Max(yFrom, yTo);
+            float q = Mathf.Clamp01(up ? progress : 1f - progress);
+            landing = Mathf.Clamp(landing, 0f, 0.45f);
+            var bottom = new Vector2(stairsX, yLow);
+            var foot = new Vector2(stairsX - halfRun, yLow);
+            var top = new Vector2(stairsX + halfRun, yHigh);
+            var off = new Vector2(stairsX, yHigh);
+            if (landing > 0f && q < landing) return Vector2.Lerp(bottom, foot, q / landing);
+            if (landing > 0f && q > 1f - landing) return Vector2.Lerp(top, off, (q - (1f - landing)) / landing);
+            return Vector2.Lerp(foot, top, (q - landing) / (1f - 2f * landing));
         }
 
         /// <summary>Segment progress 0..1 with the fraction of the next tick added.</summary>

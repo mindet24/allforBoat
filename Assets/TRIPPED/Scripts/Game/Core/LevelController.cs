@@ -32,6 +32,7 @@ namespace Trouble.Game
         private GameObject _houseObject;
         private GameObject _hudObject;
         private float _accumulator;
+        private int _sentWalk;
         private string _lastTripText = "";
         private readonly List<string> _errors = new List<string>();
         private readonly List<string> _toastLog = new List<string>();
@@ -133,6 +134,7 @@ namespace Trouble.Game
             LevelIndex = n;
             Holding = Held.None;
             _accumulator = 0f;
+            _sentWalk = 0;
             TickFraction = 0f;
             _lastTripText = "";
             _toastLog.Clear();
@@ -151,7 +153,9 @@ namespace Trouble.Game
             if (_camera != null)
             {
                 _camera.UseArea(Sim.IsDayMode ? _config.dayHouseArea : _config.houseArea);
-                _camera.Frame(House.Bounds, () => HouseLayout.CharacterPoint(Sim, TickFraction, _config.roomHeight));
+                // Day mode: A/D/W/S and the arrows move the character, not the camera.
+                _camera.KeyPan = !Sim.IsDayMode;
+                _camera.Frame(House.Bounds, () => HouseLayout.CharacterPoint(Sim, TickFraction, _config.roomHeight, _config.stairsHalfRun, _config.stairsLanding));
             }
             LevelLoaded?.Invoke(n);
             return true;
@@ -218,6 +222,8 @@ namespace Trouble.Game
         public void HandleClick(ClickInput click)
         {
             if (Sim == null || Sim.Phase == LevelPhase.Won || Sim.Phase == LevelPhase.Lost) return;
+            // Day mode is played with the keyboard (walk, W/S stairs, E); the sim rejects click commands there.
+            if (Sim.IsDayMode) return;
             if (click.Kind == ClickKind.TrayAppliance) click.Shift = ShiftHeld;
             click.DayMode = Sim.IsDayMode;
             var outcome = ClickResolver.Resolve(Holding, click);
@@ -271,6 +277,23 @@ namespace Trouble.Game
                 if (HasLevel(n)) LoadLevel(n);
                 return;
             }
+            if (Sim != null && Sim.IsDayMode) HandleDayKeys(kb);
+        }
+
+        /// <summary>
+        /// Day mode: A/D or Left/Right hold a walking direction (sent once when it changes, 0 when released),
+        /// W/Up climbs, S/Down goes down, E interacts. Keys only act while the day is running.
+        /// </summary>
+        private void HandleDayKeys(Keyboard kb)
+        {
+            if (Sim.Phase != LevelPhase.Running) return;
+            int dir = 0;
+            if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) dir += 1;
+            if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) dir -= 1;
+            if (dir != _sentWalk && Submit(Command.Walk(dir))) _sentWalk = dir;
+            if (kb.wKey.wasPressedThisFrame || kb.upArrowKey.wasPressedThisFrame) Submit(Command.Climb(1));
+            if (kb.sKey.wasPressedThisFrame || kb.downArrowKey.wasPressedThisFrame) Submit(Command.Climb(-1));
+            if (kb.eKey.wasPressedThisFrame) Submit(Command.Interact());
         }
 
         /// <summary>Steps the sim every 1/ticksPerSecond of real time while running, at most maxStepsPerFrame per frame.</summary>

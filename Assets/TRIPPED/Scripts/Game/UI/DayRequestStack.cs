@@ -52,16 +52,18 @@ namespace Trouble.Game
         public void Sync(HouseSim sim, float now, float dt)
         {
             int tps = sim.Rules.ticksPerSecond;
+            // When the day is over every card leaves, including requests that were still waiting.
+            bool dayOver = sim.Phase == LevelPhase.Won || sim.Phase == LevelPhase.Lost;
             foreach (var r in sim.Requests)
             {
                 if (r.Serial <= 0) continue;
                 if (!_cards.TryGetValue(r.Serial, out var card))
                 {
-                    if (!r.IsActive) continue; // finished before it ever had a card
+                    if (!r.IsActive || dayOver) continue; // finished before it ever had a card
                     card = MakeCard(sim, r, now);
                     _cards[r.Serial] = card;
                 }
-                Update(card, sim, r, now, tps);
+                Update(card, sim, r, now, tps, dayOver);
             }
 
             // Keep cards in the order the requests appeared and let them glide into place.
@@ -94,9 +96,9 @@ namespace Trouble.Game
             }
         }
 
-        private void Update(Card card, HouseSim sim, RequestState r, float now, int tps)
+        private void Update(Card card, HouseSim sim, RequestState r, float now, int tps, bool dayOver)
         {
-            bool finished = !r.IsActive;
+            bool finished = !r.IsActive || dayOver;
             if (finished && card.ExitAt < 0f) card.ExitAt = now;
             var level = DayRules.ParseUrgency(r.Urgency);
             var color = _config.UrgencyColor(level);

@@ -32,16 +32,70 @@ namespace Trouble.Game
 
         /// <summary>Builds the room's pieces under this object, which sits at world origin.</summary>
         public void Build(RoomState room, bool isPanelRoom, TrippedViewConfig config, ArtLibrary art,
-            IReadOnlyList<RoomState> allRooms = null, bool dayMode = false)
+            IReadOnlyList<RoomState> allRooms = null, bool dayMode = false, bool greyboxShell = true, float panelX = float.NaN)
         {
             _room = room;
             _config = config;
             _day = dayMode;
             var rect = HouseLayout.RoomRect(room, config.roomHeight);
             float depth = config.roomDepth;
+
+            // Day mode: labels and bars sit in front of the house so stairs, walls and kit props never cover them.
+            float labelZ = dayMode ? config.dayOverlayZ : depth - 0.02f;
+            if (greyboxShell) BuildGreybox(room, rect, config, art, allRooms);
+
+            if (isPanelRoom)
+            {
+                float px = float.IsNaN(panelX) ? rect.xMin + 0.7f : panelX;
+                float py = rect.yMin + 1.5f;
+                var panelSprite = dayMode ? art.Prop(config.panelArtPath) : null;
+                if (panelSprite != null)
+                {
+                    // The artist's panel (bottom-centre pivot, 1 unit tall) hung on the back wall at sim.PanelX.
+                    float bottom = rect.yMin + config.panelMountHeight;
+                    var go = new GameObject("Panel");
+                    go.transform.SetParent(transform, false);
+                    go.transform.localPosition = new Vector3(px, bottom, depth - 0.06f);
+                    float spriteH = panelSprite.rect.height / Mathf.Max(1f, panelSprite.pixelsPerUnit);
+                    go.transform.localScale = Vector3.one * (config.panelWorldHeight / Mathf.Max(0.01f, spriteH));
+                    var sr = go.AddComponent<SpriteRenderer>();
+                    sr.sprite = panelSprite;
+                    sr.sortingOrder = 21;
+                    py = bottom + config.panelWorldHeight * 0.5f;
+                }
+                else
+                {
+                    var panelColor = config.panelColor;
+                    Add(Prims.Box(transform, "Panel", new Vector3(px, py, depth - 0.08f),
+                        new Vector3(0.55f, 0.75f, 0.16f), panelColor), panelColor);
+                    Prims.Text(transform, "PanelLabel", new Vector3(px, py, depth - 0.17f),
+                        new Vector2(0.5f, 0.2f), "PANEL", config.roomNameText, 1.2f).sortingOrder = 20;
+                }
+                // Glow behind the panel (blackout: reset me), and a click target on it.
+                var glow = new GameObject("PanelGlow");
+                glow.transform.SetParent(transform, false);
+                glow.transform.localPosition = new Vector3(px, py, depth - 0.2f);
+                _panelGlow = glow.AddComponent<SpriteRenderer>();
+                _panelGlow.sprite = PlaceholderArt.WorldRounded;
+                _panelGlow.drawMode = SpriteDrawMode.Sliced;
+                _panelGlow.size = new Vector2(1.0f, 1.25f);
+                _panelGlow.color = config.alertColor;
+                _panelGlow.sortingOrder = 19;
+                _panelGlow.enabled = false;
+                var panelClick = new GameObject("PanelClick");
+                panelClick.transform.SetParent(transform, false);
+                panelClick.transform.localPosition = new Vector3(px, py, depth - 0.3f);
+                ClickTarget.Add(panelClick, ClickKind.Panel, room.Id, room.Id, 3, Vector3.zero, new Vector3(0.9f, 1.1f, 0.5f));
+            }
+
+            BuildLabels(room, rect, config, dayMode, labelZ);
+        }
+
+        private void BuildGreybox(RoomState room, Rect rect, TrippedViewConfig config, ArtLibrary art, IReadOnlyList<RoomState> allRooms)
+        {
+            float depth = config.roomDepth;
             float floorT = config.floorThickness;
             float wallT = config.wallThickness;
-
             Add(Prims.Box(transform, "Floor", new Vector3(rect.center.x, rect.yMin - floorT * 0.5f, depth * 0.5f),
                 new Vector3(rect.width, floorT, depth), config.floorColor), config.floorColor);
             Add(Prims.Box(transform, "BackWall", new Vector3(rect.center.x, rect.center.y, depth + wallT * 0.5f),
@@ -63,33 +117,13 @@ namespace Trouble.Game
                 _backgroundMaterial = quad.sharedMaterial;
                 Add(quad, Color.white);
             }
+        }
 
-            if (isPanelRoom)
-            {
-                var panelColor = config.panelColor;
-                Add(Prims.Box(transform, "Panel", new Vector3(rect.xMin + 0.7f, rect.yMin + 1.5f, depth - 0.08f),
-                    new Vector3(0.55f, 0.75f, 0.16f), panelColor), panelColor);
-                Prims.Text(transform, "PanelLabel", new Vector3(rect.xMin + 0.7f, rect.yMin + 1.5f, depth - 0.17f),
-                    new Vector2(0.5f, 0.2f), "PANEL", config.roomNameText, 1.2f).sortingOrder = 20;
-                // Glow behind the panel (blackout: reset me), and a click target on it.
-                var glow = new GameObject("PanelGlow");
-                glow.transform.SetParent(transform, false);
-                glow.transform.localPosition = new Vector3(rect.xMin + 0.7f, rect.yMin + 1.5f, depth - 0.2f);
-                _panelGlow = glow.AddComponent<SpriteRenderer>();
-                _panelGlow.sprite = PlaceholderArt.WorldRounded;
-                _panelGlow.drawMode = SpriteDrawMode.Sliced;
-                _panelGlow.size = new Vector2(1.0f, 1.25f);
-                _panelGlow.color = config.alertColor;
-                _panelGlow.sortingOrder = 19;
-                _panelGlow.enabled = false;
-                var panelClick = new GameObject("PanelClick");
-                panelClick.transform.SetParent(transform, false);
-                panelClick.transform.localPosition = new Vector3(rect.xMin + 0.7f, rect.yMin + 1.5f, depth - 0.3f);
-                ClickTarget.Add(panelClick, ClickKind.Panel, room.Id, room.Id, 3, Vector3.zero, new Vector3(0.9f, 1.1f, 0.5f));
-            }
-
+        private void BuildLabels(RoomState room, Rect rect, TrippedViewConfig config, bool dayMode, float labelZ)
+        {
+            float depth = config.roomDepth;
             // Inset from the left wall so the wall's side face (seen in perspective) never covers the name.
-            _nameText = Prims.Text(transform, "Name", new Vector3(rect.xMin + 0.5f + rect.width * (dayMode ? 0.3f : 0.25f), rect.yMax - (dayMode ? 0.7f : 0.3f), depth - 0.02f),
+            _nameText = Prims.Text(transform, "Name", new Vector3(rect.xMin + 0.5f + rect.width * (dayMode ? 0.3f : 0.25f), rect.yMax - (dayMode ? 0.7f : 0.3f), labelZ),
                 new Vector2(rect.width * (dayMode ? 0.6f : 0.5f), dayMode ? 0.42f : 0.35f), room.Name, config.roomNameText, dayMode ? 4f : 3f, TMPro.TextAlignmentOptions.Left);
             _nameText.sortingOrder = 20;
             if (dayMode)
@@ -99,12 +133,12 @@ namespace Trouble.Game
                 _barWidth = rect.width * 0.5f;
                 // Below the floor slab of the room above, which hangs 0.3 m into this room.
                 float barY = rect.yMax - 1.12f;
-                _barBack = MakeBar("LoadBarBack", new Vector3(_barLeft + _barWidth * 0.5f, barY, depth - 0.03f), 18);
+                _barBack = MakeBar("LoadBarBack", new Vector3(_barLeft + _barWidth * 0.5f, barY, labelZ - 0.01f), 18);
                 _barBack.color = new Color(0f, 0f, 0f, 0.55f);
                 _barBack.size = new Vector2(_barWidth, 0.17f);
-                _barFill = MakeBar("LoadBarFill", new Vector3(_barLeft, barY, depth - 0.04f), 19);
+                _barFill = MakeBar("LoadBarFill", new Vector3(_barLeft, barY, labelZ - 0.02f), 19);
                 _barFill.size = new Vector2(0.05f, 0.13f);
-                _countdownText = Prims.Text(transform, "Countdown", new Vector3(_barLeft + _barWidth + 0.55f, barY, depth - 0.04f),
+                _countdownText = Prims.Text(transform, "Countdown", new Vector3(_barLeft + _barWidth + 0.55f, barY, labelZ - 0.02f),
                     new Vector2(1.0f, 0.3f), "", config.alertColor, 3f, TMPro.TextAlignmentOptions.Left);
                 _countdownText.sortingOrder = 20;
             }

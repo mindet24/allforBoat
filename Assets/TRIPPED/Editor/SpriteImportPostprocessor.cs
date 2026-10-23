@@ -7,7 +7,7 @@ using UnityEngine;
 namespace Trouble.EditorTools
 {
     /// <summary>
-    /// Imports art dropped into Art/Appliances, Art/Characters or Art/Faces as ready-to-use sprites, so the
+    /// Imports art dropped into Art/Appliances, Art/Characters, Art/Faces or Art/Props as ready-to-use sprites, so the
     /// artist only has to name the file right (GDD v1.1 §3.6–3.8). Character strips stay one sprite; the game
     /// slices frames at runtime (width ÷ height frames). Naming and size mistakes are logged as warnings.
     /// </summary>

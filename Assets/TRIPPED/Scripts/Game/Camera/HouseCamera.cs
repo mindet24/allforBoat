@@ -41,6 +41,9 @@ namespace Trouble.Game
         /// <summary>True while the camera follows the character (F).</summary>
         public bool Following { get; private set; }
 
+        /// <summary>true = A/D/W/S and the arrow keys pan the camera. Off in day mode, where they move the character.</summary>
+        public bool KeyPan { get; set; } = true;
+
         /// <summary>View height (world metres on screen, top to bottom) the camera is easing toward.</summary>
         public float TargetViewHeight => _targetDistance;
 
@@ -163,6 +166,7 @@ namespace Trouble.Game
                 if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) pan.x += 1f;
                 if (kb.wKey.isPressed || kb.upArrowKey.isPressed) pan.y += 1f;
                 if (kb.sKey.isPressed || kb.downArrowKey.isPressed) pan.y -= 1f;
+                if (!KeyPan) pan = Vector2.zero;
                 if (pan != Vector2.zero)
                 {
                     Following = false;

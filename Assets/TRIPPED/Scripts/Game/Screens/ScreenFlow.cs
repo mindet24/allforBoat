@@ -180,6 +180,8 @@ namespace Trouble.Game
 
         private void Update()
         {
+            // Not set up yet (or already torn down): nothing to drive.
+            if (_controller == null || _menus == null || _menus.ResultLevels == null) return;
             if (_endAt >= 0f && Current == ScreenId.None && Time.unscaledTime >= _endAt) ShowEnd();
 
             var kb = Keyboard.current;
@@ -189,7 +191,7 @@ namespace Trouble.Game
                 if (target != Current) Show(target);
             }
 
-            bool resultShown = Current == ScreenId.None && _controller.Hud != null && _controller.Hud.Result.IsShown;
+            bool resultShown = Current == ScreenId.None && _controller.Hud != null && _controller.Hud.Result != null && _controller.Hud.Result.IsShown;
             if (_menus.ResultLevels.activeSelf != resultShown) _menus.ResultLevels.SetActive(resultShown);
         }
 

@@ -20,6 +20,7 @@ namespace Trouble.Game
         private TextMeshPro _label;
         private bool _hasArt;
         private float _width;
+        private float _height;
         private ClickTarget _target;
         private TextMeshPro _seenText;
         private int _shownSeenSecond = -2;
@@ -28,6 +29,9 @@ namespace Trouble.Game
         /// <summary>The sim appliance this view shows.</summary>
         public ApplianceState Appliance => _app;
 
+        /// <summary>Middle of the top edge of the drawn appliance, in the house's local space (for the "E" prompt).</summary>
+        public Vector3 TopPoint => transform.localPosition + new Vector3(0f, _height, 0f);
+
         /// <summary>Builds the sprite layers and click collider.</summary>
         public void Build(ApplianceState app, ApplianceDef def, TrippedViewConfig config, ArtLibrary art, bool showLoad = false)
         {
@@ -35,6 +39,7 @@ namespace Trouble.Game
             _config = config;
             float height = def != null && def.worldHeight > 0f ? def.worldHeight : 0.6f;
             if (showLoad) height *= 1.4f; // day mode: bigger, the player reads loads from the house
+            _height = height;
             var sprite = art.Appliance(app.Type);
             _hasArt = sprite != null;
 
@@ -45,6 +50,16 @@ namespace Trouble.Game
                 _width = height * aspect;
                 _glow = MakeSprite("Glow", sprite, 0, new Vector3(0f, -height * 0.04f, 0.02f), Vector3.one * height * 1.1f);
                 _card = MakeSprite("Sprite", sprite, 2, Vector3.zero, Vector3.one * height);
+                if (showLoad)
+                {
+                    // Day mode: the load the appliance draws, on a small badge at its top right.
+                    var badge = MakeSliced("LoadBadge", PlaceholderArt.WorldRounded, 3, new Vector2(0.34f, 0.26f),
+                        new Vector3(_width * 0.38f, height * 0.92f, -0.02f));
+                    badge.color = config.applianceCard;
+                    _label = Prims.Text(transform, "Load", new Vector3(_width * 0.38f, height * 0.92f, -0.03f), new Vector2(0.3f, 0.22f),
+                        app.Load.ToString(), config.worldText, 2.4f);
+                    _label.sortingOrder = 4;
+                }
             }
             else
             {

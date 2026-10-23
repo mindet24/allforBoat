@@ -46,7 +46,16 @@ MonoBehaviour:
   slabColor: {r: 0.2901961, g: 0.2901961, b: 0.33333334, a: 1}
   doorColor: {r: 0.41960785, g: 0.36862746, b: 0.32156864, a: 1}
   panelColor: {r: 0.23137255, g: 0.20784314, b: 0.3137255, a: 1}
-  hiddenRoomTint: {r: 0.32, g: 0.32, b: 0.38, a: 1}
+  socketBody: {r: 0.23137255, g: 0.20784314, b: 0.3137255, a: 1}
+  hiddenRoomOverlay: {r: 0.11764706, g: 0.11764706, b: 0.14117648, a: 0.85}
+  powerOutOverlay: {r: 0, g: 0, b: 0, a: 0.55}
+  overlayFeather: 0.35
+  wireUnknown: {r: 0.43137255, g: 0.43137255, b: 0.47058824, a: 1}
+  wireWidth: 0.035
+  wireSweepSeconds: 0.4
+  cordColor: {r: 0.16862746, g: 0.16862746, b: 0.2, a: 1}
+  cordWidth: 0.045
+  cordSag: 0.18
   ghostAlpha: 0.3
   applianceCard: {r: 0.9372549, g: 0.8901961, b: 0.8117647, a: 1}
   applianceOutline: {r: 0.16862746, g: 0.16862746, b: 0.2, a: 1}
@@ -69,6 +78,7 @@ MonoBehaviour:
   socketDepth: 0.3
   playerWorldHeight: 1.4
   animationFps: 8
+  orthographic: 1
   fieldOfView: 20
   zoomStep: 0.15
   zoomSmoothTime: 0.15
@@ -76,13 +86,89 @@ MonoBehaviour:
   nearRoomWidth: 4
   nearRoomScreenFraction: 0.6
   keyPanSpeed: 0.6
-  houseViewport:
+  houseArea:
     serializedVersion: 2
     x: 0.20833333
     y: 0.18518518
     width: 0.5833333
-    height: 0.7259259
+    height: 0.65185183
+  dayHouseArea:
+    serializedVersion: 2
+    x: 0.01
+    y: 0.18518518
+    width: 0.7916667
+    height: 0.7314815
+  urgencyUrgent: {r: 0.8980392, g: 0.22352941, b: 0.20784314, a: 1}
+  urgencyNormal: {r: 1, g: 0.7019608, b: 0, a: 1}
+  urgencyRelaxed: {r: 0.5411765, g: 0.5411765, b: 0.5803922, a: 1}
+  heartColor: {r: 0.8980392, g: 0.22352941, b: 0.3137255, a: 1}
+  heartEmpty: {r: 0.22745098, g: 0.22745098, b: 0.26666668, a: 1}
+  daySocket: {r: 0.9372549, g: 0.8901961, b: 0.8117647, a: 1}
+  blackoutOverlay: {r: 0, g: 0, b: 0, a: 0.62}
+  cardExitSeconds: 0.7
+  stairsHalfRun: 1
+  stairsLanding: 0.15
+  characterFollowSpeed: 6
+  carryIconHeight: 0.75
+  dayOverlayZ: -0.45
+  promptBack: {r: 0.11764706, g: 0.11764706, b: 0.14117648, a: 0.9019608}
+  promptText: {r: 1, g: 0.8784314, b: 0.4, a: 1}
+  promptSize: {x: 0.5, y: 0.42}
+  stairsPromptSize: {x: 0.8, y: 0.42}
+  panelArtPath: Art/Props/panel
+  panelWorldHeight: 0.9
+  panelMountHeight: 1
+  useHouseKit: 1
+  houseKit: {fileID: 919132149155446097, guid: ddaf319699e61504ea1bc167a75da7f1, type: 3}
+  kitchenRoom: {fileID: 919132149155446097, guid: f72d05524e5eece47b87ac1b50202bf2, type: 3}
+  kitModuleWidth: 6
+  kitYaw: 180
+  kitchenSkipParts:
+  - Fridge
+  - Kitchen_Counter
+  - Kitchen_CounterItems
+  - Kitchen_Chair_01
+  - Kitchen_Chair_02
+  - Kitchen_DiningTable
+  - Kitchen_Bin
+  - Kitchen_Pantry
+  - Kitchen_PendantLamp
+  socketPlateScale: 1.5
+  deadlineWarnSeconds: 5
+  routineWarnSeconds: 3
+  interruptAlertSeconds: 3
+  alertColor: {r: 0.8980392, g: 0.22352941, b: 0.20784314, a: 1}
+  alertEdgeMargin: 0.03
   maxStepsPerFrame: 5
+  showTitle: 1
+  audioFolder: Audio
+  masterVolume: 1
+  soundVolumes:
+  - name: click
+    volume: 0.4
+  - name: clunk
+    volume: 0.8
+  - name: chime
+    volume: 0.4
+  - name: wrong
+    volume: 0.35
+  - name: ding
+    volume: 0.4
+  - name: tick
+    volume: 0.25
+  - name: nope
+    volume: 0.3
+  - name: fail_small
+    volume: 0.4
+  - name: win
+    volume: 0.5
+  - name: lose
+    volume: 0.5
+  buzzMinVolume: 0.25
+  buzzMaxVolume: 0.6
+  secondClunkDelay: 0.18
+  tickWarnSeconds: 5
+  endScreenDelay: 2
   applianceArtFolder: Art/Appliances
   characterArtFolder: Art/Characters
   faceArtFolder: Art/Faces

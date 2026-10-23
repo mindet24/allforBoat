@@ -28,6 +28,9 @@ namespace Trouble.Game
         /// <summary>The appliance sprite for a catalog id, or null to use the placeholder card.</summary>
         public Sprite Appliance(string type) => LoadSprite(_config.applianceArtFolder + "/" + type);
 
+        /// <summary>A prop sprite by Resources path (for example the breaker panel, Art/Props/panel), or null.</summary>
+        public Sprite Prop(string path) => string.IsNullOrEmpty(path) ? null : LoadSprite(path);
+
         /// <summary>The face icon of a family member, or null to use the placeholder circle.</summary>
         public Sprite Face(string owner) => string.IsNullOrEmpty(owner) ? null : LoadSprite(_config.faceArtFolder + "/face_" + owner.ToLowerInvariant());
 

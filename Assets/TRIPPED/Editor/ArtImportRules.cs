@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Trouble.EditorTools
 {
-    public enum ArtKind { None, Appliance, Character, Face }
+    public enum ArtKind { None, Appliance, Character, Face, Prop }
 
     /// <summary>How one art file should be imported, and anything wrong with how it was made.</summary>
     public sealed class ArtImportPlan
@@ -22,7 +22,7 @@ namespace Trouble.EditorTools
 
     /// <summary>
     /// The art drop-in conventions of GDD v1.1 §3.6–3.7, decided from the file path and size alone.
-    /// Any folder named Art/Appliances, Art/Characters or Art/Faces under Assets/TRIPPED counts.
+    /// Any folder named Art/Appliances, Art/Characters, Art/Faces or Art/Props under Assets/TRIPPED counts.
     /// </summary>
     public static class ArtImportRules
     {
@@ -30,7 +30,7 @@ namespace Trouble.EditorTools
         public const int FaceSize = 256;
         public static readonly string[] CharacterStates = { "idle", "walk", "interact", "panic" };
 
-        private static readonly Regex Folder = new Regex(@"^Assets/TRIPPED/(?:.*/)?Art/(Appliances|Characters|Faces)/[^/]+\.png$", RegexOptions.IgnoreCase);
+        private static readonly Regex Folder = new Regex(@"^Assets/TRIPPED/(?:.*/)?Art/(Appliances|Characters|Faces|Props)/[^/]+\.png$", RegexOptions.IgnoreCase);
 
         /// <param name="assetPath">Project path with forward slashes.</param>
         /// <param name="width">Source image width in pixels.</param>
@@ -64,6 +64,13 @@ namespace Trouble.EditorTools
                         plan.Problems.Add($"{name}.png is {width}x{height}; a strip must be square frames side by side (width a multiple of height).");
                     if (!IsCharacterName(name))
                         plan.Problems.Add($"{name}.png should be named player_{string.Join("/", CharacterStates)}.png.");
+                    break;
+
+                case "props":
+                    // Props (the breaker panel): stand on their bottom edge like appliances, 1 unit tall, any name.
+                    plan.Kind = ArtKind.Prop;
+                    plan.Pivot = new Vector2(0.5f, 0f);
+                    plan.PixelsPerUnit = Mathf.Max(1, height);
                     break;
 
                 case "faces":
