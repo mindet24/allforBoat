@@ -11,7 +11,8 @@ namespace Trouble.Game
     /// </summary>
     public sealed class ToastView
     {
-        private const float Width = 1000f, Height = 56f, Gap = 8f, Top = 156f;
+        private const float Width = 1000f, Height = 56f, Gap = 8f;
+        private float _top = 236f;
 
         private sealed class Toast
         {
@@ -35,10 +36,11 @@ namespace Trouble.Game
         }
 
         /// <summary>Creates the (empty) toast area.</summary>
-        public void Build(RectTransform canvas, TrippedViewConfig config)
+        public void Build(RectTransform canvas, TrippedViewConfig config, float top = 236f)
         {
+            _top = top;
             _config = config;
-            _root = UIFactory.Anchored(canvas, "Toasts", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -Top), new Vector2(Width, 3 * (Height + Gap)));
+            _root = UIFactory.Anchored(canvas, "Toasts", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -_top), new Vector2(Width, 3 * (Height + Gap)));
         }
 
         /// <summary>Shows a message; the oldest is dropped when there are already maxToasts.</summary>

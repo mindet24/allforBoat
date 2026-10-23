@@ -19,6 +19,12 @@ namespace Trouble.Game
         /// <summary>The level controller of this session.</summary>
         public LevelController Controller { get; private set; }
 
+        /// <summary>Sound and first-time tips (G3).</summary>
+        public FeedbackController Feedback { get; private set; }
+
+        /// <summary>The screen flow: Title, Level Select, End and unlock progress (G3).</summary>
+        public ScreenFlow Flow { get; private set; }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Boot()
         {
@@ -46,8 +52,34 @@ namespace Trouble.Game
             Controller.Setup(config, houseCamera);
             gameObject.AddComponent<WorldPointer>().Setup(Controller, cam);
 
-            int start = LevelLoader.Exists(config.startLevel) ? config.startLevel : 1;
-            Controller.LoadLevel(start);
+            // G3: sound and tips, the screens (Title, Level Select, End) and, in dev builds, the F1 panel.
+            Feedback = gameObject.AddComponent<FeedbackController>();
+            Feedback.Setup(Controller, config);
+            Flow = gameObject.AddComponent<ScreenFlow>();
+            Flow.Setup(Controller, config, new Progress(new PlayerPrefsProgressStore()));
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            gameObject.AddComponent<TuningPanel>().Setup(Controller, Feedback, config);
+#endif
+
+            // A fresh Play opens the Title. The quick test flow goes straight into a level instead:
+            // showTitle off in the view config, the -startLevel N argument, or the editor pref TRIPPED.skipTitle.
+            int start = DevStartLevel(config);
+            if (start > 0) Controller.LoadLevel(start);
+            else Flow.ShowTitle();
+        }
+
+        /// <summary>The level to open at once, or 0 to show the Title.</summary>
+        private static int DevStartLevel(TrippedViewConfig config)
+        {
+            var args = System.Environment.GetCommandLineArgs();
+            for (int i = 0; i + 1 < args.Length; i++)
+                if (args[i] == "-startLevel" && int.TryParse(args[i + 1], out int n) && LevelLoader.Exists(n)) return n;
+            bool skip = !config.showTitle;
+#if UNITY_EDITOR
+            skip |= UnityEditor.EditorPrefs.GetBool("TRIPPED.skipTitle", false);
+#endif
+            if (!skip) return 0;
+            return LevelLoader.Exists(config.startLevel) ? config.startLevel : 1;
         }
 
         private void EnsureEventSystem()

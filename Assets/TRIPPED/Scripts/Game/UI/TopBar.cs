@@ -45,7 +45,7 @@ namespace Trouble.Game
             UIFactory.Button(buttons, "Restart", 256, 0, 204, 60, text.Get("hud_restart"), 24, config.hudOutline, config.textPrimary,
                 controller.Restart);
 
-            var hintRt = UIFactory.Anchored(canvas, "Hint", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -104f), new Vector2(1000, 44));
+            var hintRt = UIFactory.Anchored(canvas, "Hint", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -184f), new Vector2(1000, 44));
             var hintBg = UIFactory.Fill(hintRt, new Color(0f, 0f, 0f, 0.55f), true, false);
             _hint = UIFactory.LabelOn(UIFactory.Stretch(UIFactory.Rect(hintBg.transform, "Text", 0, 0, 1000, 44)),
                 text.Sim("pause_hint"), 26, config.loadAmber, TextAlignmentOptions.Center, true);

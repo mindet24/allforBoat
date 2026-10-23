@@ -59,6 +59,43 @@ namespace Trouble.Game
             return tmp;
         }
 
+        private static Material _lineMaterial;
+
+        /// <summary>
+        /// A LineRenderer child with the default sprite material (vertex colours, no lighting). Local space,
+        /// round ends, so wires and cables look the same at any zoom.
+        /// </summary>
+        public static LineRenderer Line(Transform parent, string name, float width, int sortingOrder)
+        {
+            if (_lineMaterial == null)
+            {
+                var probe = new GameObject("probe").AddComponent<SpriteRenderer>();
+                _lineMaterial = probe.sharedMaterial;
+                Object.Destroy(probe.gameObject);
+            }
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var lr = go.AddComponent<LineRenderer>();
+            lr.sharedMaterial = _lineMaterial;
+            lr.useWorldSpace = false;
+            lr.widthMultiplier = width;
+            lr.numCapVertices = 4;
+            lr.numCornerVertices = 4;
+            lr.sortingOrder = sortingOrder;
+            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lr.receiveShadows = false;
+            return lr;
+        }
+
+        /// <summary>Sets a LineRenderer's points (local space, all at depth <paramref name="z"/>) and one colour.</summary>
+        public static void SetLine(LineRenderer lr, System.Collections.Generic.IReadOnlyList<Vector2> points, float z, Color color)
+        {
+            lr.positionCount = points.Count;
+            for (int i = 0; i < points.Count; i++) lr.SetPosition(i, new Vector3(points[i].x, points[i].y, z));
+            lr.startColor = color;
+            lr.endColor = color;
+        }
+
         /// <summary>The shared lit material for a colour.</summary>
         public static Material Lit(Color color)
         {

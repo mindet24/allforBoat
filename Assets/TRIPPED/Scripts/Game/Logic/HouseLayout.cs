@@ -133,6 +133,38 @@ namespace Trouble.Game
             return Mathf.Clamp01((elapsedTicks + Mathf.Clamp01(tickFraction)) / segmentTicks);
         }
 
+        /// <summary>
+        /// The parts of [<paramref name="xMin"/>, <paramref name="xMax"/>] not covered by any of <paramref name="covers"/>
+        /// (each cover is x = start, y = end). Used to draw a ceiling only where no room above provides the floor.
+        /// </summary>
+        public static List<Vector2> UncoveredSpans(float xMin, float xMax, IReadOnlyList<Vector2> covers)
+        {
+            var spans = new List<Vector2> { new Vector2(xMin, xMax) };
+            foreach (var c in covers)
+            {
+                var next = new List<Vector2>();
+                foreach (var s in spans)
+                {
+                    if (c.y <= s.x + Epsilon || c.x >= s.y - Epsilon) { next.Add(s); continue; }
+                    if (c.x > s.x + Epsilon) next.Add(new Vector2(s.x, c.x));
+                    if (c.y < s.y - Epsilon) next.Add(new Vector2(c.y, s.y));
+                }
+                spans = next;
+            }
+            return spans;
+        }
+
+        /// <summary>
+        /// The overlap in x of two rooms on different floors, or width 0 if they do not overlap. Stairs between
+        /// them are drawn inside this span.
+        /// </summary>
+        public static Vector2 OverlapSpan(RoomState a, RoomState b)
+        {
+            float lo = Mathf.Max(a.X, b.X);
+            float hi = Mathf.Min(a.X + a.Width, b.X + b.Width);
+            return hi > lo ? new Vector2(lo, hi) : new Vector2(lo, lo);
+        }
+
         private static void AddEdge(List<WallSpec> walls, float x, int floor)
         {
             foreach (var w in walls)

@@ -24,7 +24,9 @@ namespace Trouble.Sim
             foreach (var s in level.sockets)
             {
                 if (!rooms.Contains(s.room)) errors.Add($"Socket {s.id} is in unknown room '{s.room}'.");
-                if (!circuits.Contains(s.circuit)) errors.Add($"Socket {s.id} is on unknown circuit '{s.circuit}'.");
+                // Day mode: each room is its own circuit, so sockets name no circuit.
+                bool day = level.day != null && level.day.enabled;
+                if (!day && !circuits.Contains(s.circuit)) errors.Add($"Socket {s.id} is on unknown circuit '{s.circuit}'.");
                 if (!string.IsNullOrEmpty(s.assumed) && !circuits.Contains(s.assumed)) errors.Add($"Socket {s.id} assumes unknown circuit '{s.assumed}'.");
                 if (s.pos > 1f) errors.Add($"Socket {s.id} has pos {s.pos}; use 0..1.");
             }
@@ -74,6 +76,8 @@ namespace Trouble.Sim
                 if (c.capacity <= 0) errors.Add($"Circuit {c.id} needs capacity > 0.");
             if (level.mainCapacity < 0) errors.Add("mainCapacity cannot be negative.");
             if (level.dayLengthSec <= 0f) errors.Add("dayLengthSec must be > 0.");
+
+            if (level.day != null && level.day.enabled) ValidateDay(level, catalog, sockets, errors);
 
             // Rule overrides name real rules.
             rules.WithOverrides(level.rulesOverride, errors);
@@ -204,6 +208,38 @@ namespace Trouble.Sim
                 else if (!set.Add(value)) errors.Add($"The {kind} id '{value}' is used twice.");
             }
             return set;
+        }
+
+        /// <summary>
+        /// Day mode: appliances are in the catalog and sit in distinct sockets, every room keeps a free socket at
+        /// the start (or nothing can ever be carried in), and the room capacities can be rolled.
+        /// </summary>
+        private static void ValidateDay(LevelData level, Catalog catalog, HashSet<string> sockets, List<string> errors)
+        {
+            var used = new HashSet<string>(StringComparer.Ordinal);
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var a in level.appliances)
+            {
+                if (!ids.Add(a.id)) errors.Add($"Appliance '{a.id}' appears twice.");
+                if (catalog.Find(a.type) == null) errors.Add($"Appliance '{a.id}' has type '{a.type}', which is not in the catalog.");
+                if (!sockets.Contains(a.socket)) errors.Add($"Appliance '{a.id}' starts in unknown socket '{a.socket}'.");
+                else if (!used.Add(a.socket)) errors.Add($"Socket {a.socket} holds two appliances at the start.");
+            }
+            foreach (var r in level.rooms)
+            {
+                bool free = false;
+                foreach (var s in level.sockets)
+                    if (s.room == r.id && !used.Contains(s.id)) free = true;
+                if (!free) errors.Add($"Room {r.id} has no free socket at the start, so nothing can be carried in.");
+            }
+            try
+            {
+                HouseRoller.RollRoomCapacities(level.rooms, level.day.houseCapacity, new SimRandom(1));
+            }
+            catch (ArgumentException e)
+            {
+                errors.Add(e.Message);
+            }
         }
     }
 }

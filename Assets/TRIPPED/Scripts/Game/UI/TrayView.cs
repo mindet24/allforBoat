@@ -31,8 +31,12 @@ namespace Trouble.Game
         private TextMeshProUGUI _cords;
         private TextMeshProUGUI _hint;
         private RectTransform _cordChip;
+        private Image _cordRing;
+        private string _shownHint = "~";
         private int _shownCords = -1;
-        private string _shownSelection = "\0";
+
+        /// <summary>The tray strip, so other HUD parts can sit inside it.</summary>
+        public RectTransform Root => _tray;
 
         /// <summary>Builds the tray strip.</summary>
         public void Build(RectTransform canvas, LevelController controller, TrippedViewConfig config, HudText text)
@@ -49,17 +53,24 @@ namespace Trouble.Game
             UIFactory.Fill(_tray, bg, false);
 
             _hint = UIFactory.Label(_tray, "Hint", Left, 6, 1800, 34, "", 20, config.textSecondary);
-            _cordChip = UIFactory.Panel(_tray, "Cords", 0, Top, ChipW, ChipH, config.hudPanel).rectTransform;
-            _cords = UIFactory.LabelOn(UIFactory.Stretch(UIFactory.Rect(_cordChip, "Text", 0, 0, ChipW, ChipH)), "", 24, config.textSecondary,
-                TextAlignmentOptions.Center, true);
+            var cordButton = UIFactory.Button(_tray, "Cords", 0, Top, ChipW, ChipH, "", 24, config.hudPanel, config.textSecondary,
+                () => _controller.HandleClick(new ClickInput { Kind = ClickKind.TrayCord }));
+            _cordChip = (RectTransform)cordButton.transform;
+            _cords = cordButton.GetComponentInChildren<TextMeshProUGUI>();
+            _cordRing = UIFactory.Panel(_cordChip, "Selected", -6, -6, ChipW + 12, ChipH + 12, config.selection, true, false);
+            _cordRing.sprite = PlaceholderArt.UiRoundedOutline;
+            _cordRing.enabled = false;
         }
 
         /// <summary>Rebuilds the chips when the set of unplugged appliances changes; updates selection and counts.</summary>
         public void Sync(HouseSim sim)
         {
             _wanted.Clear();
+            bool day = sim.IsDayMode;
+            // Day mode: every appliance stays in a socket (or in the hands), so the tray has no chips and no cord.
+            if (_cordChip.gameObject.activeSelf == day) _cordChip.gameObject.SetActive(!day);
             foreach (var app in sim.Appliances)
-                if (!app.Fixed && string.IsNullOrEmpty(app.SocketId)) _wanted.Add(app.Id);
+                if (!day && !app.Fixed && string.IsNullOrEmpty(app.SocketId)) _wanted.Add(app.Id);
 
             bool same = _wanted.Count == _chips.Count;
             for (int i = 0; same && i < _wanted.Count; i++) same = _wanted[i] == _chips[i].ApplianceId;
@@ -67,17 +78,25 @@ namespace Trouble.Game
 
             string selection = _controller.Selection;
             foreach (var chip in _chips) chip.Ring.enabled = chip.ApplianceId == selection;
+            var holding = _controller.Holding;
+            _cordRing.enabled = holding.Kind == HeldKind.Cord || holding.Kind == HeldKind.CordFrom;
 
             if (sim.CordsLeft != _shownCords)
             {
                 _shownCords = sim.CordsLeft;
                 _cords.text = _text.Format("hud_cords", ("n", sim.CordsLeft));
             }
-            if (selection != _shownSelection)
+            string hintKey = holding.Kind == HeldKind.Cord ? "hud_cord_selected"
+                : holding.Kind == HeldKind.CordFrom ? "hud_cord_room|" + holding.Id
+                : selection == null ? (day ? "day_hint" : "hud_tray_help") : "hud_selected|" + selection;
+            if (hintKey != _shownHint)
             {
-                _shownSelection = selection;
-                _hint.text = selection == null ? _text.Get("hud_tray_help") : _text.Format("hud_selected", ("appliance", NameOf(sim, selection)));
-                _hint.color = selection == null ? _config.textSecondary : _config.selection;
+                _shownHint = hintKey;
+                if (holding.Kind == HeldKind.Cord) _hint.text = _text.Get("hud_cord_selected");
+                else if (holding.Kind == HeldKind.CordFrom) _hint.text = _text.Format("hud_cord_room", ("socket", holding.Id));
+                else if (selection == null) _hint.text = _text.Get(day ? "day_hint" : "hud_tray_help");
+                else _hint.text = _text.Format("hud_selected", ("appliance", NameOf(sim, selection)));
+                _hint.color = holding.Kind == HeldKind.None ? _config.textSecondary : _config.selection;
             }
         }
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Trouble.Sim;
 using UnityEngine;
@@ -41,8 +42,11 @@ namespace Trouble.Game
         /// <summary>Number of the level being played.</summary>
         public int LevelIndex { get; private set; }
 
+        /// <summary>What the player holds between two clicks: an appliance, the cord, or the cord waiting for a room.</summary>
+        public Held Holding { get; private set; } = Held.None;
+
         /// <summary>Selected appliance id (click a socket to plug it), or null.</summary>
-        public string Selection { get; private set; }
+        public string Selection => Holding.ApplianceId;
 
         /// <summary>How far the clock is into the next tick, 0..1, for smooth animation only.</summary>
         public float TickFraction { get; private set; }
@@ -50,11 +54,48 @@ namespace Trouble.Game
         /// <summary>The house view of the current level.</summary>
         public HouseView House { get; private set; }
 
+        /// <summary>The camera rig (for alert arrows and panning).</summary>
+        public HouseCamera HouseCam => _camera;
+
+        /// <summary>Pans the camera to a room (an alert arrow was clicked). The character does not move.</summary>
+        public void PanToRoom(string roomId)
+        {
+            var room = Sim?.FindRoom(roomId);
+            if (room == null || _camera == null) return;
+            _camera.PanTo(new Vector2(room.CenterX, HouseLayout.FloorY(room.Floor, _config.roomHeight) + _config.roomHeight * 0.5f));
+        }
+
         /// <summary>The HUD of the current level.</summary>
         public Hud Hud { get; private set; }
 
         /// <summary>Every toast text shown since the level was loaded, oldest first (for checks and debugging).</summary>
         public IReadOnlyList<string> ToastLog => _toastLog;
+
+        // ---- G3 hooks: feedback, screens and the F1 panel listen here; the controller does not know them. ----
+
+        /// <summary>Raised after a level was loaded (also on restart) with its number.</summary>
+        public event Action<int> LevelLoaded;
+
+        /// <summary>Raised after <see cref="Unload"/> removed the level.</summary>
+        public event Action LevelUnloaded;
+
+        /// <summary>Raised with the events of every sim tick, after the controller handled them. The list is reused; copy to keep.</summary>
+        public event Action<IReadOnlyList<SimEvent>> TickEvents;
+
+        /// <summary>Raised when the sim accepted a player command (at once in planning, or into the queue).</summary>
+        public event Action<Command> CommandAccepted;
+
+        /// <summary>Raised when Esc is pressed while no appliance is selected (the screen flow goes to Level Select).</summary>
+        public event Action EscapePressed;
+
+        /// <summary>true = keyboard shortcuts are ignored (a text field of the F1 panel has focus). The clock still runs.</summary>
+        public bool KeysSuspended { get; set; }
+
+        /// <summary>Speed of the tick clock (debug time scale, 1 = normal).</summary>
+        public float TimeScale { get; set; } = 1f;
+
+        /// <summary>The loader that builds every level; its <see cref="LevelLoader.Rules"/> are used on the next load.</summary>
+        public LevelLoader Loader => _loader;
 
         /// <summary>Shift is held: actions join the end of the character's queue.</summary>
         public bool ShiftHeld => Keyboard.current != null && Keyboard.current.shiftKey.isPressed;
@@ -90,7 +131,7 @@ namespace Trouble.Game
             TearDown();
             Sim = sim;
             LevelIndex = n;
-            Selection = null;
+            Holding = Held.None;
             _accumulator = 0f;
             TickFraction = 0f;
             _lastTripText = "";
@@ -108,8 +149,19 @@ namespace Trouble.Game
             Hud.Build(this, _config, _text, _art);
 
             if (_camera != null)
+            {
+                _camera.UseArea(Sim.IsDayMode ? _config.dayHouseArea : _config.houseArea);
                 _camera.Frame(House.Bounds, () => HouseLayout.CharacterPoint(Sim, TickFraction, _config.roomHeight));
+            }
+            LevelLoaded?.Invoke(n);
             return true;
+        }
+
+        /// <summary>Removes the current level (house, HUD and sim), e.g. when going back to a menu.</summary>
+        public void Unload()
+        {
+            TearDown();
+            LevelUnloaded?.Invoke();
         }
 
         /// <summary>Restarts the current level (R).</summary>
@@ -150,7 +202,11 @@ namespace Trouble.Game
         public bool Submit(Command command)
         {
             if (Sim == null) return false;
-            if (Sim.Submit(command, out var reason)) return true;
+            if (Sim.Submit(command, out var reason))
+            {
+                CommandAccepted?.Invoke(command);
+                return true;
+            }
             Toast(reason);
             return false;
         }
@@ -163,17 +219,16 @@ namespace Trouble.Game
         {
             if (Sim == null || Sim.Phase == LevelPhase.Won || Sim.Phase == LevelPhase.Lost) return;
             if (click.Kind == ClickKind.TrayAppliance) click.Shift = ShiftHeld;
-            var outcome = ClickResolver.Resolve(Selection, click);
-            Selection = outcome.Selection;
+            click.DayMode = Sim.IsDayMode;
+            var outcome = ClickResolver.Resolve(Holding, click);
+            Holding = outcome.Selection;
             if (!outcome.HasCommand) return;
-            // Before the first Space nobody walks (planning is free, v1.1 N6): a room click just does nothing
-            // instead of showing "Unpause to walk.".
-            if (outcome.Command.Type == CommandType.MoveTo && Sim.Phase == LevelPhase.Planning) return;
+            // During free planning the sim refuses MoveTo and the toast says "Unpause to walk.".
             Submit(outcome.Command);
         }
 
         /// <summary>Drops the selected appliance (Esc).</summary>
-        public void ClearSelection() => Selection = null;
+        public void ClearSelection() => Holding = Held.None;
 
         /// <summary>Shows a toast and records it in <see cref="ToastLog"/>.</summary>
         public void Toast(string message)
@@ -186,7 +241,8 @@ namespace Trouble.Game
         private void Update()
         {
             if (Sim == null) return;
-            HandleKeys();
+            if (!KeysSuspended) HandleKeys();
+            if (Sim == null) return;
             Tick();
         }
 
@@ -200,7 +256,15 @@ namespace Trouble.Game
                 Restart();
                 return;
             }
-            if (kb.escapeKey.wasPressedThisFrame) ClearSelection();
+            if (kb.escapeKey.wasPressedThisFrame)
+            {
+                if (!Holding.IsNone) ClearSelection();
+                else
+                {
+                    EscapePressed?.Invoke();
+                    if (Sim == null) return;
+                }
+            }
             for (int n = 1; n <= 9; n++)
             {
                 if (!kb[Key.Digit1 + (n - 1)].wasPressedThisFrame) continue;
@@ -218,7 +282,7 @@ namespace Trouble.Game
                 return;
             }
             float tickSeconds = 1f / Mathf.Max(1, Sim.Rules.ticksPerSecond);
-            _accumulator += Time.unscaledDeltaTime;
+            _accumulator += Time.unscaledDeltaTime * Mathf.Max(0f, TimeScale);
             int steps = 0;
             int maxSteps = Mathf.Max(1, _config.maxStepsPerFrame);
             while (_accumulator >= tickSeconds && steps < maxSteps && Sim.Phase == LevelPhase.Running)
@@ -263,10 +327,22 @@ namespace Trouble.Game
                         string text = _formatter.Describe(e, Sim);
                         _lastTripText = text ?? "";
                         Toast(text);
+                        Toast(_formatter.Hint(e)); // "Breaker A is still hot..." when it was reset while hot
                         break;
                     }
-                    case SimEventType.CommandRejected:
                     case SimEventType.ApplianceInterrupted:
+                        Toast(_formatter.Describe(e, Sim));
+                        if (e.ProgressLost && Hud != null)
+                        {
+                            var request = Sim.FindRequest(e.Appliance);
+                            if (request != null) Hud.AddInterrupt(request.Owner, request.RoomId);
+                        }
+                        break;
+                    case SimEventType.RequestMissed:
+                        _lastTripText = _formatter.Describe(e, Sim) ?? _lastTripText;
+                        Toast(_formatter.Describe(e, Sim));
+                        break;
+                    case SimEventType.CommandRejected:
                     case SimEventType.SocketRevealed:
                         Toast(_formatter.Describe(e, Sim));
                         break;
@@ -278,13 +354,21 @@ namespace Trouble.Game
                         break;
                 }
             }
+            TickEvents?.Invoke(events);
         }
 
         private void ShowResult(bool won, string cause)
         {
-            Selection = null;
+            Holding = Held.None;
             if (Hud == null) return;
             string time = HudFormat.Clock(Sim.Now, Sim.Rules.ticksPerSecond);
+            if (Sim.IsDayMode)
+            {
+                Hud.ShowResult(won, cause, won ? "" : _lastTripText, time, Sim.TripCount, false,
+                    _text.Format("result_day_stats", ("score", Sim.Score), ("done", Sim.RequestsDone), ("missed", Sim.RequestsMissed)),
+                    _text.Get(won ? "result_day_won" : "result_day_lost"));
+                return;
+            }
             Hud.ShowResult(won, cause, won ? "" : _lastTripText, time, Sim.TripCount, won && HasLevel(LevelIndex + 1));
         }
 

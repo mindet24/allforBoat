@@ -19,13 +19,21 @@ namespace Trouble.Game
         private readonly List<SocketView> _socketList = new List<SocketView>();
         private readonly List<ApplianceView> _appliances = new List<ApplianceView>();
         private readonly List<DoorState> _doorStates = new List<DoorState>();
-        private readonly List<GameObject> _doorLeaves = new List<GameObject>();
+        private readonly List<Transform> _doorPivots = new List<Transform>();
+        private readonly List<float> _doorClosedness = new List<float>();
+        private readonly List<WireView> _wires = new List<WireView>();
+        private readonly Dictionary<string, CableView> _cables = new Dictionary<string, CableView>();
+        private readonly List<string> _staleCables = new List<string>();
+        private Transform _wireRoot;
+        private Transform _cableRoot;
         private CharacterView _character;
         private Transform _socketRoot;
         private string _highlightedSocket;
 
         /// <summary>World rect of the whole house front (x right, y up), for the camera.</summary>
         public Rect Bounds { get; private set; }
+        private bool _day;
+        private SpriteRenderer _blackout;
 
         /// <summary>Builds the house for the controller's current sim.</summary>
         public void Build(LevelController controller, TrippedViewConfig config, ArtLibrary art)
@@ -34,17 +42,38 @@ namespace Trouble.Game
             _sim = controller.Sim;
             _config = config;
             Bounds = HouseLayout.HouseBounds(_sim.Rooms, config.roomHeight);
+            _day = _sim.IsDayMode;
 
             foreach (var room in _sim.Rooms)
             {
                 var go = new GameObject("Room " + room.Id);
                 go.transform.SetParent(transform, false);
                 var view = go.AddComponent<RoomView>();
-                view.Build(room, room.Id == _sim.PanelRoomId, config, art);
+                view.Build(room, room.Id == _sim.PanelRoomId, config, art, _sim.Rooms, _day);
                 _rooms.Add(view);
             }
 
             BuildWalls();
+            BuildStairs();
+
+            _wireRoot = new GameObject("Wires").transform;
+            _wireRoot.SetParent(transform, false);
+            _cableRoot = new GameObject("Cables").transform;
+            _cableRoot.SetParent(transform, false);
+            int realSockets = 0;
+            foreach (var s in _sim.Sockets)
+                if (!s.IsCord) realSockets++;
+            int lane = 0;
+            foreach (var s in _sim.Sockets)
+            {
+                // No circuit puzzle in a day: no wires at all.
+                if (s.IsCord || _day) continue;
+                var go = new GameObject("Wire " + s.Id);
+                go.transform.SetParent(_wireRoot, false);
+                var wire = go.AddComponent<WireView>();
+                wire.Build(s, _sim, config, lane++, realSockets);
+                _wires.Add(wire);
+            }
 
             _socketRoot = new GameObject("Sockets").transform;
             _socketRoot.SetParent(transform, false);
@@ -57,7 +86,7 @@ namespace Trouble.Game
                 var go = new GameObject("Appliance " + app.Id);
                 go.transform.SetParent(appRoot, false);
                 var view = go.AddComponent<ApplianceView>();
-                view.Build(app, _sim.Catalog.Find(app.Type), config, art);
+                view.Build(app, _sim.Catalog.Find(app.Type), config, art, _day);
                 _appliances.Add(view);
             }
 
@@ -89,12 +118,17 @@ namespace Trouble.Game
             if (_sim == null || _controller == null || _controller.Sim != _sim) return;
             float time = Time.unscaledTime;
 
-            for (int i = 0; i < _rooms.Count; i++) _rooms[i].Sync();
+            for (int i = 0; i < _rooms.Count; i++) _rooms[i].Sync(_sim);
+            SyncBlackout();
+            // Door leaves slide between closed (across the opening) and open (folded back to the hinge edge, so an
+            // open door never hides what is behind it), smoothly.
             for (int i = 0; i < _doorStates.Count; i++)
             {
-                bool closed = !_doorStates[i].IsOpen;
-                if (_doorLeaves[i].activeSelf != closed) _doorLeaves[i].SetActive(closed);
+                float target = _doorStates[i].IsOpen ? 0.08f : 1f;
+                _doorClosedness[i] = Mathf.MoveTowards(_doorClosedness[i], target, 6f * Time.unscaledDeltaTime);
+                _doorPivots[i].localScale = new Vector3(1f, 1f, _doorClosedness[i]);
             }
+            for (int i = 0; i < _wires.Count; i++) _wires[i].Sync();
 
             SyncSocketSet();
             for (int i = 0; i < _socketList.Count; i++)
@@ -102,12 +136,63 @@ namespace Trouble.Game
                 var s = _socketList[i];
                 s.Sync(_sim, _sim.IsRoomVisible(s.Socket.RoomId));
             }
+            SyncCables();
 
             string selected = _controller.Selection;
             for (int i = 0; i < _appliances.Count; i++)
                 _appliances[i].Sync(_sim, selected != null && selected == _appliances[i].Appliance.Id, time);
 
             _character.Sync(_sim, _controller.TickFraction, time);
+        }
+
+        /// <summary>Day mode: dims the whole house while any breaker is OFF (a blackout).</summary>
+        private void SyncBlackout()
+        {
+            if (!_day) return;
+            if (_blackout == null)
+            {
+                var go = new GameObject("BlackoutOverlay");
+                go.transform.SetParent(transform, false);
+                go.transform.localPosition = new Vector3(Bounds.center.x, Bounds.center.y, -0.1f);
+                _blackout = go.AddComponent<SpriteRenderer>();
+                _blackout.sprite = PlaceholderArt.SoftRect;
+                _blackout.drawMode = SpriteDrawMode.Sliced;
+                _blackout.size = new Vector2(Bounds.width + 1.2f, Bounds.height + 1.2f);
+                _blackout.color = _config.blackoutOverlay;
+                _blackout.sortingOrder = 11;
+                _blackout.enabled = false;
+            }
+            bool on = DayRules.IsBlackout(_sim);
+            if (_blackout.enabled != on) _blackout.enabled = on;
+        }
+
+        /// <summary>One cable per cord socket: created when a cord appears, removed when it goes.</summary>
+        private void SyncCables()
+        {
+            int frame = Time.frameCount;
+            foreach (var s in _sim.Sockets)
+            {
+                if (!s.IsCord) continue;
+                if (!_cables.TryGetValue(s.Id, out var cable) || cable == null || cable.Cord != s)
+                {
+                    if (cable != null) Destroy(cable.gameObject);
+                    var go = new GameObject("Cable " + s.Id);
+                    go.transform.SetParent(_cableRoot, false);
+                    cable = go.AddComponent<CableView>();
+                    cable.Build(s, _config);
+                    _cables[s.Id] = cable;
+                }
+                cable.SeenFrame = frame;
+                cable.Sync(_sim);
+            }
+            _staleCables.Clear();
+            foreach (var pair in _cables)
+                if (pair.Value == null || pair.Value.SeenFrame != frame) _staleCables.Add(pair.Key);
+            foreach (var id in _staleCables)
+            {
+                if (_cables[id] != null) Destroy(_cables[id].gameObject);
+                _cables.Remove(id);
+            }
         }
 
         /// <summary>Creates views for new sockets (extension cords) and removes views of sockets that are gone.</summary>
@@ -145,6 +230,43 @@ namespace Trouble.Game
             }
         }
 
+        /// <summary>
+        /// Stairs between rooms on different floors: a slanted plank with rungs, drawn on the front edge of the
+        /// house inside the x range the two rooms share, so it reads from the camera without hiding the rooms.
+        /// </summary>
+        private void BuildStairs()
+        {
+            var root = new GameObject("Stairs").transform;
+            root.SetParent(transform, false);
+            foreach (var door in _sim.Doors)
+            {
+                if (!door.IsStairs) continue;
+                var a = _sim.FindRoom(door.RoomA);
+                var b = _sim.FindRoom(door.RoomB);
+                if (a == null || b == null || a.Floor == b.Floor) continue;
+                var lower = a.Floor < b.Floor ? a : b;
+                var upper = lower == a ? b : a;
+                var span = HouseLayout.OverlapSpan(lower, upper);
+                if (span.y - span.x < 1f) continue;
+                float yLow = HouseLayout.FloorY(lower.Floor, _config.roomHeight);
+                float yHigh = HouseLayout.FloorY(upper.Floor, _config.roomHeight);
+                var p0 = new Vector2(span.x + 0.8f, yLow + 0.1f);
+                var p1 = new Vector2(span.y - 0.8f, yHigh + 0.1f);
+                var delta = p1 - p0;
+                float length = delta.magnitude;
+                float angle = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
+                var plank = Prims.Box(root, "Stairs " + door.Id, new Vector3((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f, -0.3f),
+                    new Vector3(length, 0.09f, 0.5f), _config.doorColor);
+                plank.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
+                int rungs = Mathf.Max(3, Mathf.RoundToInt(length / 0.45f));
+                for (int i = 1; i < rungs; i++)
+                {
+                    var at = Vector2.Lerp(p0, p1, (float)i / rungs);
+                    Prims.Box(root, "Rung", new Vector3(at.x, at.y + 0.12f, -0.3f), new Vector3(0.22f, 0.07f, 0.5f), _config.slabColor);
+                }
+            }
+        }
+
         private void BuildWalls()
         {
             var root = new GameObject("Walls").transform;
@@ -168,14 +290,26 @@ namespace Trouble.Game
                     new Vector3(t, h - doorH, d), _config.wallColor);
                 Prims.Box(root, name + " back", new Vector3(wall.X, y0 + doorH * 0.5f, (doorW + d) * 0.5f),
                     new Vector3(t, doorH, d - doorW), _config.wallColor);
-                var leaf = Prims.Box(root, "Door " + wall.DoorId, new Vector3(wall.X, y0 + doorH * 0.5f, doorW * 0.5f),
-                    new Vector3(t * 0.6f, doorH, doorW), _config.doorColor).gameObject;
+
+                // The leaf hangs on a hinge at the far edge of the opening and folds back to it when open.
+                var pivot = new GameObject("Hinge " + wall.DoorId).transform;
+                pivot.SetParent(root, false);
+                pivot.localPosition = new Vector3(wall.X, y0, doorW);
+                Prims.Box(pivot, "Door " + wall.DoorId, new Vector3(0f, doorH * 0.5f, -doorW * 0.5f),
+                    new Vector3(t * 0.6f, doorH, doorW), _config.doorColor);
                 var door = _sim.FindDoor(wall.DoorId);
-                leaf.SetActive(door != null && !door.IsOpen);
                 if (door != null)
                 {
                     _doorStates.Add(door);
-                    _doorLeaves.Add(leaf);
+                    _doorPivots.Add(pivot);
+                    _doorClosedness.Add(door.IsOpen ? 0.08f : 1f);
+                    pivot.localScale = new Vector3(1f, 1f, door.IsOpen ? 0.08f : 1f);
+                    // Clickable area stays put whether the door is open or shut.
+                    if (_day) continue;
+                    var click = new GameObject("DoorClick " + wall.DoorId);
+                    click.transform.SetParent(root, false);
+                    click.transform.localPosition = new Vector3(wall.X, y0 + doorH * 0.5f, doorW * 0.5f);
+                    ClickTarget.Add(click, ClickKind.Door, wall.DoorId, "", 1, Vector3.zero, new Vector3(0.9f, doorH, doorW));
                 }
             }
         }

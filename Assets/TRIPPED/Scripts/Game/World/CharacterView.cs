@@ -16,6 +16,9 @@ namespace Trouble.Game
         private ArtLibrary _art;
         private SpriteRenderer _sprite;
         private TextMeshPro _queueText;
+        private SpriteRenderer _carryCard;
+        private TextMeshPro _carryText;
+        private string _shownCarry = "~";
         private float _lastX;
         private bool _facingLeft;
         private readonly System.Collections.Generic.List<Command> _shownCommands = new System.Collections.Generic.List<Command>();
@@ -37,6 +40,20 @@ namespace Trouble.Game
                 new Vector2(2.4f, 0.6f), "", config.roomNameText, 1.6f, TextAlignmentOptions.Bottom, false);
             _queueText.textWrappingMode = TextWrappingModes.Normal;
             _queueText.sortingOrder = 6;
+
+            // What the character carries (day mode): a small card above the head.
+            var carry = new GameObject("Carrying");
+            carry.transform.SetParent(transform, false);
+            carry.transform.localPosition = new Vector3(0f, config.playerWorldHeight + 0.3f, -0.05f);
+            _carryCard = carry.AddComponent<SpriteRenderer>();
+            _carryCard.sprite = PlaceholderArt.WorldRounded;
+            _carryCard.drawMode = SpriteDrawMode.Sliced;
+            _carryCard.size = new Vector2(1.1f, 0.5f);
+            _carryCard.color = config.glowOn;
+            _carryCard.sortingOrder = 30;
+            _carryText = Prims.Text(carry.transform, "Text", new Vector3(0f, 0f, -0.01f), new Vector2(1.0f, 0.4f), "", config.worldText, 3f);
+            _carryText.sortingOrder = 31;
+            carry.SetActive(false);
         }
 
         /// <summary>Moves and animates the character for this frame.</summary>
@@ -69,7 +86,22 @@ namespace Trouble.Game
                 _sprite.transform.localPosition = new Vector3(0f, bob, 0f);
             }
 
+            SyncCarry(sim);
             SyncQueue(sim);
+        }
+
+        private void SyncCarry(HouseSim sim)
+        {
+            string id = sim.Character.CarryingId ?? "";
+            if (id == _shownCarry) return;
+            _shownCarry = id;
+            _carryCard.gameObject.SetActive(id.Length > 0);
+            var lift = new Vector3(0f, _config.playerWorldHeight + (id.Length > 0 ? 0.95f : 0.35f), 0f);
+            _queueText.transform.localPosition = lift;
+            if (id.Length == 0) return;
+            var app = sim.FindAppliance(id);
+            var def = app == null ? null : sim.Catalog.Find(app.Type);
+            _carryText.text = (def != null ? def.name : id) + " " + (app != null ? app.Load : 0);
         }
 
         private void SyncQueue(HouseSim sim)

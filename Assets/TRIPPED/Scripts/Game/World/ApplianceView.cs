@@ -21,16 +21,20 @@ namespace Trouble.Game
         private bool _hasArt;
         private float _width;
         private ClickTarget _target;
+        private TextMeshPro _seenText;
+        private int _shownSeenSecond = -2;
+        private bool _ghostOrder;
 
         /// <summary>The sim appliance this view shows.</summary>
         public ApplianceState Appliance => _app;
 
         /// <summary>Builds the sprite layers and click collider.</summary>
-        public void Build(ApplianceState app, ApplianceDef def, TrippedViewConfig config, ArtLibrary art)
+        public void Build(ApplianceState app, ApplianceDef def, TrippedViewConfig config, ArtLibrary art, bool showLoad = false)
         {
             _app = app;
             _config = config;
             float height = def != null && def.worldHeight > 0f ? def.worldHeight : 0.6f;
+            if (showLoad) height *= 1.4f; // day mode: bigger, the player reads loads from the house
             var sprite = art.Appliance(app.Type);
             _hasArt = sprite != null;
 
@@ -51,11 +55,16 @@ namespace Trouble.Game
                 _outline.color = config.applianceOutline;
                 _card = MakeSliced("Card", rounded, 2, new Vector2(_width, height), new Vector3(0f, height * 0.5f, 0f));
                 string label = def != null && !string.IsNullOrEmpty(def.shortLabel) ? def.shortLabel : app.Type.ToUpperInvariant();
+                if (showLoad) label += "\n" + app.Load; // day mode: the player must know what each appliance draws
                 _label = Prims.Text(transform, "Label", new Vector3(0f, height * 0.5f, -0.01f), new Vector2(_width * 0.85f, height * 0.5f),
                     label, config.worldText, 3f);
                 _label.sortingOrder = 3;
             }
             _glow.enabled = false;
+            // "last seen m:ss" under a ghost (V4); drawn above the Sight overlay (order 10) so it can be read.
+            _seenText = Prims.Text(transform, "Seen", new Vector3(0f, -0.12f, -0.02f), new Vector2(1.4f, 0.22f), "", _config.roomNameText, 1.2f);
+            _seenText.sortingOrder = 24;
+            _seenText.gameObject.SetActive(false);
             _target = ClickTarget.Add(gameObject, ClickKind.WorldAppliance, app.Id, "", 3,
                 new Vector3(0f, height * 0.5f, 0f), new Vector3(_width + 0.1f, height + 0.1f, 0.3f));
         }
@@ -82,6 +91,8 @@ namespace Trouble.Game
             transform.localPosition = new Vector3(x, HouseLayout.FloorY(room.Floor, _config.roomHeight), _config.roomDepth - _config.applianceInset);
 
             bool ghost = !room.Visible;
+            SetGhostOrder(ghost);
+            UpdateSeenText(sim, ghost);
             bool on = _app.SeenSwitchedOn;
             bool powered = _app.SeenPowered;
             float alpha = ghost ? _config.ghostAlpha : 1f;
@@ -124,6 +135,30 @@ namespace Trouble.Game
             }
             _glow.enabled = showGlow;
             if (showGlow) _glow.color = glow;
+        }
+
+        /// <summary>Ghosts are lifted above the Sight overlay so they stay readable as faint shapes.</summary>
+        private void SetGhostOrder(bool ghost)
+        {
+            if (ghost == _ghostOrder) return;
+            _ghostOrder = ghost;
+            int lift = ghost ? 14 : 0;
+            _glow.sortingOrder = 0 + lift;
+            _card.sortingOrder = 2 + lift;
+            if (_outline != null) _outline.sortingOrder = 1 + lift;
+            if (_label != null) _label.sortingOrder = 3 + lift;
+        }
+
+        private void UpdateSeenText(HouseSim sim, bool ghost)
+        {
+            bool show = ghost && _app.SeenTick >= 0;
+            if (_seenText.gameObject.activeSelf != show) _seenText.gameObject.SetActive(show);
+            if (!show) return;
+            int tps = sim.Rules.ticksPerSecond;
+            int second = _app.SeenTick / Mathf.Max(1, tps);
+            if (second == _shownSeenSecond) return;
+            _shownSeenSecond = second;
+            _seenText.text = "seen " + HudFormat.Clock(_app.SeenTick, tps);
         }
 
         private SpriteRenderer MakeSprite(string name, Sprite sprite, int order, Vector3 localPos, Vector3 scale)

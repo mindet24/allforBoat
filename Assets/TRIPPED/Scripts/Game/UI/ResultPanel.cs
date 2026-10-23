@@ -57,13 +57,13 @@ namespace Trouble.Game
         /// <param name="cause">Cause sentence from the CauseFormatter.</param>
         /// <param name="detail">Extra line (for a loss: the last trip sentence). Empty = none.</param>
         /// <param name="hasNext">Show the Next button (won and a next level exists).</param>
-        public void Show(bool won, string cause, string detail, string time, int trips, bool hasNext)
+        public void Show(bool won, string cause, string detail, string time, int trips, bool hasNext, string stats = null, string title = null)
         {
-            _title.text = won ? _text.Get("result_won") : _text.Get("result_lost");
+            _title.text = title ?? (won ? _text.Get("result_won") : _text.Get("result_lost"));
             _title.color = won ? _config.resultWon : _config.resultLost;
             _cause.text = cause ?? "";
             _detail.text = detail ?? "";
-            _stats.text = _text.Format("result_stats", ("time", time), ("trips", trips));
+            _stats.text = stats ?? _text.Format("result_stats", ("time", time), ("trips", trips));
             _next.gameObject.SetActive(hasNext);
             _retry.anchoredPosition = new Vector2(hasNext ? 150f : 285f, -370f);
             _root.SetActive(true);

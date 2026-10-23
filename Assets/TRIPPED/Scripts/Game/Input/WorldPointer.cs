@@ -33,7 +33,11 @@ namespace Trouble.Game
 
             var house = _controller.House;
             if (house != null)
-                house.HighlightSocket(_controller.Selection != null && target != null && target.Kind == ClickKind.Socket ? target.Id : null);
+                {
+                var held = _controller.Holding.Kind;
+                bool carrying = held == HeldKind.Appliance || held == HeldKind.Cord;
+                house.HighlightSocket(carrying && target != null && target.Kind == ClickKind.Socket ? target.Id : null);
+            }
 
             bool left = mouse.leftButton.wasPressedThisFrame;
             bool right = mouse.rightButton.wasPressedThisFrame;
@@ -86,6 +90,8 @@ namespace Trouble.Game
                 }
                 case ClickKind.Socket:
                 {
+                    var socketState = sim.FindSocket(target.Id);
+                    click.SocketIsCord = socketState != null && socketState.IsCord;
                     // The appliance the player sees in this socket, which may be a last-seen ghost.
                     foreach (var app in sim.Appliances)
                     {

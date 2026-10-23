@@ -11,22 +11,32 @@ namespace Trouble.Game
     public sealed class RoomView : MonoBehaviour
     {
         private readonly List<Renderer> _renderers = new List<Renderer>();
-        private readonly List<Color> _colors = new List<Color>();
-        private MaterialPropertyBlock _block;
         private RoomState _room;
         private TrippedViewConfig _config;
-        private bool _shownVisible = true;
+        private SpriteRenderer _overlay;
         private Material _backgroundMaterial;
+        private bool _day;
+        private TMPro.TextMeshPro _nameText;
+        private TMPro.TextMeshPro _countdownText;
+        private SpriteRenderer _barBack;
+        private SpriteRenderer _barFill;
+        private SpriteRenderer _panelGlow;
+        private float _barLeft;
+        private float _barWidth;
+        private string _shownText = "";
+        private string _shownCountdown = "";
+        private int _shownFillKey = -1;
 
         /// <summary>The sim room this view shows.</summary>
         public RoomState Room => _room;
 
         /// <summary>Builds the room's pieces under this object, which sits at world origin.</summary>
-        public void Build(RoomState room, bool isPanelRoom, TrippedViewConfig config, ArtLibrary art)
+        public void Build(RoomState room, bool isPanelRoom, TrippedViewConfig config, ArtLibrary art,
+            IReadOnlyList<RoomState> allRooms = null, bool dayMode = false)
         {
             _room = room;
             _config = config;
-            _block = new MaterialPropertyBlock();
+            _day = dayMode;
             var rect = HouseLayout.RoomRect(room, config.roomHeight);
             float depth = config.roomDepth;
             float floorT = config.floorThickness;
@@ -36,8 +46,14 @@ namespace Trouble.Game
                 new Vector3(rect.width, floorT, depth), config.floorColor), config.floorColor);
             Add(Prims.Box(transform, "BackWall", new Vector3(rect.center.x, rect.center.y, depth + wallT * 0.5f),
                 new Vector3(rect.width, rect.height, wallT), config.backWallColor), config.backWallColor);
-            Add(Prims.Box(transform, "Ceiling", new Vector3(rect.center.x, rect.yMax + floorT * 0.5f, depth * 0.5f),
-                new Vector3(rect.width, floorT, depth), config.slabColor), config.slabColor);
+            // A ceiling only where no room above provides a floor (stacked floors would z-fight otherwise).
+            var covers = new List<Vector2>();
+            if (allRooms != null)
+                foreach (var other in allRooms)
+                    if (other.Floor == room.Floor + 1) covers.Add(new Vector2(other.X, other.X + other.Width));
+            foreach (var span in HouseLayout.UncoveredSpans(rect.xMin, rect.xMax, covers))
+                Add(Prims.Box(transform, "Ceiling", new Vector3((span.x + span.y) * 0.5f, rect.yMax + floorT * 0.5f, depth * 0.5f),
+                    new Vector3(span.y - span.x, floorT, depth), config.slabColor), config.slabColor);
 
             var background = art.RoomBackground(room.Theme);
             if (background != null)
@@ -54,35 +70,134 @@ namespace Trouble.Game
                 Add(Prims.Box(transform, "Panel", new Vector3(rect.xMin + 0.7f, rect.yMin + 1.5f, depth - 0.08f),
                     new Vector3(0.55f, 0.75f, 0.16f), panelColor), panelColor);
                 Prims.Text(transform, "PanelLabel", new Vector3(rect.xMin + 0.7f, rect.yMin + 1.5f, depth - 0.17f),
-                    new Vector2(0.5f, 0.2f), "PANEL", config.roomNameText, 1.2f);
+                    new Vector2(0.5f, 0.2f), "PANEL", config.roomNameText, 1.2f).sortingOrder = 20;
+                // Glow behind the panel (blackout: reset me), and a click target on it.
+                var glow = new GameObject("PanelGlow");
+                glow.transform.SetParent(transform, false);
+                glow.transform.localPosition = new Vector3(rect.xMin + 0.7f, rect.yMin + 1.5f, depth - 0.2f);
+                _panelGlow = glow.AddComponent<SpriteRenderer>();
+                _panelGlow.sprite = PlaceholderArt.WorldRounded;
+                _panelGlow.drawMode = SpriteDrawMode.Sliced;
+                _panelGlow.size = new Vector2(1.0f, 1.25f);
+                _panelGlow.color = config.alertColor;
+                _panelGlow.sortingOrder = 19;
+                _panelGlow.enabled = false;
+                var panelClick = new GameObject("PanelClick");
+                panelClick.transform.SetParent(transform, false);
+                panelClick.transform.localPosition = new Vector3(rect.xMin + 0.7f, rect.yMin + 1.5f, depth - 0.3f);
+                ClickTarget.Add(panelClick, ClickKind.Panel, room.Id, room.Id, 3, Vector3.zero, new Vector3(0.9f, 1.1f, 0.5f));
             }
 
             // Inset from the left wall so the wall's side face (seen in perspective) never covers the name.
-            Prims.Text(transform, "Name", new Vector3(rect.xMin + 0.5f + rect.width * 0.25f, rect.yMax - 0.3f, depth - 0.02f),
-                new Vector2(rect.width * 0.5f, 0.35f), room.Name, config.roomNameText, 3f, TMPro.TextAlignmentOptions.Left);
+            _nameText = Prims.Text(transform, "Name", new Vector3(rect.xMin + 0.5f + rect.width * (dayMode ? 0.3f : 0.25f), rect.yMax - (dayMode ? 0.7f : 0.3f), depth - 0.02f),
+                new Vector2(rect.width * (dayMode ? 0.6f : 0.5f), dayMode ? 0.42f : 0.35f), room.Name, config.roomNameText, dayMode ? 4f : 3f, TMPro.TextAlignmentOptions.Left);
+            _nameText.sortingOrder = 20;
+            if (dayMode)
+            {
+                // Load bar under the name, red over capacity, with the blackout countdown beside it.
+                _barLeft = rect.xMin + 0.4f;
+                _barWidth = rect.width * 0.5f;
+                // Below the floor slab of the room above, which hangs 0.3 m into this room.
+                float barY = rect.yMax - 1.12f;
+                _barBack = MakeBar("LoadBarBack", new Vector3(_barLeft + _barWidth * 0.5f, barY, depth - 0.03f), 18);
+                _barBack.color = new Color(0f, 0f, 0f, 0.55f);
+                _barBack.size = new Vector2(_barWidth, 0.17f);
+                _barFill = MakeBar("LoadBarFill", new Vector3(_barLeft, barY, depth - 0.04f), 19);
+                _barFill.size = new Vector2(0.05f, 0.13f);
+                _countdownText = Prims.Text(transform, "Countdown", new Vector3(_barLeft + _barWidth + 0.55f, barY, depth - 0.04f),
+                    new Vector2(1.0f, 0.3f), "", config.alertColor, 3f, TMPro.TextAlignmentOptions.Left);
+                _countdownText.sortingOrder = 20;
+            }
+
+            // Sight overlay (v1.1 §3.3): #1E1E24 at 85% over everything in the room, soft edges. Sockets and the
+            // name are drawn above it (V4: the player always knows where the sockets are).
+            var overlayGo = new GameObject("SightOverlay");
+            overlayGo.transform.SetParent(transform, false);
+            overlayGo.transform.localPosition = new Vector3(rect.center.x, rect.center.y, -0.05f);
+            _overlay = overlayGo.AddComponent<SpriteRenderer>();
+            _overlay.sprite = PlaceholderArt.SoftRect;
+            _overlay.drawMode = SpriteDrawMode.Sliced;
+            float grow = config.overlayFeather * 0.6f;
+            _overlay.size = new Vector2(rect.width + grow, rect.height + grow);
+            _overlay.color = config.hiddenRoomOverlay;
+            _overlay.sortingOrder = 10;
+            _overlay.enabled = false;
 
             // Click anywhere in the room volume to walk there. Appliances and sockets win over it (priority).
             ClickTarget.Add(gameObject, ClickKind.Room, room.Id, room.Id, 0,
                 new Vector3(rect.center.x, rect.center.y, depth * 0.5f), new Vector3(rect.width, rect.height, depth));
         }
 
-        /// <summary>Darkens or restores the room to match whether the player can see it.</summary>
-        public void Sync()
+        /// <summary>
+        /// Shows or hides the Sight overlay to match whether the player can see the room. In day mode it also keeps the
+        /// room text with its load, the load bar and the blackout countdown up to date, and glows the panel in a blackout.
+        /// </summary>
+        public void Sync(HouseSim sim = null)
         {
-            if (_room == null || _room.Visible == _shownVisible) return;
-            _shownVisible = _room.Visible;
-            for (int i = 0; i < _renderers.Count; i++)
+            if (_room == null || _overlay == null) return;
+            bool hidden = !_room.Visible;
+            if (_overlay.enabled != hidden) _overlay.enabled = hidden;
+            if (!_day || sim == null) return;
+
+            var circuit = sim.FindCircuit(_room.Id);
+            if (circuit != null)
             {
-                var c = _shownVisible ? _colors[i] : _colors[i] * _config.hiddenRoomTint;
-                c.a = 1f;
-                Prims.Tint(_renderers[i], c, _block);
+                string text = DayRules.RoomLoadText(_room.Name, circuit.Load, circuit.Capacity) + (circuit.IsOn ? "" : "  OFF");
+                if (text != _shownText)
+                {
+                    _shownText = text;
+                    _nameText.text = text;
+                }
+                float fill = HudFormat.Fill(circuit.Load, circuit.Capacity);
+                var band = HudFormat.Band(circuit.Load, circuit.Capacity, _config.loadAmberAbove, _config.loadRedAbove);
+                int key = (int)(fill * 100f) * 8 + (int)band;
+                if (key != _shownFillKey)
+                {
+                    _shownFillKey = key;
+                    float w = Mathf.Max(0.04f, _barWidth * fill);
+                    _barFill.size = new Vector2(w, 0.13f);
+                    var pos = _barFill.transform.localPosition;
+                    _barFill.transform.localPosition = new Vector3(_barLeft + w * 0.5f, pos.y, pos.z);
+                    _barFill.color = _config.LoadColor(band);
+                }
+                string countdown = "";
+                if (circuit.Overloading)
+                    countdown = HudFormat.SecondsToTrip(circuit.OverTicks, sim.Rules.overTripTicks, sim.Rules.ticksPerSecond).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " s";
+                if (countdown != _shownCountdown)
+                {
+                    _shownCountdown = countdown;
+                    _countdownText.text = countdown;
+                }
+            }
+
+            if (_panelGlow != null)
+            {
+                bool blackout = DayRules.IsBlackout(sim);
+                if (_panelGlow.enabled != blackout) _panelGlow.enabled = blackout;
+                if (blackout)
+                {
+                    var c = _config.alertColor;
+                    c.a = 0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * 7f);
+                    _panelGlow.color = c;
+                }
             }
         }
 
-        private void Add(Renderer r, Color baseColor)
+        private SpriteRenderer MakeBar(string name, Vector3 localPos, int order)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(transform, false);
+            go.transform.localPosition = localPos;
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = PlaceholderArt.WorldRounded;
+            sr.drawMode = SpriteDrawMode.Sliced;
+            sr.sortingOrder = order;
+            return sr;
+        }
+
+        private void Add(Renderer r, Color unused)
         {
             _renderers.Add(r);
-            _colors.Add(baseColor);
         }
 
         private void OnDestroy()

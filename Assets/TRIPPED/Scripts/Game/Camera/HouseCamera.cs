@@ -5,7 +5,8 @@ using UnityEngine.InputSystem;
 namespace Trouble.Game
 {
     /// <summary>
-    /// Perspective camera looking straight at the house front (GDD v1.1 §2.6): wheel zooms toward the cursor
+    /// Camera looking straight at the house front (GDD v1.1 §2.6), orthographic by default (art direction 23 Oct)
+    /// or perspective (<see cref="TrippedViewConfig.orthographic"/>). Wheel zooms toward the cursor
     /// (smoothed), middle-drag and WASD/arrows pan, F toggles following the character, Home shows the whole house.
     /// Position is clamped to the house. All numbers come from <see cref="TrippedViewConfig"/>.
     /// </summary>
@@ -20,32 +21,81 @@ namespace Trouble.Game
         private Func<Vector2> _followPoint;
         private Rect _bounds;
         private Rect _limits;
+        // "View height" is the world height seen on the focus plane. Both projections are driven by it.
         private float _minDistance = 5f;
         private float _maxDistance = 30f;
         private float _distance;
         private float _targetDistance;
         private float _distanceVelocity;
+        private const float OrthoDepth = 50f;
         private Vector2 _position;
         private Vector2 _targetPosition;
         private Vector2 _positionVelocity;
         private bool _dragging;
         private Vector2 _lastMouse;
         /// <summary>The player has not zoomed or panned since the last Home, so a window resize re-frames the house.</summary>
+        private Rect _area;
         private bool _atHome;
         private float _framedAspect;
 
         /// <summary>True while the camera follows the character (F).</summary>
         public bool Following { get; private set; }
 
-        /// <summary>Distance the camera is easing toward.</summary>
-        public float TargetDistance => _targetDistance;
+        /// <summary>View height (world metres on screen, top to bottom) the camera is easing toward.</summary>
+        public float TargetViewHeight => _targetDistance;
+
+        /// <summary>Current camera x, y on the house front.</summary>
+        public Vector2 Position => _position;
+
+        /// <summary>Current view height in world metres.</summary>
+        public float ViewHeight => _distance;
+
+        /// <summary>The Unity camera, for ray casts.</summary>
+        public Camera Cam => _camera;
+
+        /// <summary>
+        /// Screen position of a house-front point as a viewport coordinate (0..1, origin bottom-left; outside 0..1 =
+        /// off screen). Uses the position the camera is easing toward, so alert arrows do not lag.
+        /// </summary>
+        public Vector2 WorldToViewport(Vector2 point)
+        {
+            if (_targetDistance <= 0.0001f) return new Vector2(0.5f, 0.5f);
+            return CameraMath.PlaneToViewportForHeight(_targetPosition, _targetDistance, Aspect(), point);
+        }
+
+        /// <summary>Zooms to a view height (clamped to the zoom limits). <paramref name="snap"/> = no easing.</summary>
+        public void ZoomToHeight(float viewHeight, bool snap)
+        {
+            _atHome = false;
+            _targetDistance = Mathf.Clamp(viewHeight, _minDistance, _maxDistance);
+            if (!snap) return;
+            _distance = _targetDistance;
+            _distanceVelocity = 0f;
+            Apply();
+        }
+
+        /// <summary>Moves the view so <paramref name="point"/> is centred (no zoom change). Stops following.</summary>
+        public void PanTo(Vector2 point)
+        {
+            Following = false;
+            _atHome = false;
+            _targetPosition = CameraMath.CenterOnForHeight(point, _targetDistance, Aspect(), _area);
+        }
+
+        /// <summary>The part of the screen the house may use (viewport units). Day mode uses a wider one.</summary>
+        public void UseArea(Rect area)
+        {
+            _area = area;
+        }
 
         /// <summary>Takes the camera settings from the config.</summary>
         public void Setup(TrippedViewConfig config)
         {
             _config = config;
+            _area = config.houseArea;
             _camera = GetComponent<Camera>();
-            _camera.orthographic = false;
+            _camera.orthographic = config.orthographic;
+            _camera.orthographicSize = 5f;
             _camera.fieldOfView = config.fieldOfView;
             _camera.clearFlags = CameraClearFlags.SolidColor;
             _camera.backgroundColor = config.sceneBackground;
@@ -69,11 +119,11 @@ namespace Trouble.Game
         public void Home(bool snap)
         {
             float aspect = Aspect();
-            _maxDistance = CameraMath.FitDistance(_bounds.size, _config.fieldOfView, aspect, _config.houseViewport, _config.homeMargin);
+            _maxDistance = CameraMath.FitViewHeight(_bounds.size, aspect, _area, _config.homeMargin);
             _minDistance = Mathf.Min(_maxDistance,
-                CameraMath.DistanceForWidth(_config.nearRoomWidth, _config.nearRoomScreenFraction, _config.fieldOfView, aspect));
+                CameraMath.ViewHeightForWidth(_config.nearRoomWidth, _config.nearRoomScreenFraction, aspect));
             _targetDistance = _maxDistance;
-            _targetPosition = CameraMath.CenterOn(_bounds.center, _maxDistance, _config.fieldOfView, aspect, _config.houseViewport);
+            _targetPosition = CameraMath.CenterOnForHeight(_bounds.center, _maxDistance, aspect, _area);
             _limits = CameraMath.Encapsulate(_bounds, _targetPosition);
             _atHome = true;
             _framedAspect = aspect;
@@ -117,7 +167,7 @@ namespace Trouble.Game
                 {
                     Following = false;
                     _atHome = false;
-                    var visible = CameraMath.VisibleSize(_targetDistance, _config.fieldOfView, aspect);
+                    var visible = CameraMath.VisibleSizeForHeight(_targetDistance, aspect);
                     _targetPosition += pan * (_config.keyPanSpeed * visible.x * dt);
                 }
             }
@@ -144,7 +194,7 @@ namespace Trouble.Game
                     {
                         Following = false;
                         _atHome = false;
-                        var visible = CameraMath.VisibleSize(_distance, _config.fieldOfView, aspect);
+                        var visible = CameraMath.VisibleSizeForHeight(_distance, aspect);
                         float metresPerPixel = visible.y / Mathf.Max(1, Screen.height);
                         _targetPosition -= delta * metresPerPixel;
                         _position -= delta * metresPerPixel; // drag sticks to the cursor, no easing lag
@@ -173,7 +223,7 @@ namespace Trouble.Game
                 }
             }
             if (Following && _followPoint != null)
-                _targetPosition = CameraMath.CenterOn(_followPoint() + new Vector2(0f, 1f), _targetDistance, _config.fieldOfView, aspect, _config.houseViewport);
+                _targetPosition = CameraMath.CenterOnForHeight(_followPoint() + new Vector2(0f, 1f), _targetDistance, aspect, _area);
 
             _targetDistance = Mathf.Clamp(_targetDistance, _minDistance, _maxDistance);
             _targetPosition = CameraMath.Clamp(_targetPosition, _limits);
@@ -189,14 +239,24 @@ namespace Trouble.Game
             _atHome = false;
             float newDistance = Mathf.Clamp(_targetDistance * Mathf.Pow(1f - _config.zoomStep, notches), _minDistance, _maxDistance);
             var viewport = new Vector2(screenPos.x / Mathf.Max(1, Screen.width), screenPos.y / Mathf.Max(1, Screen.height));
-            var point = CameraMath.ViewportToPlane(_targetPosition, _targetDistance, _config.fieldOfView, aspect, viewport);
+            var point = CameraMath.ViewportToPlaneForHeight(_targetPosition, _targetDistance, aspect, viewport);
             _targetPosition = CameraMath.ZoomToward(_targetPosition, _targetDistance, newDistance, point);
             _targetDistance = newDistance;
         }
 
         private void Apply()
         {
-            transform.position = new Vector3(_position.x, _position.y, FocusZ - _distance);
+            if (_config.orthographic)
+            {
+                _camera.orthographic = true;
+                _camera.orthographicSize = _distance * 0.5f;
+                transform.position = new Vector3(_position.x, _position.y, FocusZ - OrthoDepth);
+            }
+            else
+            {
+                _camera.orthographic = false;
+                transform.position = new Vector3(_position.x, _position.y, FocusZ - CameraMath.DistanceForViewHeight(_distance, _config.fieldOfView));
+            }
             transform.rotation = Quaternion.identity;
         }
 

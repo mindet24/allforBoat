@@ -97,5 +97,69 @@ namespace Trouble.Tests
             // Assert
             Assert.AreEqual(new Vector2(0f, 3f), clamped);
         }
+
+        [Test]
+        public void FitViewHeight_MatchesPerspectiveFitAtTheSameDistance()
+        {
+            // Arrange
+            var size = new Vector2(24f, 3f);
+
+            // Act
+            float height = CameraMath.FitViewHeight(size, Aspect, HouseViewport, 0.1f);
+            float distance = CameraMath.FitDistance(size, Fov, Aspect, HouseViewport, 0.1f);
+
+            // Assert: the same world height is seen whichever projection is used.
+            Assert.AreEqual(CameraMath.VisibleSize(distance, Fov, Aspect).y, height, 1e-3f);
+            Assert.AreEqual(distance, CameraMath.DistanceForViewHeight(height, Fov), 1e-3f);
+        }
+
+        [Test]
+        public void ZoomTowardWithHeights_KeepsThePointUnderTheCursor()
+        {
+            // Arrange
+            var cam = new Vector2(6f, 1.5f);
+            float oldH = 10f, newH = 8.5f;
+            var cursor = new Vector2(0.3f, 0.7f);
+            var point = CameraMath.ViewportToPlaneForHeight(cam, oldH, Aspect, cursor);
+
+            // Act
+            var newCam = CameraMath.ZoomToward(cam, oldH, newH, point);
+            var after = CameraMath.ViewportToPlaneForHeight(newCam, newH, Aspect, cursor);
+
+            // Assert
+            Assert.AreEqual(point.x, after.x, 1e-4f);
+            Assert.AreEqual(point.y, after.y, 1e-4f);
+        }
+
+        [Test]
+        public void PlaneToViewport_IsTheInverseOfViewportToPlane()
+        {
+            // Arrange
+            var cam = new Vector2(6f, 1.5f);
+            var viewport = new Vector2(0.8f, 0.25f);
+
+            // Act
+            var plane = CameraMath.ViewportToPlaneForHeight(cam, 9f, Aspect, viewport);
+            var back = CameraMath.PlaneToViewportForHeight(cam, 9f, Aspect, plane);
+
+            // Assert
+            Assert.AreEqual(viewport.x, back.x, 1e-4f);
+            Assert.AreEqual(viewport.y, back.y, 1e-4f);
+        }
+
+        [Test]
+        public void CenterOnForHeight_PutsTheTargetAtTheViewportCentre()
+        {
+            // Arrange
+            var target = new Vector2(6f, 1.5f);
+
+            // Act
+            var cam = CameraMath.CenterOnForHeight(target, 9f, Aspect, HouseViewport);
+            var vp = CameraMath.PlaneToViewportForHeight(cam, 9f, Aspect, target);
+
+            // Assert
+            Assert.AreEqual(HouseViewport.center.x, vp.x, 1e-4f);
+            Assert.AreEqual(HouseViewport.center.y, vp.y, 1e-4f);
+        }
     }
 }

@@ -371,6 +371,36 @@ namespace Trouble.Tests
             Assert.AreEqual(30, sim.Requests[0].DurationTicks);
         }
 
+        // ---- validation ---------------------------------------------------------------
+
+        [Test]
+        public void DemoLevel_PassesValidation()
+        {
+            // Arrange
+            var level = Demo();
+
+            // Act
+            var errors = LevelValidator.Validate(level, ShippedCatalog(), Rules());
+
+            // Assert
+            CollectionAssert.IsEmpty(errors);
+        }
+
+        [Test]
+        public void DayRoomWithEverySocketTaken_IsReported()
+        {
+            // Arrange: room A's two sockets both hold an appliance at the start.
+            var level = TwoRooms(10, new[] { "kettle" });
+            level.appliances[0].socket = "A1";
+            level.appliances[1].socket = "A2";
+
+            // Act
+            var errors = LevelValidator.Validate(level, TestData.Catalog(), Rules());
+
+            // Assert
+            Assert.That(errors, Has.Some.Contains("Room a has no free socket"));
+        }
+
         // ---- generator ----------------------------------------------------------------
 
         [Test]

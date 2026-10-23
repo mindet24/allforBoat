@@ -2,6 +2,20 @@ using UnityEngine;
 
 namespace Trouble.Game
 {
+    /// <summary>One sound and how loud it plays (0..1).</summary>
+    [System.Serializable]
+    public struct SoundVolume
+    {
+        public string name;
+        [Range(0f, 1f)] public float volume;
+
+        public SoundVolume(string name, float volume)
+        {
+            this.name = name;
+            this.volume = volume;
+        }
+    }
+
     /// <summary>
     /// Every value the view layer uses that is not a game rule: colours, house geometry, camera, UI timing,
     /// art paths (GDD v1.1 §4.2). Game rules live in rules.json; this is look and feel only.
@@ -64,8 +78,20 @@ namespace Trouble.Game
         public Color doorColor = Hex("#6B5E52");
         public Color panelColor = Hex("#3B3550");
         public Color socketBody = Hex("#3B3550");
-        [Tooltip("Rooms the player cannot see are multiplied by this.")]
-        public Color hiddenRoomTint = new Color(0.32f, 0.32f, 0.38f, 1f);
+        [Tooltip("Overlay over a room the player cannot see (v1.1 §3.3: #1E1E24 at 85%).")]
+        public Color hiddenRoomOverlay = new Color(0x1E / 255f, 0x1E / 255f, 0x24 / 255f, 0.85f);
+        [Tooltip("Overlay over a visible socket area whose breaker is OFF (v1.1 §3.3: black at 55%).")]
+        public Color powerOutOverlay = new Color(0f, 0f, 0f, 0.55f);
+        [Tooltip("Soft edge of the Sight overlay, metres.")]
+        public float overlayFeather = 0.35f;
+        [Tooltip("Plain grey of a wall wire whose socket is not revealed yet.")]
+        public Color wireUnknown = Hex("#6E6E78");
+        public float wireWidth = 0.035f;
+        [Tooltip("Seconds for a revealed wire to light from socket to panel.")]
+        public float wireSweepSeconds = 0.4f;
+        public Color cordColor = Hex("#2B2B33");
+        public float cordWidth = 0.045f;
+        public float cordSag = 0.18f;
         [Tooltip("Opacity of an appliance in a room that is not visible (last-seen ghost, v1.1 §2.3 V4).")]
         [Range(0f, 1f)] public float ghostAlpha = 0.3f;
         public Color applianceCard = Hex("#EFE3CF");
@@ -98,6 +124,8 @@ namespace Trouble.Game
         public float animationFps = 8f;
 
         [Header("Camera (GDD v1.1 §2.6)")]
+        [Tooltip("Orthographic side view (art direction, 23 Oct). Off = perspective with fieldOfView.")]
+        public bool orthographic = true;
         public float fieldOfView = 20f;
         [Tooltip("Zoom per wheel notch.")]
         public float zoomStep = 0.15f;
@@ -109,11 +137,71 @@ namespace Trouble.Game
         public float nearRoomScreenFraction = 0.6f;
         [Tooltip("Keyboard pan speed, in screen widths per second.")]
         public float keyPanSpeed = 0.6f;
-        [Tooltip("Part of the screen not covered by the HUD (viewport units, origin bottom-left).")]
-        public Rect houseViewport = new Rect(400f / 1920f, 200f / 1080f, 1120f / 1920f, 784f / 1080f);
+        [Tooltip("Part of the screen the house may use: between the panels, under the timeline, above the tray (viewport units, origin bottom-left).")]
+        public Rect houseArea = new Rect(400f / 1920f, 200f / 1080f, 1120f / 1920f, 704f / 1080f);
+
+        [Header("Day mode (level_demo)")]
+        [Tooltip("House area of the screen in day mode: no left panel, requests on the right (viewport units).")]
+        public Rect dayHouseArea = new Rect(0.01f, 200f / 1080f, 1520f / 1920f, 790f / 1080f);
+        public Color urgencyUrgent = Hex("#E53935");
+        public Color urgencyNormal = Hex("#FFB300");
+        public Color urgencyRelaxed = Hex("#8A8A94");
+        public Color heartColor = Hex("#E53950");
+        public Color heartEmpty = Hex("#3A3A44");
+        public Color daySocket = Hex("#EFE3CF");
+        [Tooltip("Dark overlay over the whole house during a blackout.")]
+        public Color blackoutOverlay = new Color(0f, 0f, 0f, 0.62f);
+        public float cardExitSeconds = 0.7f;
+
+        [Header("Alerts (GDD v1.1 §2.5)")]
+        public float deadlineWarnSeconds = 5f;
+        public float routineWarnSeconds = 3f;
+        [Tooltip("Seconds an \"!\" interruption bubble stays.")]
+        public float interruptAlertSeconds = 3f;
+        public Color alertColor = Hex("#E53935");
+        [Tooltip("Margin of off-screen alert arrows inside the house area of the screen (viewport units).")]
+        public float alertEdgeMargin = 0.03f;
 
         [Header("Ticking")]
         public int maxStepsPerFrame = 5;
+
+        [Header("Start (G3)")]
+        [Tooltip("true = a fresh Play opens the Title screen. false = go straight into startLevel (quick test flow). The -startLevel N command-line argument and the editor pref TRIPPED.skipTitle do the same.")]
+        public bool showTitle = true;
+
+        [Header("Audio (GDD v1.0 §7.2 levels)")]
+        [Tooltip("Resources folder checked for a file named like each sound before the generated one is used.")]
+        public string audioFolder = "Audio";
+        [Range(0f, 1f)] public float masterVolume = 1f;
+        [Tooltip("Volume of every sound, by name. A name missing here plays at 0.5.")]
+        public SoundVolume[] soundVolumes =
+        {
+            new SoundVolume("click", 0.4f), new SoundVolume("clunk", 0.8f), new SoundVolume("chime", 0.4f),
+            new SoundVolume("wrong", 0.35f), new SoundVolume("ding", 0.4f), new SoundVolume("tick", 0.25f),
+            new SoundVolume("nope", 0.3f), new SoundVolume("fail_small", 0.4f), new SoundVolume("win", 0.5f),
+            new SoundVolume("lose", 0.5f),
+        };
+        [Tooltip("Buzz volume when a circuit has just become overloaded.")]
+        [Range(0f, 1f)] public float buzzMinVolume = 0.25f;
+        [Tooltip("Buzz volume when the overload counter is about to trip the breaker.")]
+        [Range(0f, 1f)] public float buzzMaxVolume = 0.6f;
+        [Tooltip("Seconds between the two clunks of a main trip.")]
+        public float secondClunkDelay = 0.18f;
+        [Tooltip("Tick sound every second while a request has this many seconds or fewer left.")]
+        public float tickWarnSeconds = 5f;
+
+        [Header("Screens (G3)")]
+        [Tooltip("Seconds after winning the last level before the End screen opens.")]
+        public float endScreenDelay = 2f;
+
+        /// <summary>Playing volume of a sound (before the master volume); 0.5 if it is not listed.</summary>
+        public float VolumeOf(string sound)
+        {
+            if (soundVolumes != null)
+                for (int i = 0; i < soundVolumes.Length; i++)
+                    if (soundVolumes[i].name == sound) return soundVolumes[i].volume;
+            return 0.5f;
+        }
 
         [Header("Art (Resources paths; a file with the right name replaces the placeholder)")]
         public string applianceArtFolder = "Art/Appliances";
@@ -127,6 +215,17 @@ namespace Trouble.Game
             if (string.IsNullOrEmpty(circuitId)) return unknownSocket;
             int index = char.ToUpperInvariant(circuitId[0]) - 'A';
             return index >= 0 && index < circuitColors.Length ? circuitColors[index] : unknownSocket;
+        }
+
+        /// <summary>Colour of a day request by urgency: urgent red, normal amber, relaxed grey.</summary>
+        public Color UrgencyColor(UrgencyLevel level)
+        {
+            switch (level)
+            {
+                case UrgencyLevel.Urgent: return urgencyUrgent;
+                case UrgencyLevel.Relaxed: return urgencyRelaxed;
+                default: return urgencyNormal;
+            }
         }
 
         /// <summary>Colour of the load bar for this band.</summary>
