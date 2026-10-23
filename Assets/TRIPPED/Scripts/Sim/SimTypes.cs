@@ -4,7 +4,7 @@ namespace Trouble.Sim
 {
     public enum LevelPhase { Planning, Running, Paused, Won, Lost }
 
-    public enum LoseReason { None, Deadline, FridgeSpoiled, DayOver }
+    public enum LoseReason { None, Deadline, FridgeSpoiled, DayOver, OutOfHearts }
 
     // Read-only views of sim state. Setters are internal: only HouseSim changes them.
     // Times are ticks (1 tick = 1 / RulesConfig.ticksPerSecond seconds). Lengths are metres.
@@ -120,6 +120,20 @@ namespace Trouble.Sim
         public int DueTicks { get; internal set; }
         public int ProgressTicks { get; internal set; }
         public bool Done { get; internal set; }
+
+        // Day mode only. Scripted requests leave these at their defaults.
+
+        /// <summary>Unique per request in a day, in the order they appeared. 0 for scripted requests.</summary>
+        public int Serial { get; internal set; }
+        /// <summary>Urgency id from the level (for example "urgent").</summary>
+        public string Urgency { get; internal set; } = "";
+        public int Points { get; internal set; }
+        public bool CostsHeart { get; internal set; }
+        public int SpawnTick { get; internal set; }
+        /// <summary>The appliance was not running in the room by <see cref="DueTicks"/>.</summary>
+        public bool Missed { get; internal set; }
+        /// <summary>Not done and not missed.</summary>
+        public bool IsActive => !Done && !Missed;
     }
 
     public sealed class RoutineState
@@ -158,6 +172,8 @@ namespace Trouble.Sim
         public string SegmentDoorId { get; internal set; } = "";
         /// <summary>Ticks left of the current interaction. 0 = not interacting.</summary>
         public int InteractTicksLeft { get; internal set; }
+        /// <summary>Day mode: the appliance in the character's hands. Empty = hands free.</summary>
+        public string CarryingId { get; internal set; } = "";
         /// <summary>First entry is the action in progress.</summary>
         public IReadOnlyList<CharacterAction> Queue => QueueList;
 

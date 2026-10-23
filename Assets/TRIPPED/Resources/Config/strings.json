@@ -19,6 +19,23 @@
         { "key": "tip_first_reveal", "text": "Now you know that socket's breaker." },
         { "key": "tip_level3_start", "text": "Grandpa's heater turns on by itself. Check the timeline." },
 
+        { "key": "menu_title", "text": "TRIPPED!" },
+        { "key": "menu_play", "text": "Play" },
+        { "key": "menu_quit", "text": "Quit" },
+        { "key": "menu_choose_level", "text": "Choose a level" },
+        { "key": "menu_level_n", "text": "Level {n}" },
+        { "key": "menu_locked", "text": "Locked" },
+        { "key": "menu_best", "text": "Best {time}" },
+        { "key": "menu_not_won", "text": "Not won yet" },
+        { "key": "menu_back", "text": "Back (Esc)" },
+        { "key": "result_levels", "text": "Levels (Esc)" },
+        { "key": "end_title", "text": "The house survived." },
+        { "key": "end_time", "text": "Total time {time}" },
+        { "key": "end_credits", "text": "Made for the We R in Trouble jam" },
+        { "key": "end_levels", "text": "Levels" },
+        { "key": "sound_on", "text": "Sound on" },
+        { "key": "sound_off", "text": "Sound off (M to turn on)" },
+
         { "key": "reject_not_yours", "text": "That belongs to someone else." },
         { "key": "reject_socket_in_use", "text": "Socket in use." },
         { "key": "reject_reserved", "text": "Reserved for {owner}'s {appliance}." },
@@ -38,6 +55,11 @@
         { "key": "reject_queue_full", "text": "Too many things to do." },
         { "key": "reject_unpause_walk", "text": "Unpause to walk." },
         { "key": "reject_no_path", "text": "Can't get there." },
+        { "key": "reject_hands_full", "text": "Hands full. Plug in what you're carrying first." },
+        { "key": "day_blackout", "text": "{label} overloaded: {terms} = {sum} > {cap}. The whole house went dark!" },
+        { "key": "day_won", "text": "You made it through the day! Score {score}." },
+        { "key": "lost_hearts", "text": "Out of hearts. The family has had enough." },
+        { "key": "day_missed", "text": "{owner} gave up waiting for the {appliance}." },
         { "key": "reject_not_implemented", "text": "Not implemented yet." }
     ]
 }

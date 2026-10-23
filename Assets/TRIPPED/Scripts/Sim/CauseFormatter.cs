@@ -21,7 +21,7 @@ namespace Trouble.Sim
                 case SimEventType.CircuitTripped:
                 {
                     var c = sim.FindCircuit(e.Circuit);
-                    return _strings.Format("trip",
+                    return _strings.Format(sim.IsDayMode ? "day_blackout" : "trip",
                         ("id", c.Id), ("label", c.ShownLabel), ("terms", Terms(e.Terms, sim)), ("sum", e.Load), ("cap", e.Capacity));
                 }
                 case SimEventType.MainTripped:
@@ -29,7 +29,13 @@ namespace Trouble.Sim
                 case SimEventType.LevelLost:
                     return Lost(e, sim);
                 case SimEventType.LevelWon:
+                    if (sim.IsDayMode) return _strings.Format("day_won", ("score", sim.Score));
                     return _strings.Format("won", ("time", Clock(e.Tick, sim.Rules.ticksPerSecond)));
+                case SimEventType.RequestMissed:
+                {
+                    var req = sim.FindRequest(e.Appliance);
+                    return _strings.Format("day_missed", ("owner", req?.Owner ?? ""), ("appliance", NameOf(e.Appliance, sim)));
+                }
                 case SimEventType.ApplianceInterrupted when e.ProgressLost:
                     return _strings.Format("save_lost", ("owner", sim.FindRequest(e.Appliance)?.Owner ?? ""));
                 case SimEventType.SocketRevealed when e.AssumptionWasWrong:
@@ -65,6 +71,8 @@ namespace Trouble.Sim
                     return _strings.Format("lost_fridge", ("n", sim.SpoilLimitTicks / sim.Rules.ticksPerSecond));
                 case LoseReason.DayOver:
                     return _strings.Get("lost_day");
+                case LoseReason.OutOfHearts:
+                    return _strings.Get("lost_hearts");
                 default:
                     return null;
             }

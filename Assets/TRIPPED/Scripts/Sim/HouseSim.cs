@@ -38,6 +38,8 @@ namespace Trouble.Sim
         private readonly Strings _strings;
         private bool _inStep;
         private int _mainCool;
+        private readonly SimRandom _rng;
+        private readonly RequestGenerator _generator;
 
         /// <param name="level">Level data as loaded from JSON.</param>
         /// <param name="rules">Global rules. The level's rulesOverride is applied on top.</param>
@@ -56,7 +58,11 @@ namespace Trouble.Sim
             if (ruleErrors.Count > 0) throw new ArgumentException(string.Join(" ", ruleErrors));
 
             DayLengthTicks = Rules.SecondsToTicks(level.dayLengthSec);
-            MainCapacity = level.mainCapacity;
+            IsDayMode = level.day != null && level.day.enabled;
+            Seed = IsDayMode && level.day.seed != 0 ? level.day.seed : 1;
+            _rng = new SimRandom(Seed);
+            Hearts = IsDayMode ? level.day.hearts : 0;
+            MainCapacity = IsDayMode ? 0 : level.mainCapacity;
             SpoilLimitTicks = Rules.SecondsToTicks(level.fridgeSpoilSec);
             CordsLeft = level.cordCount;
             Phase = LevelPhase.Planning;
@@ -67,6 +73,7 @@ namespace Trouble.Sim
             BuildSockets();
             BuildAppliances();
             BuildCharacter();
+            if (IsDayMode) _generator = new RequestGenerator(level.day, _rng, Rules, DayLengthTicks);
             RecomputePower();
             UpdateSight();
         }
@@ -87,6 +94,19 @@ namespace Trouble.Sim
         public LoseReason LoseReason { get; private set; }
         /// <summary>Breaker trips so far, main breaker included. Flipping a breaker by hand is not a trip.</summary>
         public int TripCount { get; private set; }
+
+        // ---- day mode ------------------------------------------------------------------
+
+        /// <summary>The level's day mode is on: generated requests, room circuits, hearts, carrying.</summary>
+        public bool IsDayMode { get; }
+        /// <summary>Seed actually used for this day's rolls (level.day.seed, or 1 when that is 0).</summary>
+        public int Seed { get; }
+        public int Hearts { get; private set; }
+        public int Score { get; private set; }
+        public int RequestsDone { get; private set; }
+        public int RequestsMissed { get; private set; }
+        /// <summary>Tick the next request is due to appear. -1 outside day mode.</summary>
+        public int NextRequestTick => _generator?.NextTick ?? -1;
 
         // ---- state for views -----------------------------------------------------------
 
@@ -119,7 +139,17 @@ namespace Trouble.Sim
         public SocketState FindSocket(string id) => Find(_sockets, id, s => s.Id);
         public ApplianceState FindAppliance(string id) => Find(_appliances, id, a => a.Id);
         /// <summary>The request that uses this appliance, or null.</summary>
-        public RequestState FindRequest(string applianceId) => Find(_requests, applianceId, r => r.ApplianceId);
+        public RequestState FindRequest(string applianceId)
+        {
+            RequestState last = null;
+            foreach (var r in _requests)
+            {
+                if (r.ApplianceId != applianceId) continue;
+                if (r.IsActive) return r;
+                last = r;
+            }
+            return last;
+        }
 
         public bool IsRoomVisible(string roomId) => FindRoom(roomId)?.Visible ?? false;
 
@@ -309,7 +339,12 @@ namespace Trouble.Sim
                 {
                     req.Done = true;
                     app.SwitchedOn = false;
-                    Emit(new SimEvent { Type = SimEventType.RequestCompleted, Appliance = app.Id });
+                    if (IsDayMode)
+                    {
+                        Score += req.Points;
+                        RequestsDone++;
+                    }
+                    Emit(new SimEvent { Type = SimEventType.RequestCompleted, Appliance = app.Id, Room = req.RoomId });
                 }
             }
             RecomputePower();
@@ -327,6 +362,12 @@ namespace Trouble.Sim
 
             // 11. Time.
             Now++;
+
+            if (IsDayMode)
+            {
+                DayEndOfTick();
+                return;
+            }
 
             // 12. Lose, checked before win (fridge, then deadline, then day).
             if (fridge != null && SpoilTicks > SpoilLimitTicks)
@@ -408,6 +449,13 @@ namespace Trouble.Sim
             TripCount++;
             c.ResetWhileHot = false;
             TurnOff(c);
+            if (IsDayMode)
+            {
+                // One room over its capacity blacks out the whole house.
+                foreach (var other in _circuitsById)
+                    if (other.IsOn) TurnOff(other);
+                LoseHeart();
+            }
         }
 
         private void TripMain(int total)
@@ -493,9 +541,18 @@ namespace Trouble.Sim
             }
             if (socket.OccupantId.Length > 0) return Reject("reject_socket_in_use", out reason);
             if (socket.CordSocketId.Length > 0) return Reject("reject_cord_here", out reason);
-            var req = FindRequest(app.Id);
-            if (req != null && req.RoomId != socket.RoomId)
-                return Reject(out reason, "reject_wrong_room", ("owner", req.Owner), ("room", FindRoom(req.RoomId).Name));
+            if (IsDayMode)
+            {
+                string carrying = Character.CarryingId;
+                if (carrying.Length > 0 && carrying != app.Id) return Reject("reject_hands_full", out reason);
+                if (carrying == app.Id) Character.CarryingId = "";
+            }
+            else
+            {
+                var req = FindRequest(app.Id);
+                if (req != null && req.RoomId != socket.RoomId)
+                    return Reject(out reason, "reject_wrong_room", ("owner", req.Owner), ("room", FindRoom(req.RoomId).Name));
+            }
 
             Vacate(app);
             socket.OccupantId = app.Id;
@@ -507,7 +564,8 @@ namespace Trouble.Sim
         private bool ApplyUnplug(string applianceId, out string reason)
         {
             var app = FindAppliance(applianceId);
-            if (app == null || app.Fixed || app.SocketId.Length == 0) return Reject("reject_cant_unplug", out reason);
+            // Day mode: an appliance is always in a socket or in the character's hands.
+            if (IsDayMode || app == null || app.Fixed || app.SocketId.Length == 0) return Reject("reject_cant_unplug", out reason);
             Vacate(app);
             reason = "";
             return true;
@@ -515,6 +573,8 @@ namespace Trouble.Sim
 
         private bool ApplySwitch(string applianceId, bool on, out string reason)
         {
+            // Day mode: appliances switch themselves on in the room that wants them.
+            if (IsDayMode) return Reject("reject_unknown", out reason);
             bool allowedNow = Phase == LevelPhase.Running || (Phase == LevelPhase.Planning && Rules.planningIsFree);
             if (!allowedNow) return Reject("reject_unpause_switch", out reason);
             var app = FindAppliance(applianceId);
@@ -531,6 +591,7 @@ namespace Trouble.Sim
         private bool ApplyBreaker(string circuitId, out string reason)
         {
             if (Phase != LevelPhase.Running) return Reject("reject_unpause_breaker", out reason);
+            if (IsDayMode) return ResetHouse(out reason);
             var c = FindCircuit(circuitId);
             if (c == null) return Reject("reject_unknown", out reason);
 
@@ -633,6 +694,78 @@ namespace Trouble.Sim
 
         // ---- power and reveals ---------------------------------------------------------
 
+        /// <summary>Day mode: the house is dark. One reset at the panel turns every room back on.</summary>
+        private bool ResetHouse(out string reason)
+        {
+            bool any = false;
+            foreach (var c in _circuitsById)
+            {
+                if (c.IsOn) continue;
+                c.IsOn = true;
+                c.OverTicks = 0;
+                c.CoolTicks = 0;
+                any = true;
+                Emit(new SimEvent { Type = SimEventType.BreakerSwitched, Circuit = c.Id });
+            }
+            if (!any) return Reject("reject_unknown", out reason);
+            reason = "";
+            return true;
+        }
+
+        private void LoseHeart()
+        {
+            if (Hearts <= 0) return;
+            Hearts--;
+            Emit(new SimEvent { Type = SimEventType.HeartLost });
+        }
+
+        /// <summary>
+        /// Day mode, after the clock moves: requests not started in time are missed, then lose (no hearts),
+        /// then win (the day is over), then new requests.
+        /// </summary>
+        private void DayEndOfTick()
+        {
+            foreach (var req in _requests)
+            {
+                if (!req.IsActive || req.ProgressTicks > 0 || Now <= req.DueTicks) continue;
+                req.Missed = true;
+                RequestsMissed++;
+                Emit(new SimEvent { Type = SimEventType.RequestMissed, Appliance = req.ApplianceId, Room = req.RoomId });
+                if (req.CostsHeart) LoseHeart();
+            }
+            if (Hearts <= 0)
+            {
+                Lose(LoseReason.OutOfHearts, "");
+                return;
+            }
+            if (Now >= DayLengthTicks)
+            {
+                Phase = LevelPhase.Won;
+                Emit(new SimEvent { Type = SimEventType.LevelWon });
+                return;
+            }
+            int before = _requests.Count;
+            _generator.Tick(this, Now, _requests);
+            for (int i = before; i < _requests.Count; i++)
+                Emit(new SimEvent { Type = SimEventType.RequestSpawned, Appliance = _requests[i].ApplianceId, Room = _requests[i].RoomId });
+        }
+
+        /// <summary>Day mode: an appliance runs while it is in the room of an active request for it.</summary>
+        private void DayAutoSwitch()
+        {
+            foreach (var app in _appliances)
+            {
+                if (app.SocketId.Length == 0)
+                {
+                    app.SwitchedOn = false;
+                    continue;
+                }
+                string room = FindSocket(app.SocketId).RoomId;
+                var req = FindRequest(app.Id);
+                app.SwitchedOn = req != null && req.IsActive && req.RoomId == room;
+            }
+        }
+
         private bool IsPowered(ApplianceState app)
         {
             if (app.SocketId.Length == 0 || !app.SwitchedOn) return false;
@@ -642,6 +775,7 @@ namespace Trouble.Sim
         /// <summary>Recomputes Powered on every appliance and Load on every circuit (R2).</summary>
         private void RecomputePower()
         {
+            if (IsDayMode) DayAutoSwitch();
             foreach (var c in _circuits) c.Load = 0;
             foreach (var app in _appliances)
             {
@@ -774,6 +908,16 @@ namespace Trouble.Sim
 
         private void BuildCircuits()
         {
+            if (IsDayMode)
+            {
+                // Each room is its own circuit, with the same id as the room.
+                var caps = HouseRoller.RollRoomCapacities(Level.rooms, Level.day.houseCapacity, _rng);
+                foreach (var r in Level.rooms)
+                    _circuits.Add(new CircuitState { Id = r.id, ShownLabel = r.name, Capacity = caps[r.id], IsOn = true });
+                _circuitsById.AddRange(_circuits);
+                _circuitsById.Sort((x, y) => string.CompareOrdinal(x.Id, y.Id));
+                return;
+            }
             foreach (var c in Level.circuits)
             {
                 _circuits.Add(new CircuitState
@@ -799,16 +943,17 @@ namespace Trouble.Sim
             foreach (var s in Level.sockets)
             {
                 RequireRoom(s.room, $"Socket {s.id}");
-                if (FindCircuit(s.circuit) == null) throw new ArgumentException($"Socket {s.id} is on unknown circuit '{s.circuit}'.");
+                string circuit = IsDayMode ? s.room : s.circuit;
+                if (FindCircuit(circuit) == null) throw new ArgumentException($"Socket {s.id} is on unknown circuit '{s.circuit}'.");
                 indexInRoom[s.room] = indexInRoom.TryGetValue(s.room, out var i) ? i + 1 : 1;
 
                 _sockets.Add(new SocketState
                 {
                     Id = s.id,
                     RoomId = s.room,
-                    CircuitId = s.circuit,
-                    AssumedCircuitId = s.assumed ?? "",
-                    Revealed = s.revealed,
+                    CircuitId = circuit,
+                    AssumedCircuitId = IsDayMode ? "" : s.assumed ?? "",
+                    Revealed = IsDayMode || s.revealed,
                     CordSourceId = "",
                     CordSocketId = "",
                     OccupantId = "",
@@ -819,6 +964,18 @@ namespace Trouble.Sim
 
         private void BuildAppliances()
         {
+            if (IsDayMode)
+            {
+                foreach (var a in Level.appliances)
+                {
+                    var app = AddAppliance(a.id, a.type, "", fixedInPlace: false);
+                    app.Load = HouseRoller.RollLoad(a, Catalog.Find(a.type), _rng);
+                    PlaceFixed(app, a.socket, reserve: false);
+                }
+                _appliancesById.AddRange(_appliances);
+                _appliancesById.Sort((x, y) => string.CompareOrdinal(x.Id, y.Id));
+                return;
+            }
             foreach (var r in Level.requests)
             {
                 RequireRoom(r.room, $"{r.owner}'s request");
@@ -954,6 +1111,12 @@ namespace Trouble.Sim
                 if (ch.InteractTicksLeft > 0) ch.InteractTicksLeft--;
                 if (ch.InteractTicksLeft > 0) return;
 
+                if (IsDayMode && head.Command.Type == CommandType.Plug && TryPickUp(head))
+                {
+                    if (Rules.interactTicks > 0) return;
+                    continue;
+                }
+
                 queue.RemoveAt(0);
                 if (Apply(head.Command, out var reason))
                     Emit(new SimEvent { Type = SimEventType.ActionDone, Command = head.Command, Room = ch.RoomId });
@@ -963,6 +1126,38 @@ namespace Trouble.Sim
             }
         }
 
+        /// <summary>Day mode: the appliance is in a socket in another room than the target socket, so it must be fetched first.</summary>
+        private bool NeedsPickup(ApplianceState app, string socketId)
+        {
+            if (app.SocketId.Length == 0 || Character.CarryingId == app.Id) return false;
+            var target = FindSocket(socketId);
+            return target != null && FindSocket(app.SocketId).RoomId != target.RoomId;
+        }
+
+        /// <summary>
+        /// Day mode, at the end of a Plug action's hands-on time in the appliance's room: takes it out of its
+        /// socket and keeps the action, which now heads for the target socket. Returns false when no pickup was due.
+        /// </summary>
+        private bool TryPickUp(CharacterAction head)
+        {
+            var app = FindAppliance(head.Command.A);
+            if (app == null || !NeedsPickup(app, head.Command.B)) return false;
+            if (Character.CarryingId.Length > 0)
+            {
+                Character.QueueList.RemoveAt(0);
+                Emit(new SimEvent { Type = SimEventType.CommandRejected, Message = _strings.Get("reject_hands_full"), Command = head.Command });
+                return true;
+            }
+            string from = app.SocketId;
+            Vacate(app);
+            NoteLostPower();
+            Character.CarryingId = app.Id;
+            head.TargetRoomId = null;
+            head.Started = false;
+            Emit(new SimEvent { Type = SimEventType.PickedUp, Appliance = app.Id, Socket = from });
+            return true;
+        }
+
         /// <summary>The room the character has to be in to do this command.</summary>
         private string TargetRoomOf(Command cmd)
         {
@@ -970,7 +1165,11 @@ namespace Trouble.Sim
             switch (cmd.Type)
             {
                 case CommandType.Plug:
+                {
+                    var app = FindAppliance(cmd.A);
+                    if (IsDayMode && app != null && NeedsPickup(app, cmd.B)) return FindSocket(app.SocketId).RoomId;
                     return FindSocket(cmd.B)?.RoomId ?? here;
+                }
                 case CommandType.Unplug:
                 case CommandType.SetSwitch:
                 {

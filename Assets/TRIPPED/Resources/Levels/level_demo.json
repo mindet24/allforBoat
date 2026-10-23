@@ -1,0 +1,96 @@
+{
+  "id": 100,
+  "title": "One Busy Day",
+  "teaches": "Carry each appliance to whoever needs it most, without overloading a room",
+  "intro": "Everyone wants power, right now. Carry things around and keep the lights on.",
+  "dayLengthSec": 180,
+  "mainCapacity": 0,
+  "fridgeSocket": "",
+  "fridgeSpoilSec": 0,
+  "lampCount": 0,
+  "cordCount": 0,
+  "startRoom": "living",
+  "panelRoom": "laundry",
+  "rooms": [
+    { "id": "laundry",  "name": "Basement",    "floor": 0, "x": 4,  "width": 9, "theme": "laundry",  "capRandom": true, "capMin": 5, "capMax": 10 },
+    { "id": "living",   "name": "Living room", "floor": 1, "x": 0,  "width": 9, "theme": "living",   "capRandom": true, "capMin": 5, "capMax": 10 },
+    { "id": "kitchen",  "name": "Kitchen",     "floor": 1, "x": 9,  "width": 8, "theme": "kitchen",  "capRandom": true, "capMin": 6, "capMax": 10 },
+    { "id": "bedroom",  "name": "Bedroom",     "floor": 2, "x": 0,  "width": 6, "theme": "bedroom",  "capRandom": true, "capMin": 3, "capMax": 10 },
+    { "id": "bathroom", "name": "Bathroom",    "floor": 2, "x": 6,  "width": 5, "theme": "bathroom", "capRandom": true, "capMin": 4, "capMax": 10 },
+    { "id": "kidroom",  "name": "Kid's room",  "floor": 2, "x": 11, "width": 6, "theme": "bedroom",  "capRandom": true, "capMin": 3, "capMax": 10 },
+    { "id": "study",    "name": "Study",       "floor": 3, "x": 4,  "width": 9, "theme": "study",    "capRandom": true, "capMin": 3, "capMax": 10 }
+  ],
+  "doors": [
+    { "id": "D_living_kitchen",   "a": "living",   "b": "kitchen",  "kind": "door",   "open": true },
+    { "id": "S_kitchen_laundry",  "a": "kitchen",  "b": "laundry",  "kind": "stairs", "open": true },
+    { "id": "S_living_bedroom",   "a": "living",   "b": "bedroom",  "kind": "stairs", "open": true },
+    { "id": "D_bedroom_bathroom", "a": "bedroom",  "b": "bathroom", "kind": "door",   "open": true },
+    { "id": "D_bathroom_kidroom", "a": "bathroom", "b": "kidroom",  "kind": "door",   "open": true },
+    { "id": "S_bathroom_study",   "a": "bathroom", "b": "study",    "kind": "stairs", "open": true }
+  ],
+  "circuits": [],
+  "sockets": [
+    { "id": "B1", "room": "laundry",  "circuit": "" },
+    { "id": "B2", "room": "laundry",  "circuit": "" },
+    { "id": "L1", "room": "living",   "circuit": "" },
+    { "id": "L2", "room": "living",   "circuit": "" },
+    { "id": "K1", "room": "kitchen",  "circuit": "" },
+    { "id": "K2", "room": "kitchen",  "circuit": "" },
+    { "id": "K3", "room": "kitchen",  "circuit": "" },
+    { "id": "K4", "room": "kitchen",  "circuit": "" },
+    { "id": "R1", "room": "bedroom",  "circuit": "" },
+    { "id": "R2", "room": "bedroom",  "circuit": "" },
+    { "id": "W1", "room": "bathroom", "circuit": "" },
+    { "id": "W2", "room": "bathroom", "circuit": "" },
+    { "id": "C1", "room": "kidroom",  "circuit": "" },
+    { "id": "C2", "room": "kidroom",  "circuit": "" },
+    { "id": "S1", "room": "study",    "circuit": "" },
+    { "id": "S2", "room": "study",    "circuit": "" }
+  ],
+  "appliances": [
+    { "id": "toaster",   "type": "toaster",   "socket": "K1", "load": 3, "useSec": 12 },
+    { "id": "fridge",    "type": "fridge",    "socket": "K2", "load": 1, "useSec": 30 },
+    { "id": "kettle",    "type": "kettle",    "socket": "K3", "load": 6, "useSec": 8 },
+    { "id": "microwave", "type": "microwave", "socket": "K4", "load": 4, "useSec": 10 },
+    { "id": "tv",        "type": "tv",        "socket": "L1", "load": 1, "useSec": 45 },
+    { "id": "heater",    "type": "heater",    "socket": "L2", "load": 6, "useSec": 30 },
+    { "id": "washer",    "type": "washer",    "socket": "B1", "load": 5, "useSec": 40 },
+    { "id": "dryer",     "type": "dryer",     "socket": "W1", "load": 5, "useSec": 10 },
+    { "id": "blender",   "type": "blender",   "socket": "W2", "load": 2, "useSec": 6 }
+  ],
+  "day": {
+    "enabled": true,
+    "seed": 0,
+    "houseCapacity": 35,
+    "hearts": 3,
+    "uniformUseSec": 0,
+    "firstRequestSec": 3,
+    "intervalStartSec": 15,
+    "intervalEndSec": 6,
+    "intervalJitter": 0.25,
+    "maxActive": 5,
+    "bundleChance": 0.35,
+    "urgencies": [
+      { "id": "urgent",  "dueSec": 20, "points": 3, "costsHeart": true,  "weight": 1 },
+      { "id": "normal",  "dueSec": 40, "points": 2, "costsHeart": false, "weight": 2 },
+      { "id": "relaxed", "dueSec": 60, "points": 1, "costsHeart": false, "weight": 1 }
+    ],
+    "people": [
+      { "name": "Mum",     "rooms": ["kitchen", "living", "laundry"], "wants": ["kettle", "microwave", "toaster", "fridge", "washer", "blender"] },
+      { "name": "Dad",     "rooms": ["living", "study", "kitchen"],   "wants": ["tv", "heater", "microwave", "kettle", "toaster"] },
+      { "name": "Sis",     "rooms": ["bathroom", "bedroom"],          "wants": ["dryer", "blender", "heater"] },
+      { "name": "Kid",     "rooms": ["kidroom", "living"],            "wants": ["tv", "microwave", "blender", "toaster"] },
+      { "name": "Grandpa", "rooms": ["living", "bedroom"],            "wants": ["heater", "tv", "kettle"] }
+    ]
+  },
+  "rulesOverride": [
+    { "key": "overTripTicks", "value": "30" },
+    { "key": "counterAfterTrip", "value": "reset" },
+    { "key": "sightDepth", "value": "99" },
+    { "key": "sightThroughStairs", "value": "true" }
+  ],
+  "requests": [],
+  "routines": [],
+  "reference": [],
+  "scenarios": []
+}

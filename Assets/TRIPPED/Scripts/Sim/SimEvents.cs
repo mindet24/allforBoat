@@ -23,6 +23,14 @@ namespace Trouble.Sim
         DoorToggled,
         /// <summary>The set of visible rooms changed.</summary>
         SightChanged,
+        /// <summary>Day mode: a new request appeared (Appliance, Room).</summary>
+        RequestSpawned,
+        /// <summary>Day mode: a request was not started in time (Appliance, Room).</summary>
+        RequestMissed,
+        /// <summary>Day mode: a heart was lost (by a blackout or a missed urgent request).</summary>
+        HeartLost,
+        /// <summary>Day mode: the character took an appliance out of its socket to carry it (Appliance, Socket).</summary>
+        PickedUp,
     }
 
     /// <summary>One appliance that adds to a load sum, for messages like "Kettle 6 + Toaster 4 = 10 > 8".</summary>

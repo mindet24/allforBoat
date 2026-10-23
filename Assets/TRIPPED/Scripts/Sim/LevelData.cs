@@ -37,6 +37,10 @@ namespace Trouble.Sim
         public List<RuleOverrideData> rulesOverride = new List<RuleOverrideData>();
         public List<CommandData> reference = new List<CommandData>();
         public List<ScenarioData> scenarios = new List<ScenarioData>();
+        /// <summary>Day mode only: appliances in the house at the start, each in its socket.</summary>
+        public List<ApplianceData> appliances = new List<ApplianceData>();
+        /// <summary>Day mode: requests are generated while the day runs. Off = the scripted levels 1–4.</summary>
+        public DayData day = new DayData();
     }
 
     /// <summary>A room. If every room has width 0, rooms are laid out left to right on floor 0.</summary>
@@ -51,6 +55,14 @@ namespace Trouble.Sim
         /// <summary>Width in metres. 0 = use <see cref="RulesConfig.autoRoomWidth"/>.</summary>
         public float width;
         public string theme = "";
+        /// <summary>Day mode: this room's circuit capacity when <see cref="capRandom"/> is off.</summary>
+        public int capacity;
+        /// <summary>Day mode: roll the capacity so all rooms add up to <see cref="DayData.houseCapacity"/>.</summary>
+        public bool capRandom;
+        /// <summary>Day mode, random: the lowest capacity this room may get.</summary>
+        public int capMin;
+        /// <summary>Day mode, random: the highest capacity this room may get. 0 = no limit.</summary>
+        public int capMax;
     }
 
     [Serializable]
@@ -139,5 +151,79 @@ namespace Trouble.Sim
         /// <summary>"won", "lost", or "notFasterThanReference".</summary>
         public string expect = "";
         public List<CommandData> commands = new List<CommandData>();
+    }
+
+    /// <summary>Day mode: one appliance placed in the house at the start.</summary>
+    [Serializable]
+    public sealed class ApplianceData
+    {
+        public string id = "";
+        /// <summary>Catalog id.</summary>
+        public string type = "";
+        /// <summary>Socket it starts in.</summary>
+        public string socket = "";
+        /// <summary>Load when <see cref="loadRandom"/> is off. 0 = the catalog load.</summary>
+        public int load;
+        /// <summary>Roll the load between <see cref="loadMin"/> and <see cref="loadMax"/> at the start of the day.</summary>
+        public bool loadRandom;
+        public int loadMin;
+        public int loadMax;
+        /// <summary>Seconds of power one request needs. Ignored when <see cref="DayData.uniformUseSec"/> is above 0.</summary>
+        public float useSec = 10f;
+    }
+
+    /// <summary>
+    /// Day mode settings (design: TRIPPED day mode, 2026-10-24). Each room is its own circuit; a room over its
+    /// capacity for overTripTicks blacks out the whole house; requests appear over time and the player carries
+    /// appliances to them.
+    /// </summary>
+    [Serializable]
+    public sealed class DayData
+    {
+        public bool enabled;
+        /// <summary>Seed for every roll of the day. 0 = the game picks one when the level starts.</summary>
+        public int seed;
+        /// <summary>Sum of every room capacity. Random rooms share what the fixed rooms leave.</summary>
+        public int houseCapacity;
+        public int hearts = 3;
+        /// <summary>Above 0 = every appliance needs this many seconds of power, whatever its own useSec.</summary>
+        public float uniformUseSec;
+        public float firstRequestSec = 3f;
+        /// <summary>Seconds between requests at the start of the day.</summary>
+        public float intervalStartSec = 15f;
+        /// <summary>Seconds between requests at the end of the day. The gap shrinks evenly in between.</summary>
+        public float intervalEndSec = 6f;
+        /// <summary>Each gap is multiplied by a random factor in 1 ± this.</summary>
+        public float intervalJitter = 0.25f;
+        public int maxActive = 5;
+        /// <summary>Chance that a request comes with a second one from the same person, at another urgency.</summary>
+        public float bundleChance = 0.35f;
+        public List<UrgencyData> urgencies = new List<UrgencyData>();
+        public List<PersonData> people = new List<PersonData>();
+    }
+
+    /// <summary>One urgency level of a request.</summary>
+    [Serializable]
+    public sealed class UrgencyData
+    {
+        public string id = "";
+        /// <summary>Seconds the player has to get the appliance running in the person's room.</summary>
+        public float dueSec;
+        public int points;
+        /// <summary>true = missing it costs a heart.</summary>
+        public bool costsHeart;
+        /// <summary>Relative chance of this urgency.</summary>
+        public float weight = 1f;
+    }
+
+    /// <summary>Someone in the house who makes requests.</summary>
+    [Serializable]
+    public sealed class PersonData
+    {
+        public string name = "";
+        /// <summary>Rooms this person asks from. They wait in the room until the request is done or missed.</summary>
+        public List<string> rooms = new List<string>();
+        /// <summary>Appliance ids this person asks for. Empty = any.</summary>
+        public List<string> wants = new List<string>();
     }
 }

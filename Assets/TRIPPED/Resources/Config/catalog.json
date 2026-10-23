@@ -12,6 +12,7 @@
         { "id": "lamp",      "name": "Lamp",            "load": 1, "fragile": false, "shortLabel": "LMP",  "worldHeight": 0.7 },
         { "id": "heater",    "name": "Space heater",    "load": 6, "fragile": false, "shortLabel": "HTR",  "worldHeight": 0.8 },
         { "id": "tv",        "name": "TV",              "load": 2, "fragile": false, "shortLabel": "TV",   "worldHeight": 0.8 },
-        { "id": "ac",        "name": "Air conditioner", "load": 8, "fragile": false, "shortLabel": "AC",   "worldHeight": 0.6 }
+        { "id": "ac",        "name": "Air conditioner", "load": 8, "fragile": false, "shortLabel": "AC",   "worldHeight": 0.6 },
+        { "id": "blender",   "name": "Blender",         "load": 2, "fragile": false, "shortLabel": "BLD",  "worldHeight": 0.5 }
     ]
 }
