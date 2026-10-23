@@ -203,6 +203,21 @@ namespace Trouble.Sim
             if (command.Type == CommandType.CancelAction)
                 return CancelAction(command.Index, out reason);
 
+            if (IsDayMode)
+            {
+                // Day mode is played with the keyboard: walk, climb and interact happen at once while time runs.
+                bool keyboard = command.Type == CommandType.Walk || command.Type == CommandType.Climb || command.Type == CommandType.Interact;
+                if (!keyboard) return Reject("reject_unknown", out reason);
+                if (Phase != LevelPhase.Running) return Reject("reject_unpause_walk", out reason);
+                bool done = Apply(command, out reason);
+                if (done)
+                {
+                    RecomputePower();
+                    UpdateSight();
+                }
+                return done;
+            }
+
             if (Phase == LevelPhase.Planning && Rules.planningIsFree)
             {
                 if (command.Type == CommandType.ToggleBreaker) return Reject("reject_unpause_breaker", out reason);
@@ -522,6 +537,9 @@ namespace Trouble.Sim
                 case CommandType.RemoveCord: ok = ApplyRemoveCord(cmd.A, out reason); break;
                 case CommandType.ToggleDoor: ok = ApplyDoor(cmd.A, out reason); break;
                 case CommandType.MoveTo: ok = FindRoom(cmd.A) != null || Reject("reject_no_path", out reason); break;
+                case CommandType.Walk: ok = ApplyWalk(cmd.Index, out reason); break;
+                case CommandType.Climb: ok = ApplyClimb(cmd.Index, out reason); break;
+                case CommandType.Interact: ok = ApplyInteract(out reason); break;
                 default: ok = Reject("reject_unknown", out reason); break;
             }
             if (ok) NoteLostPower();
@@ -1058,6 +1076,8 @@ namespace Trouble.Sim
             Character.RoomId = start;
             Character.FromRoomId = start;
             Character.ToRoomId = start;
+            var startRoom = FindRoom(start);
+            Character.XCm = Cm(startRoom.CenterX);
         }
 
         // ---- character -----------------------------------------------------------------
@@ -1068,6 +1088,11 @@ namespace Trouble.Sim
         /// </summary>
         private void CharacterTick()
         {
+            if (IsDayMode)
+            {
+                KeyboardTick();
+                return;
+            }
             var ch = Character;
             var queue = ch.QueueList;
             // Each pass spends the tick (return), removes an action, or arrives at no cost (then the next
@@ -1111,12 +1136,6 @@ namespace Trouble.Sim
                 if (ch.InteractTicksLeft > 0) ch.InteractTicksLeft--;
                 if (ch.InteractTicksLeft > 0) return;
 
-                if (IsDayMode && head.Command.Type == CommandType.Plug && TryPickUp(head))
-                {
-                    if (Rules.interactTicks > 0) return;
-                    continue;
-                }
-
                 queue.RemoveAt(0);
                 if (Apply(head.Command, out var reason))
                     Emit(new SimEvent { Type = SimEventType.ActionDone, Command = head.Command, Room = ch.RoomId });
@@ -1126,36 +1145,180 @@ namespace Trouble.Sim
             }
         }
 
-        /// <summary>Day mode: the appliance is in a socket in another room than the target socket, so it must be fetched first.</summary>
-        private bool NeedsPickup(ApplianceState app, string socketId)
+        // ---- day mode keyboard ---------------------------------------------------------
+
+        /// <summary>Day mode: where the panel hangs, in metres.</summary>
+        public float PanelX
         {
-            if (app.SocketId.Length == 0 || Character.CarryingId == app.Id) return false;
-            var target = FindSocket(socketId);
-            return target != null && FindSocket(app.SocketId).RoomId != target.RoomId;
+            get
+            {
+                var room = FindRoom(PanelRoomId);
+                return room.X + Clamp01(Level.panelPos) * room.Width;
+            }
+        }
+
+        /// <summary>Horizontal position of a socket, in metres.</summary>
+        public float SocketX(SocketState s)
+        {
+            var room = FindRoom(s.RoomId);
+            return room.X + s.Pos * room.Width;
         }
 
         /// <summary>
-        /// Day mode, at the end of a Plug action's hands-on time in the appliance's room: takes it out of its
-        /// socket and keeps the action, which now heads for the target socket. Returns false when no pickup was due.
+        /// Day mode: where a stairs door can be used, in metres: the middle of the stretch both rooms share.
+        /// The view draws the stairs there.
         /// </summary>
-        private bool TryPickUp(CharacterAction head)
+        public float StairsX(DoorState door)
         {
-            var app = FindAppliance(head.Command.A);
-            if (app == null || !NeedsPickup(app, head.Command.B)) return false;
-            if (Character.CarryingId.Length > 0)
+            var a = FindRoom(door.RoomA);
+            var b = FindRoom(door.RoomB);
+            float left = Math.Max(a.X, b.X);
+            float right = Math.Min(a.X + a.Width, b.X + b.Width);
+            return right > left ? (left + right) * 0.5f : (a.CenterX + b.CenterX) * 0.5f;
+        }
+
+        private static int Cm(float metres) => (int)Math.Round(metres * 100f, MidpointRounding.AwayFromZero);
+        private static float Clamp01(float v) => v < 0f ? 0f : v > 1f ? 1f : v;
+        private int ReachCm => Cm(Rules.reachMetres);
+
+        private bool ApplyWalk(int direction, out string reason)
+        {
+            Character.WalkDir = Math.Sign(direction);
+            if (Character.WalkDir != 0) Character.Facing = Character.WalkDir;
+            reason = "";
+            return true;
+        }
+
+        private bool ApplyClimb(int direction, out string reason)
+        {
+            var ch = Character;
+            if (ch.IsClimbing) return Reject("reject_unknown", out reason);
+            var here = FindRoom(ch.RoomId);
+            int dir = Math.Sign(direction);
+            foreach (var door in _doors)
             {
-                Character.QueueList.RemoveAt(0);
-                Emit(new SimEvent { Type = SimEventType.CommandRejected, Message = _strings.Get("reject_hands_full"), Command = head.Command });
+                if (!door.IsStairs || !door.IsOpen || (door.RoomA != here.Id && door.RoomB != here.Id)) continue;
+                var other = FindRoom(door.OtherRoom(here.Id));
+                if (other.Floor != here.Floor + dir) continue;
+                int stairs = Cm(StairsX(door));
+                if (Math.Abs(ch.XCm - stairs) > ReachCm) continue;
+                ch.XCm = stairs;
+                ch.ClimbFromRoomId = here.Id;
+                ch.ClimbToRoomId = other.Id;
+                ch.ClimbTicks = Math.Max(1, Rules.stairsTicks);
+                ch.ClimbTicksLeft = ch.ClimbTicks;
+                reason = "";
                 return true;
             }
-            string from = app.SocketId;
-            Vacate(app);
-            NoteLostPower();
-            Character.CarryingId = app.Id;
-            head.TargetRoomId = null;
-            head.Started = false;
-            Emit(new SimEvent { Type = SimEventType.PickedUp, Appliance = app.Id, Socket = from });
+            return Reject("reject_no_stairs", out reason);
+        }
+
+        /// <summary>
+        /// E: reset the panel during a blackout when standing at it; otherwise plug what is carried into the
+        /// nearest free socket in reach; otherwise pick up the nearest appliance in reach.
+        /// </summary>
+        private bool ApplyInteract(out string reason)
+        {
+            var ch = Character;
+            if (ch.IsClimbing) return Reject("reject_unknown", out reason);
+
+            bool dark = false;
+            foreach (var c in _circuits)
+                if (!c.IsOn) dark = true;
+            if (dark && ch.RoomId == PanelRoomId && Math.Abs(ch.XCm - Cm(PanelX)) <= ReachCm)
+                return ResetHouse(out reason);
+
+            if (ch.CarryingId.Length > 0)
+            {
+                SocketState best = null;
+                int bestDist = int.MaxValue;
+                foreach (var s in _sockets)
+                {
+                    if (s.RoomId != ch.RoomId || s.OccupantId.Length > 0 || s.Reserved || s.CordSocketId.Length > 0) continue;
+                    int d = Math.Abs(ch.XCm - Cm(SocketX(s)));
+                    if (d <= ReachCm && d < bestDist)
+                    {
+                        best = s;
+                        bestDist = d;
+                    }
+                }
+                if (best == null) return Reject("reject_no_free_socket", out reason);
+                return ApplyPlug(ch.CarryingId, best.Id, out reason);
+            }
+
+            ApplianceState pick = null;
+            int pickDist = int.MaxValue;
+            foreach (var app in _appliancesById)
+            {
+                if (app.SocketId.Length == 0) continue;
+                var s = FindSocket(app.SocketId);
+                if (s.RoomId != ch.RoomId) continue;
+                int d = Math.Abs(ch.XCm - Cm(SocketX(s)));
+                if (d <= ReachCm && d < pickDist)
+                {
+                    pick = app;
+                    pickDist = d;
+                }
+            }
+            if (pick == null) return Reject("reject_unknown", out reason);
+            string from = pick.SocketId;
+            Vacate(pick);
+            ch.CarryingId = pick.Id;
+            Emit(new SimEvent { Type = SimEventType.PickedUp, Appliance = pick.Id, Socket = from });
+            reason = "";
             return true;
+        }
+
+        /// <summary>Day mode: one tick of climbing, or of walking in the held direction through open doors.</summary>
+        private void KeyboardTick()
+        {
+            var ch = Character;
+            if (ch.IsClimbing)
+            {
+                ch.ClimbTicksLeft--;
+                if (ch.ClimbTicksLeft == 0)
+                {
+                    EnterRoom(ch.ClimbToRoomId);
+                    var to = FindRoom(ch.ClimbToRoomId);
+                    ch.XCm = Math.Max(Cm(to.X), Math.Min(Cm(to.X + to.Width), ch.XCm));
+                }
+                return;
+            }
+            if (ch.WalkDir == 0) return;
+
+            const int wallGapCm = 30;
+            int x = ch.XCm + ch.WalkDir * Math.Max(1, Cm(Rules.walkSpeed / Rules.ticksPerSecond));
+            var room = FindRoom(ch.RoomId);
+            for (int guard = 0; guard < _rooms.Count; guard++)
+            {
+                int left = Cm(room.X);
+                int right = Cm(room.X + room.Width);
+                if (x >= left && x <= right) break;
+                var next = NeighbourThroughDoor(room, x > right ? 1 : -1);
+                if (next == null)
+                {
+                    x = x > right ? right - wallGapCm : left + wallGapCm;
+                    break;
+                }
+                room = next;
+                EnterRoom(room.Id);
+            }
+            ch.XCm = x;
+        }
+
+        /// <summary>The room on the same floor right next to this one on that side, joined by an open door. Null = a wall.</summary>
+        private RoomState NeighbourThroughDoor(RoomState room, int side)
+        {
+            int edge = Cm(side > 0 ? room.X + room.Width : room.X);
+            foreach (var door in _doors)
+            {
+                if (door.IsStairs || !door.IsOpen || (door.RoomA != room.Id && door.RoomB != room.Id)) continue;
+                var other = FindRoom(door.OtherRoom(room.Id));
+                if (other.Floor != room.Floor) continue;
+                int otherEdge = Cm(side > 0 ? other.X : other.X + other.Width);
+                if (Math.Abs(otherEdge - edge) <= 1) return other;
+            }
+            return null;
         }
 
         /// <summary>The room the character has to be in to do this command.</summary>
@@ -1165,11 +1328,7 @@ namespace Trouble.Sim
             switch (cmd.Type)
             {
                 case CommandType.Plug:
-                {
-                    var app = FindAppliance(cmd.A);
-                    if (IsDayMode && app != null && NeedsPickup(app, cmd.B)) return FindSocket(app.SocketId).RoomId;
                     return FindSocket(cmd.B)?.RoomId ?? here;
-                }
                 case CommandType.Unplug:
                 case CommandType.SetSwitch:
                 {

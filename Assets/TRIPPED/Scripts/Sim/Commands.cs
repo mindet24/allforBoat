@@ -13,6 +13,12 @@ namespace Trouble.Sim
         MoveTo,
         /// <summary>Remove one waiting action from the character's queue.</summary>
         CancelAction,
+        /// <summary>Day mode, keyboard: hold a walking direction (Index -1 left, 0 stop, 1 right).</summary>
+        Walk,
+        /// <summary>Day mode, keyboard: take the stairs next to the character (Index 1 up, -1 down).</summary>
+        Climb,
+        /// <summary>Day mode, keyboard (E): reset the panel, plug in what is carried, or pick up what is nearest.</summary>
+        Interact,
     }
 
     /// <summary>
@@ -52,6 +58,9 @@ namespace Trouble.Sim
         public static Command ToggleDoor(string door, bool append = false) => new Command(CommandType.ToggleDoor, door, append: append);
         public static Command MoveTo(string room, bool append = false) => new Command(CommandType.MoveTo, room, append: append);
         public static Command CancelAction(int index) => new Command(CommandType.CancelAction, index: index);
+        public static Command Walk(int direction) => new Command(CommandType.Walk, index: direction);
+        public static Command Climb(int direction) => new Command(CommandType.Climb, index: direction);
+        public static Command Interact() => new Command(CommandType.Interact);
 
         public override string ToString() => $"{Type}({A}{(B.Length > 0 ? ", " + B : "")}{(Type == CommandType.SetSwitch ? (On ? ", on" : ", off") : "")})";
     }

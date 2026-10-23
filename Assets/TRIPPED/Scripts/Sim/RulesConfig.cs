@@ -36,6 +36,8 @@ namespace Trouble.Sim
         /// <summary>Extra ticks to use stairs.</summary>
         public int stairsTicks = 20;
         public int actionQueueSize = 3;
+        /// <summary>Day mode, keyboard: how close (metres) the character must be to a socket, appliance, panel or stairs to use it.</summary>
+        public float reachMetres = 1.5f;
         /// <summary>true = during planning every action except breakers happens at once, with no walking.</summary>
         public bool planningIsFree = true;
 

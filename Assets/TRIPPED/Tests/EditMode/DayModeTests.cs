@@ -172,23 +172,63 @@ namespace Trouble.Tests
             }
         }
 
+        // ---- keyboard helpers -----------------------------------------------------------
+        // TwoRooms layout (auto): room a 0–6 m, room b 6–12 m. Sockets A1 2 m, A2 4 m, B1 7.5 m (kettle),
+        // B2 9 m (toaster), B3 10.5 m. The character starts at 9 m in b; the panel hangs at 6.6 m in b.
+
+        private const float A1X = 2f, A2X = 4f, KettleX = 7.5f, ToasterX = 9f, PanelX = 6.6f;
+
+        /// <summary>Holds a direction until the character is within 15 cm of <paramref name="metres"/>, then stops.</summary>
+        private static void WalkTo(HouseSim sim, float metres)
+        {
+            int dir = Math.Sign(metres - sim.Character.X);
+            if (dir == 0) return;
+            Submit(sim, Command.Walk(dir));
+            for (int guard = 0; guard < 1000 && Math.Abs(sim.Character.X - metres) > 0.15f; guard++)
+            {
+                if (Math.Sign(metres - sim.Character.X) != dir) break;
+                sim.Step();
+            }
+            Submit(sim, Command.Walk(0));
+        }
+
+        private static void Carry(HouseSim sim, float fromX, float toX)
+        {
+            WalkTo(sim, fromX);
+            Submit(sim, Command.Interact());
+            WalkTo(sim, toX);
+            Submit(sim, Command.Interact());
+        }
+
+        /// <summary>Kettle 6 and toaster 3 both wanted in room a, which holds 6; both carried there.</summary>
+        private static HouseSim Overloaded(out List<SimEvent> events)
+        {
+            var sim = Sim(TwoRooms(6, new[] { "kettle", "toaster" }, urgentOnly: false, bundleChance: 1f), Rules(instant: false));
+            sim.Start();
+            Run(sim, 1);
+            Assert.AreEqual(2, sim.Requests.Count);
+            Carry(sim, KettleX, A1X);
+            Carry(sim, ToasterX, A2X);
+            events = new List<SimEvent>();
+            return sim;
+        }
+
         // ---- requests, carrying, power ------------------------------------------------
 
         [Test]
         public void ApplianceCarriedToRequestRoom_RunsByItselfAndScores()
         {
             // Arrange
-            var sim = Sim(TwoRooms(10, new[] { "kettle" }));
+            var sim = Sim(TwoRooms(10, new[] { "kettle" }), Rules(instant: false));
             sim.Start();
             Run(sim, 1);
             Assert.AreEqual("kettle", sim.Requests[0].ApplianceId);
 
             // Act
-            Submit(sim, Command.Plug("kettle", "A1"));
-            var events = Run(sim, 90);
+            Carry(sim, KettleX, A1X);
+            Run(sim, 90);
 
             // Assert
-            Assert.IsNotEmpty(TestData.OfType(events, SimEventType.PickedUp));
             Assert.IsTrue(sim.Requests[0].Done);
             Assert.AreEqual(3, sim.Score);
             Assert.AreEqual("A1", sim.FindAppliance("kettle").SocketId);
@@ -196,37 +236,59 @@ namespace Trouble.Tests
         }
 
         [Test]
-        public void Carrying_WithWalkTime_HoldsApplianceUntilItIsPlugged()
+        public void InteractNearAppliance_PicksItUp_ThenInteractAtFreeSocket_PlugsIt()
         {
             // Arrange
             var sim = Sim(TwoRooms(10, new[] { "kettle" }), Rules(instant: false));
             sim.Start();
-            Run(sim, 1);
-            Submit(sim, Command.Plug("kettle", "A1"));
+            WalkTo(sim, KettleX);
 
-            // Act: run until the pickup, then look at the hands.
-            int guard = 0;
-            while (sim.Character.CarryingId.Length == 0 && guard++ < 200) sim.Step();
+            // Act
+            Submit(sim, Command.Interact());
+            string carried = sim.Character.CarryingId;
             string socketWhileCarried = sim.FindAppliance("kettle").SocketId;
-            while (sim.FindAppliance("kettle").SocketId.Length == 0 && guard++ < 400) sim.Step();
+            WalkTo(sim, A1X);
+            Submit(sim, Command.Interact());
 
             // Assert
+            Assert.AreEqual("kettle", carried);
             Assert.AreEqual("", socketWhileCarried);
             Assert.AreEqual("A1", sim.FindAppliance("kettle").SocketId);
             Assert.AreEqual("", sim.Character.CarryingId);
         }
 
         [Test]
-        public void Unplug_InDayMode_IsRejected()
+        public void InteractCarryingWithNoFreeSocketInReach_IsRejected()
         {
-            // Arrange
-            var sim = Sim(TwoRooms(10, new[] { "kettle" }));
+            // Arrange: carry the kettle into room a at 5.6 m, more than 1.5 m from A2 (4 m), the nearest socket there.
+            var sim = Sim(TwoRooms(10, new[] { "kettle" }), Rules(instant: false));
+            sim.Start();
+            WalkTo(sim, KettleX);
+            Submit(sim, Command.Interact());
+            WalkTo(sim, 5.6f);
 
             // Act
-            bool accepted = sim.Submit(Command.Unplug("kettle"), out _);
+            bool accepted = sim.Submit(Command.Interact(), out var reason);
 
             // Assert
             Assert.IsFalse(accepted);
+            Assert.AreEqual("kettle", sim.Character.CarryingId);
+        }
+
+        [Test]
+        public void ClickCommands_InDayMode_AreRejected()
+        {
+            // Arrange
+            var sim = Sim(TwoRooms(10, new[] { "kettle" }));
+            sim.Start();
+
+            // Act
+            bool unplug = sim.Submit(Command.Unplug("kettle"), out _);
+            bool plug = sim.Submit(Command.Plug("kettle", "A1"), out _);
+
+            // Assert
+            Assert.IsFalse(unplug);
+            Assert.IsFalse(plug);
             Assert.AreEqual("B1", sim.FindAppliance("kettle").SocketId);
         }
 
@@ -245,21 +307,88 @@ namespace Trouble.Tests
             Assert.IsFalse(sim.FindAppliance("toaster").Powered);
         }
 
+        // ---- walking and stairs -------------------------------------------------------
+
+        [Test]
+        public void WalkThroughOpenDoor_EntersNextRoom()
+        {
+            // Arrange
+            var sim = Sim(TwoRooms(10, new[] { "kettle" }), Rules(instant: false));
+            sim.Start();
+
+            // Act
+            WalkTo(sim, 3f);
+
+            // Assert
+            Assert.AreEqual("a", sim.Character.RoomId);
+        }
+
+        [Test]
+        public void WalkIntoOuterWall_StopsInsideTheRoom()
+        {
+            // Arrange
+            var sim = Sim(TwoRooms(10, new[] { "kettle" }), Rules(instant: false));
+            sim.Start();
+            Submit(sim, Command.Walk(1));
+
+            // Act
+            Run(sim, 100);
+
+            // Assert
+            Assert.AreEqual("b", sim.Character.RoomId);
+            Assert.LessOrEqual(sim.Character.X, 12f);
+            Assert.Greater(sim.Character.X, 11f);
+        }
+
+        [Test]
+        public void ClimbAtStairs_ReachesTheFloorAboveAfterStairsTicks()
+        {
+            // Arrange: the demo starts in the living room, by the stairs up to the bedroom.
+            var level = Demo();
+            level.day.seed = 3;
+            var rules = Rules(instant: false);
+            var sim = Sim(level, rules, ShippedCatalog());
+            sim.Start();
+
+            // Act
+            Submit(sim, Command.Climb(1));
+            Run(sim, rules.stairsTicks - 1);
+            string midway = sim.Character.RoomId;
+            Run(sim, 1);
+
+            // Assert
+            Assert.AreEqual("living", midway);
+            Assert.AreEqual("bedroom", sim.Character.RoomId);
+        }
+
+        [Test]
+        public void ClimbAwayFromStairs_IsRejected()
+        {
+            // Arrange
+            var level = Demo();
+            level.day.seed = 3;
+            var sim = Sim(level, Rules(instant: false), ShippedCatalog());
+            sim.Start();
+            WalkTo(sim, 8.5f);
+
+            // Act
+            bool accepted = sim.Submit(Command.Climb(1), out _);
+
+            // Assert
+            Assert.IsFalse(accepted);
+            Assert.AreEqual("living", sim.Character.RoomId);
+        }
+
         // ---- blackout and hearts ------------------------------------------------------
 
         [Test]
         public void RoomOverCapacityForTripDelay_BlacksOutWholeHouseAndCostsHeart()
         {
-            // Arrange: kettle 6 + toaster 3 both wanted in room A, which holds 6.
-            var sim = Sim(TwoRooms(6, new[] { "kettle", "toaster" }, urgentOnly: false, bundleChance: 1f));
-            sim.Start();
-            Run(sim, 1);
-            Assert.AreEqual(2, sim.Requests.Count);
+            // Arrange
+            var sim = Overloaded(out var events);
 
             // Act
-            Submit(sim, Command.Plug("kettle", "A1", append: true));
-            Submit(sim, Command.Plug("toaster", "A2", append: true));
-            var events = Run(sim, 29);
+            events.AddRange(Run(sim, 29));
             bool darkBeforeDelay = !sim.FindCircuit("a").IsOn;
             events.AddRange(Run(sim, 5));
 
@@ -271,23 +400,22 @@ namespace Trouble.Tests
         }
 
         [Test]
-        public void BreakerAfterBlackout_TurnsEveryRoomBackOn()
+        public void InteractAtPanelDuringBlackout_TurnsEveryRoomBackOn()
         {
-            // Arrange
-            var sim = Sim(TwoRooms(6, new[] { "kettle", "toaster" }, urgentOnly: false, bundleChance: 1f));
-            sim.Start();
-            Run(sim, 1);
-            Submit(sim, Command.Plug("kettle", "A1", append: true));
-            Submit(sim, Command.Plug("toaster", "A2", append: true));
+            // Arrange: blackout, then take the toaster away so the reset holds.
+            var sim = Overloaded(out _);
             Run(sim, 40);
-            Submit(sim, Command.Plug("toaster", "B2", append: true));
+            WalkTo(sim, A2X);
+            Submit(sim, Command.Interact());
+            WalkTo(sim, PanelX);
 
             // Act
-            Submit(sim, Command.ToggleBreaker("", append: true));
+            Submit(sim, Command.Interact());
             Run(sim, 5);
 
             // Assert
             foreach (var c in sim.Circuits) Assert.IsTrue(c.IsOn, $"Circuit {c.Id} should be on.");
+            Assert.AreEqual("toaster", sim.Character.CarryingId, "Resetting the panel does not drop what is carried.");
         }
 
         [Test]
@@ -309,11 +437,11 @@ namespace Trouble.Tests
         [Test]
         public void StartedRequest_IsNotMissedAfterItsDueTime()
         {
-            // Arrange: due 2 s, takes 8 s to finish.
-            var sim = Sim(TwoRooms(10, new[] { "kettle" }, dueSec: 2f));
+            // Arrange: due 5 s, takes 8 s to finish.
+            var sim = Sim(TwoRooms(10, new[] { "kettle" }, dueSec: 5f), Rules(instant: false));
             sim.Start();
             Run(sim, 1);
-            Submit(sim, Command.Plug("kettle", "A1"));
+            Carry(sim, KettleX, A1X);
 
             // Act
             Run(sim, 100);
@@ -345,8 +473,6 @@ namespace Trouble.Tests
             // Arrange
             var sim = Sim(TwoRooms(10, new[] { "kettle" }, daySec: 5f));
             sim.Start();
-            Run(sim, 1);
-            Submit(sim, Command.Plug("kettle", "A1"));
 
             // Act
             Run(sim, 100);

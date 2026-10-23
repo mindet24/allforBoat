@@ -174,6 +174,24 @@ namespace Trouble.Sim
         public int InteractTicksLeft { get; internal set; }
         /// <summary>Day mode: the appliance in the character's hands. Empty = hands free.</summary>
         public string CarryingId { get; internal set; } = "";
+
+        // Day mode keyboard movement. Positions are whole centimetres so replays stay exact.
+
+        /// <summary>Day mode: horizontal position in the house, in centimetres.</summary>
+        public int XCm { get; internal set; }
+        /// <summary>Day mode: horizontal position in metres, for the view.</summary>
+        public float X => XCm / 100f;
+        /// <summary>Day mode: held walking direction, -1, 0 or 1.</summary>
+        public int WalkDir { get; internal set; }
+        /// <summary>Day mode: last direction walked, -1 or 1.</summary>
+        public int Facing { get; internal set; } = 1;
+        public bool IsClimbing => ClimbTicksLeft > 0;
+        public string ClimbFromRoomId { get; internal set; } = "";
+        public string ClimbToRoomId { get; internal set; } = "";
+        public int ClimbTicks { get; internal set; }
+        public int ClimbTicksLeft { get; internal set; }
+        /// <summary>0 at the bottom of the climb, 1 at the top (or the other way when going down).</summary>
+        public float ClimbProgress => ClimbTicks <= 0 ? 1f : 1f - (float)ClimbTicksLeft / ClimbTicks;
         /// <summary>First entry is the action in progress.</summary>
         public IReadOnlyList<CharacterAction> Queue => QueueList;
 

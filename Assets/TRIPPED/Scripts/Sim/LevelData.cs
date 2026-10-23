@@ -27,6 +27,8 @@ namespace Trouble.Sim
         public string startRoom = "";
         /// <summary>Room that holds the panel. Empty = the start room.</summary>
         public string panelRoom = "";
+        /// <summary>Day mode: where the panel hangs in its room, 0..1 from the left.</summary>
+        public float panelPos = 0.1f;
         public List<RoomData> rooms = new List<RoomData>();
         /// <summary>Empty = an open door between each pair of rooms that are next to each other in <see cref="rooms"/>.</summary>
         public List<DoorData> doors = new List<DoorData>();

@@ -11,6 +11,7 @@
   "cordCount": 0,
   "startRoom": "living",
   "panelRoom": "laundry",
+  "panelPos": 0.12,
   "rooms": [
     { "id": "laundry",  "name": "Basement",    "floor": 0, "x": 4,  "width": 9, "theme": "laundry",  "capRandom": true, "capMin": 5, "capMax": 10 },
     { "id": "living",   "name": "Living room", "floor": 1, "x": 0,  "width": 9, "theme": "living",   "capRandom": true, "capMin": 5, "capMax": 10 },

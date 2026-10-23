@@ -105,6 +105,9 @@ namespace Trouble.Sim
                 case "door": return Command.ToggleDoor(d.a, append);
                 case "move": return Command.MoveTo(d.a, append);
                 case "cancel": return Command.CancelAction(int.Parse(d.a));
+                case "walk": return Command.Walk(int.Parse(d.a));
+                case "climb": return Command.Climb(int.Parse(d.a));
+                case "interact": return Command.Interact();
                 default: throw new ArgumentException($"Unknown command '{d.cmd}'.");
             }
         }
@@ -124,6 +127,9 @@ namespace Trouble.Sim
                 case CommandType.ToggleDoor: d.cmd = "door"; break;
                 case CommandType.MoveTo: d.cmd = "move"; break;
                 case CommandType.CancelAction: d.cmd = "cancel"; d.a = c.Index.ToString(); d.replace = false; break;
+                case CommandType.Walk: d.cmd = "walk"; d.a = c.Index.ToString(); d.replace = false; break;
+                case CommandType.Climb: d.cmd = "climb"; d.a = c.Index.ToString(); d.replace = false; break;
+                case CommandType.Interact: d.cmd = "interact"; d.a = "e"; d.replace = false; break;
             }
             return d;
         }
