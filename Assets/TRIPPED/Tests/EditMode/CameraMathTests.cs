@@ -161,5 +161,65 @@ namespace Trouble.Tests
             Assert.AreEqual(HouseViewport.center.x, vp.x, 1e-4f);
             Assert.AreEqual(HouseViewport.center.y, vp.y, 1e-4f);
         }
+
+        [Test]
+        public void WorldToViewportTilted_NoTilt_MatchesFlatViewHeightMath()
+        {
+            // Arrange
+            var camera = new Vector2(3f, 2f);
+            var point = new Vector2(5f, 4.5f);
+
+            // Act
+            var tilted = CameraMath.WorldToViewportTilted(camera, 0f, 10f, Fov, 0f, Aspect, new Vector3(point.x, point.y, 0f));
+            var flat = CameraMath.PlaneToViewportForHeight(camera, 10f, Aspect, point);
+
+            // Assert
+            Assert.AreEqual(flat.x, tilted.x, 1e-4f);
+            Assert.AreEqual(flat.y, tilted.y, 1e-4f);
+        }
+
+        [Test]
+        public void WorldToViewportTilted_FocusPoint_IsScreenCentre()
+        {
+            // Arrange
+            var focus = new Vector2(-2f, 6f);
+
+            // Act
+            var vp = CameraMath.WorldToViewportTilted(focus, 0f, 8f, 30f, 12f, Aspect, new Vector3(focus.x, focus.y, 0f));
+
+            // Assert: the camera orbits the focus point, so tilting never moves it on screen.
+            Assert.AreEqual(0.5f, vp.x, 1e-4f);
+            Assert.AreEqual(0.5f, vp.y, 1e-4f);
+        }
+
+        [Test]
+        public void ViewportToPlaneTilted_InvertsWorldToViewportTilted()
+        {
+            // Arrange
+            var focus = new Vector2(1f, 3f);
+            var point = new Vector2(4f, 1.5f);
+
+            // Act
+            var vp = CameraMath.WorldToViewportTilted(focus, 0f, 9f, 30f, 10f, Aspect, new Vector3(point.x, point.y, 0f));
+            var back = CameraMath.ViewportToPlaneTilted(focus, 0f, 9f, 30f, 10f, Aspect, vp);
+
+            // Assert
+            Assert.AreEqual(point.x, back.x, 1e-3f);
+            Assert.AreEqual(point.y, back.y, 1e-3f);
+        }
+
+        [Test]
+        public void WorldToViewportTilted_LookingDown_FloorBehindFrontAppearsHigherOnScreen()
+        {
+            // Arrange: a floor point at the open front and the same point at the back wall, below the camera.
+            var focus = new Vector2(0f, 1.5f);
+
+            // Act
+            var front = CameraMath.WorldToViewportTilted(focus, 0f, 8f, 30f, 10f, Aspect, new Vector3(0f, 0f, 0f));
+            var back = CameraMath.WorldToViewportTilted(focus, 0f, 8f, 30f, 10f, Aspect, new Vector3(0f, 0f, 4f));
+
+            // Assert: the floor shows as a band (the back edge is drawn above the front edge).
+            Assert.Greater(back.y, front.y);
+        }
     }
 }

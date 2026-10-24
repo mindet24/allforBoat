@@ -271,7 +271,7 @@ namespace Trouble.Game
                 _bannerImage.color = Color.Lerp(ui.bad, Color.Lerp(ui.bad, Color.black, 0.3f), p);
                 var panelRoom = sim.FindRoom(sim.PanelRoomId);
                 float py = (panelRoom != null ? HouseLayout.FloorY(panelRoom.Floor, cfg.roomHeight) : 0f) + cfg.panelMountHeight + cfg.panelWorldHeight * 0.5f;
-                var target = _cx.ToCanvas(new Vector2(sim.PanelX, py), out _);
+                var target = _cx.ToCanvas(new Vector2(sim.PanelX, py), out _, cfg.roomDepth);
                 var size = _cx.CanvasSize;
                 var from = new Vector2(size.x * 0.5f + ui.blackoutSize.x * 0.5f - ui.blackoutSize.y * 0.55f - 10f, -ui.blackoutY - ui.blackoutSize.y * 0.5f);
                 var d = target - from;

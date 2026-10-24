@@ -78,8 +78,9 @@ MonoBehaviour:
   socketDepth: 0.3
   playerWorldHeight: 1.4
   animationFps: 8
-  orthographic: 1
-  fieldOfView: 20
+  orthographic: 0
+  fieldOfView: 30
+  cameraTilt: 10
   zoomStep: 0.15
   zoomSmoothTime: 0.15
   homeMargin: 0.1

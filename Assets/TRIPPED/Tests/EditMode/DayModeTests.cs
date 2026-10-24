@@ -448,6 +448,21 @@ namespace Trouble.Tests
         }
 
         [Test]
+        public void RoomTripsOverCapacity_RoomLightGoesOut()
+        {
+            // Arrange
+            var sim = Overloaded(out _);
+            bool litBefore = Trouble.Game.RoomLightRules.IsLit(sim.FindCircuit("a"));
+
+            // Act
+            Run(sim, 40);
+
+            // Assert
+            Assert.IsTrue(litBefore, "Lit while the breaker is ON, even over capacity.");
+            Assert.IsFalse(Trouble.Game.RoomLightRules.IsLit(sim.FindCircuit("a")));
+        }
+
+        [Test]
         public void InteractAtPanelDuringBlackout_TurnsEveryRoomBackOn()
         {
             // Arrange: blackout, then take the toaster away so the reset holds.

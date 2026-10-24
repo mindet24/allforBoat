@@ -6,8 +6,9 @@ using UnityEngine.InputSystem;
 namespace Trouble.Game
 {
     /// <summary>
-    /// Camera looking straight at the house front (GDD v1.1 §2.6), orthographic by default (art direction 23 Oct)
-    /// or perspective (<see cref="TrippedViewConfig.orthographic"/>). Wheel zooms toward the cursor
+    /// Camera looking at the house front (GDD v1.1 §2.6): perspective, looking down by
+    /// <see cref="TrippedViewConfig.cameraTilt"/> degrees so floors and room depth show, or orthographic and straight on
+    /// (<see cref="TrippedViewConfig.orthographic"/>). Wheel zooms toward the cursor
     /// (smoothed), middle-drag and WASD/arrows pan, F toggles following the character, Home shows the whole house.
     /// Position is clamped to the house. All numbers come from <see cref="TrippedViewConfig"/>.
     /// </summary>
@@ -94,10 +95,11 @@ namespace Trouble.Game
         /// Viewport position (0..1, origin bottom-left) of a house-front point where the camera is NOW (not where it is
         /// easing to), for HUD pieces pinned to the world.
         /// </summary>
-        public Vector2 WorldToViewportNow(Vector2 point)
+        /// <param name="z">Depth of the point (0 = the house front; the back wall is at roomDepth).</param>
+        public Vector2 WorldToViewportNow(Vector2 point, float z = FocusZ)
         {
             if (_distance <= 0.0001f) return new Vector2(0.5f, 0.5f);
-            return CameraMath.PlaneToViewportForHeight(_position, _distance, Aspect(), point);
+            return ToViewport(_position, _distance, new Vector3(point.x, point.y, z));
         }
 
         /// <summary>True while the camera follows the character (F).</summary>
@@ -125,7 +127,15 @@ namespace Trouble.Game
         public Vector2 WorldToViewport(Vector2 point)
         {
             if (_targetDistance <= 0.0001f) return new Vector2(0.5f, 0.5f);
-            return CameraMath.PlaneToViewportForHeight(_targetPosition, _targetDistance, Aspect(), point);
+            return ToViewport(_targetPosition, _targetDistance, new Vector3(point.x, point.y, FocusZ));
+        }
+
+        /// <summary>Viewport position of a world point for a camera at <paramref name="position"/> showing <paramref name="viewHeight"/>.</summary>
+        private Vector2 ToViewport(Vector2 position, float viewHeight, Vector3 point)
+        {
+            if (_config == null || _config.orthographic)
+                return CameraMath.PlaneToViewportForHeight(position, viewHeight, Aspect(), point);
+            return CameraMath.WorldToViewportTilted(position, FocusZ, viewHeight, _config.fieldOfView, _config.cameraTilt, Aspect(), point);
         }
 
         /// <summary>Zooms to a view height (clamped to the zoom limits). <paramref name="snap"/> = no easing.</summary>
@@ -377,7 +387,9 @@ namespace Trouble.Game
             _atHome = false;
             float newDistance = Mathf.Clamp(_targetDistance * Mathf.Pow(1f - _config.zoomStep, notches), _minDistance, _maxDistance);
             var viewport = new Vector2(screenPos.x / Mathf.Max(1, Screen.width), screenPos.y / Mathf.Max(1, Screen.height));
-            var point = CameraMath.ViewportToPlaneForHeight(_targetPosition, _targetDistance, aspect, viewport);
+            var point = _config.orthographic
+                ? CameraMath.ViewportToPlaneForHeight(_targetPosition, _targetDistance, aspect, viewport)
+                : CameraMath.ViewportToPlaneTilted(_targetPosition, FocusZ, _targetDistance, _config.fieldOfView, _config.cameraTilt, aspect, viewport);
             _targetPosition = CameraMath.ZoomToward(_targetPosition, _targetDistance, newDistance, point);
             _targetDistance = newDistance;
         }
@@ -389,13 +401,14 @@ namespace Trouble.Game
                 _camera.orthographic = true;
                 _camera.orthographicSize = _distance * 0.5f;
                 Pivot.position = new Vector3(_position.x, _position.y, FocusZ - OrthoDepth);
+                Pivot.rotation = Quaternion.identity;
             }
             else
             {
                 _camera.orthographic = false;
-                Pivot.position = new Vector3(_position.x, _position.y, FocusZ - CameraMath.DistanceForViewHeight(_distance, _config.fieldOfView));
+                Pivot.position = CameraMath.TiltedCameraPosition(_position, FocusZ, _distance, _config.fieldOfView, _config.cameraTilt);
+                Pivot.rotation = Quaternion.Euler(_config.cameraTilt, 0f, 0f);
             }
-            Pivot.rotation = Quaternion.identity;
         }
 
         private Transform Pivot => _rig != null ? _rig : transform;

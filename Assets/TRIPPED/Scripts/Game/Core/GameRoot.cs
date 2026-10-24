@@ -41,6 +41,7 @@ namespace Trouble.Game
             QualitySettings.vSyncCount = config.vSyncCount;
             Application.targetFrameRate = config.targetFrameRate > 0 ? config.targetFrameRate : -1;
             EnsureEventSystem();
+            ApplySceneLighting(config);
 
             var cam = Camera.main;
             if (cam == null)
@@ -70,6 +71,24 @@ namespace Trouble.Game
             int start = DevStartLevel(config);
             if (start > 0) Controller.LoadLevel(start);
             else Flow.ShowTitle();
+        }
+
+        /// <summary>
+        /// Dims the scene's sun and ambient light to the config's values, so the rooms' own lights carry the look
+        /// and a room without power reads as dark.
+        /// </summary>
+        private static void ApplySceneLighting(TrippedViewConfig config)
+        {
+            RenderSettings.ambientIntensity = config.ambientIntensity;
+            // Trilight ambient ignores ambientIntensity, so scale its colours instead.
+            if (RenderSettings.ambientMode == UnityEngine.Rendering.AmbientMode.Trilight)
+            {
+                RenderSettings.ambientSkyColor *= config.ambientIntensity;
+                RenderSettings.ambientEquatorColor *= config.ambientIntensity;
+                RenderSettings.ambientGroundColor *= config.ambientIntensity;
+            }
+            foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None))
+                if (l.type == LightType.Directional) l.intensity = config.sunIntensity;
         }
 
         /// <summary>The level to open at once, or 0 to show the Title.</summary>

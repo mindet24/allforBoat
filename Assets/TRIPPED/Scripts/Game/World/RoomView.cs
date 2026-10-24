@@ -6,7 +6,8 @@ namespace Trouble.Game
 {
     /// <summary>
     /// One room of the greybox house: floor, back wall (with an optional background picture), ceiling, name and a
-    /// click collider (click = walk here). Rooms the player cannot see are darkened (minimal G1 Sight).
+    /// click collider (click = walk here). Rooms the player cannot see are darkened (minimal G1 Sight). A ceiling
+    /// light shines while the room has power and goes out when its breaker does (<see cref="RoomLightRules"/>).
     /// </summary>
     public sealed class RoomView : MonoBehaviour
     {
@@ -21,6 +22,9 @@ namespace Trouble.Game
         private SpriteRenderer _barBack;
         private SpriteRenderer _barFill;
         private SpriteRenderer _panelGlow;
+        private Light _light;
+        private bool _lightLit = true;
+        private float _lightChanged = float.NegativeInfinity;
         private float _barLeft;
         private float _barWidth;
         private string _shownText = "";
@@ -107,6 +111,38 @@ namespace Trouble.Game
             }
 
             BuildLabels(room, rect, config, dayMode, labelZ);
+            if (config.roomLights) BuildLight(rect, config);
+        }
+
+        private void BuildLight(Rect rect, TrippedViewConfig config)
+        {
+            var go = new GameObject("RoomLight");
+            go.transform.SetParent(transform, false);
+            go.transform.localPosition = new Vector3(rect.center.x, rect.yMax - config.roomLightDrop, config.roomDepth * config.roomLightDepth);
+            _light = go.AddComponent<Light>();
+            _light.type = LightType.Point;
+            _light.color = config.roomLightColor;
+            _light.range = Mathf.Max(config.roomLightRange, rect.width * 0.75f);
+            _light.intensity = config.roomLightIntensity;
+            _light.shadows = LightShadows.None;
+        }
+
+        /// <summary>Turns the ceiling light on or off with the room's power, with the fade and flicker of the rules.</summary>
+        private void SyncLight(HouseSim sim)
+        {
+            if (_light == null) return;
+            bool lit = sim == null || RoomLightRules.IsLit(sim.FindCircuit(_room.Id));
+            float now = Time.unscaledTime;
+            if (lit != _lightLit)
+            {
+                _lightLit = lit;
+                _lightChanged = now;
+            }
+            float level = RoomLightRules.Level(lit, now - _lightChanged, _config.roomLightFadeIn, _config.roomLightFlicker);
+            float intensity = _config.roomLightIntensity * level;
+            if (!Mathf.Approximately(_light.intensity, intensity)) _light.intensity = intensity;
+            bool enabled = intensity > 0.001f;
+            if (_light.enabled != enabled) _light.enabled = enabled;
         }
 
         private void BuildGreybox(RoomState room, Rect rect, TrippedViewConfig config, ArtLibrary art, IReadOnlyList<RoomState> allRooms)
@@ -189,6 +225,7 @@ namespace Trouble.Game
             if (_room == null || _overlay == null) return;
             bool hidden = !_room.Visible;
             if (_overlay.enabled != hidden) _overlay.enabled = hidden;
+            SyncLight(sim);
             if (!_day || sim == null) return;
 
             var circuit = sim.FindCircuit(_room.Id);

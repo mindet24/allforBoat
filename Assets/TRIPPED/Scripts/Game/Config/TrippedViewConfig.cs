@@ -152,9 +152,31 @@ namespace Trouble.Game
         [Range(0, 2)] public int vSyncCount = 1;
 
         [Header("Camera (GDD v1.1 §2.6)")]
-        [Tooltip("Orthographic side view (art direction, 23 Oct). Off = perspective with fieldOfView.")]
-        public bool orthographic = true;
-        public float fieldOfView = 20f;
+        [Tooltip("Orthographic, straight-on side view. Off = perspective with fieldOfView, looking down by cameraTilt (shows floors and room depth).")]
+        public bool orthographic = false;
+        public float fieldOfView = 30f;
+        [Tooltip("Perspective only: degrees the camera looks down at the house (0 = straight on). The camera orbits the point it frames.")]
+        [Range(0f, 30f)] public float cameraTilt = 10f;
+
+        [Header("Lighting (rooms lit by their own power)")]
+        [Tooltip("Each room has a ceiling light that is on while the room's breaker is ON.")]
+        public bool roomLights = true;
+        public Color roomLightColor = Hex("#FFD49A");
+        public float roomLightIntensity = 2.2f;
+        [Tooltip("Light range, metres.")]
+        public float roomLightRange = 7f;
+        [Tooltip("Height of the light under the ceiling, metres.")]
+        public float roomLightDrop = 0.45f;
+        [Tooltip("Depth of the light into the room, as a fraction of roomDepth (0 = open front).")]
+        [Range(0f, 1f)] public float roomLightDepth = 0.35f;
+        [Tooltip("Seconds the light takes to come back on.")]
+        public float roomLightFadeIn = 0.4f;
+        [Tooltip("Seconds of flicker when the breaker goes OFF.")]
+        public float roomLightFlicker = 0.35f;
+        [Tooltip("Directional (sun) light intensity, applied at boot. Lower = the room lights matter more.")]
+        public float sunIntensity = 0.55f;
+        [Tooltip("Ambient light intensity, applied at boot.")]
+        public float ambientIntensity = 0.65f;
         [Tooltip("Zoom per wheel notch.")]
         public float zoomStep = 0.15f;
         public float zoomSmoothTime = 0.15f;

@@ -216,7 +216,9 @@ namespace Trouble.Game
         private void CaptureLights()
         {
             RestoreLights();
-            foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None)) _lights.Add((l, l.intensity));
+            // Room lights follow their room's power themselves (RoomView); only the scene lights are dimmed here.
+            foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None))
+                if (l.GetComponentInParent<RoomView>() == null) _lights.Add((l, l.intensity));
         }
 
         private void SetLights(float factor)

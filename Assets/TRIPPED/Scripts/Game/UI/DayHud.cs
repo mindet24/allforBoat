@@ -50,10 +50,11 @@ namespace Trouble.Game
         public Vector2 CanvasSize => Canvas.rect.size;
 
         /// <summary>Canvas position (anchored to the top-left, y down negative) of a house-front point as drawn now.</summary>
-        public Vector2 ToCanvas(Vector2 world, out Vector2 viewport)
+        /// <param name="z">Depth of the point (0 = the house front; the panel hangs on the back wall).</param>
+        public Vector2 ToCanvas(Vector2 world, out Vector2 viewport, float z = 0f)
         {
             var cam = Controller.HouseCam;
-            viewport = cam != null ? cam.WorldToViewportNow(world) : new Vector2(0.5f, 0.5f);
+            viewport = cam != null ? cam.WorldToViewportNow(world, z) : new Vector2(0.5f, 0.5f);
             var size = CanvasSize;
             return new Vector2(viewport.x * size.x, -(1f - viewport.y) * size.y);
         }
@@ -659,7 +660,7 @@ namespace Trouble.Game
             {
                 var panelRoom = sim.FindRoom(sim.PanelRoomId);
                 float py = (panelRoom != null ? HouseLayout.FloorY(panelRoom.Floor, cfg.roomHeight) : 0f) + cfg.panelMountHeight + cfg.panelWorldHeight + 0.45f;
-                var p = _cx.ToCanvas(new Vector2(sim.PanelX, py), out _);
+                var p = _cx.ToCanvas(new Vector2(sim.PanelX, py), out _, cfg.roomDepth);
                 _targets.Add(new Target
                 {
                     Canvas = new Vector2(p.x, size.y + p.y),

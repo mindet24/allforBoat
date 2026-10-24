@@ -103,9 +103,19 @@ namespace Trouble.Game
             // Keep the sky filling the view wherever the camera eases to.
             var cam = _controller.HouseCam;
             var c = cam.Cam;
-            float h = cam.ViewHeight * 1.2f, w = h * c.aspect;
-            var size = _sky.sprite.bounds.size;
+            float h = cam.ViewHeight * 1.2f;
             var p = cam.Position;
+            if (!c.orthographic)
+            {
+                // Perspective (maybe tilted): the sky sits behind the house, where the view is wider and higher.
+                var ray = c.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+                float along = (30f - ray.origin.z) / Mathf.Max(0.0001f, ray.direction.z);
+                var centre = ray.GetPoint(along);
+                p = new Vector2(centre.x, centre.y);
+                h = 2f * along * Mathf.Tan(c.fieldOfView * 0.5f * Mathf.Deg2Rad) * 1.2f;
+            }
+            float w = h * c.aspect;
+            var size = _sky.sprite.bounds.size;
             _sky.transform.position = new Vector3(p.x, p.y, 30f);
             _sky.transform.localScale = new Vector3(w / size.x, h / size.y, 1f);
         }

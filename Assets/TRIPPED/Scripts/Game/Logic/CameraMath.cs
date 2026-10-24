@@ -3,7 +3,7 @@ using UnityEngine;
 namespace Trouble.Game
 {
     /// <summary>
-    /// Pure math for a perspective camera that looks straight down +z at the house front (GDD v1.1 §2.6).
+    /// Pure math for the house camera (GDD v1.1 §2.6): straight down +z at the house front, or tilted to look down.
     /// "Distance" is from the camera to the focus plane; positions are the camera's x, y.
     /// </summary>
     public static class CameraMath
@@ -123,6 +123,50 @@ namespace Trouble.Game
         {
             var visible = VisibleSizeForHeight(viewHeight, aspect);
             return new Vector2((point.x - camera.x) / visible.x + 0.5f, (point.y - camera.y) / visible.y + 0.5f);
+        }
+
+        // ---- tilted perspective: the camera orbits the focus point and looks down by tilt degrees ---------------
+        // At tilt 0 these match the view-height functions above for points on the focus plane.
+
+        /// <summary>
+        /// World position of a perspective camera that shows <paramref name="viewHeight"/> at the focus point
+        /// (<paramref name="focus"/>, on the plane z = <paramref name="focusZ"/>) while looking down by
+        /// <paramref name="tiltDeg"/> degrees. The camera's rotation is Euler(tiltDeg, 0, 0).
+        /// </summary>
+        public static Vector3 TiltedCameraPosition(Vector2 focus, float focusZ, float viewHeight, float verticalFovDeg, float tiltDeg)
+        {
+            float d = DistanceForViewHeight(viewHeight, verticalFovDeg);
+            float t = tiltDeg * Mathf.Deg2Rad;
+            return new Vector3(focus.x, focus.y + d * Mathf.Sin(t), focusZ - d * Mathf.Cos(t));
+        }
+
+        /// <summary>Viewport position (0..1, may be outside) of a world point seen by the tilted camera.</summary>
+        public static Vector2 WorldToViewportTilted(Vector2 focus, float focusZ, float viewHeight, float verticalFovDeg,
+            float tiltDeg, float aspect, Vector3 point)
+        {
+            var cam = TiltedCameraPosition(focus, focusZ, viewHeight, verticalFovDeg, tiltDeg);
+            float t = tiltDeg * Mathf.Deg2Rad;
+            var forward = new Vector3(0f, -Mathf.Sin(t), Mathf.Cos(t));
+            var up = new Vector3(0f, Mathf.Cos(t), Mathf.Sin(t));
+            var v = point - cam;
+            float z = Mathf.Max(0.001f, Vector3.Dot(v, forward));
+            float tan = Mathf.Tan(verticalFovDeg * 0.5f * Mathf.Deg2Rad);
+            return new Vector2(0.5f + 0.5f * v.x / (z * tan * aspect), 0.5f + 0.5f * Vector3.Dot(v, up) / (z * tan));
+        }
+
+        /// <summary>The point on the plane z = <paramref name="focusZ"/> under a viewport position, for the tilted camera.</summary>
+        public static Vector2 ViewportToPlaneTilted(Vector2 focus, float focusZ, float viewHeight, float verticalFovDeg,
+            float tiltDeg, float aspect, Vector2 viewportPoint)
+        {
+            var cam = TiltedCameraPosition(focus, focusZ, viewHeight, verticalFovDeg, tiltDeg);
+            float t = tiltDeg * Mathf.Deg2Rad;
+            float tan = Mathf.Tan(verticalFovDeg * 0.5f * Mathf.Deg2Rad);
+            var forward = new Vector3(0f, -Mathf.Sin(t), Mathf.Cos(t));
+            var up = new Vector3(0f, Mathf.Cos(t), Mathf.Sin(t));
+            var dir = forward + Vector3.right * (2f * (viewportPoint.x - 0.5f) * tan * aspect) + up * (2f * (viewportPoint.y - 0.5f) * tan);
+            float s = (focusZ - cam.z) / Mathf.Max(0.0001f, dir.z);
+            var p = cam + dir * s;
+            return new Vector2(p.x, p.y);
         }
     }
 }
