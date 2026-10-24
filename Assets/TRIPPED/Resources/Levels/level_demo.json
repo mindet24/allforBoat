@@ -83,11 +83,10 @@
       { "id": "relaxed", "dueSec": 60, "points": 1, "costsHeart": false, "weight": 1 }
     ],
     "people": [
-      { "name": "Mum",     "rooms": ["kitchen", "living", "laundry"], "wants": ["kettle", "microwave", "toaster", "fridge", "washer", "blender"] },
-      { "name": "Dad",     "rooms": ["living", "study", "kitchen"],   "wants": ["tv", "heater", "microwave", "kettle", "toaster"] },
-      { "name": "Sis",     "rooms": ["bathroom", "bedroom"],          "wants": ["dryer", "blender", "heater"] },
-      { "name": "Kid",     "rooms": ["kidroom", "living"],            "wants": ["tv", "microwave", "blender", "toaster"] },
-      { "name": "Grandpa", "rooms": ["living", "bedroom"],            "wants": ["heater", "tv", "kettle"] }
+      { "name": "Mom",      "rooms": ["kitchen", "living", "laundry"], "wants": ["kettle", "microwave", "toaster", "fridge", "washer", "blender"] },
+      { "name": "Dad",      "rooms": ["living", "study", "kitchen"],   "wants": ["tv", "heater", "microwave", "kettle", "toaster"] },
+      { "name": "Daughter", "rooms": ["kidroom", "bathroom"],          "wants": ["dryer", "blender", "tv", "microwave"] },
+      { "name": "Grandma",  "rooms": ["living", "bedroom"],            "wants": ["heater", "tv", "kettle"] }
     ]
   },
   "rulesOverride": [
