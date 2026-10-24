@@ -29,6 +29,25 @@ namespace Trouble.Game
             return rescaled && Contains(whenRescaled, part);
         }
 
+        /// <summary>
+        /// True if an optional part (its name contains "_Random") of a room model is there today: a fixed roll per
+        /// part, room and day <paramref name="seed"/>, under <paramref name="chance"/>. Every other part is always there.
+        /// </summary>
+        public static bool ShowsRandomPart(string part, string roomId, int seed, float chance)
+        {
+            if (part == null || part.IndexOf("_Random", StringComparison.Ordinal) < 0) return true;
+            // FNV-1a over room and part names, mixed with the seed: stable across runs and platforms.
+            uint h = 2166136261;
+            foreach (char c in roomId + "/" + part)
+            {
+                h ^= c;
+                h *= 16777619;
+            }
+            h ^= (uint)seed;
+            h *= 2654435761;
+            return (h >> 8) / (float)(1 << 24) < chance;
+        }
+
         private static bool Contains(string[] names, string name)
         {
             if (names == null) return false;

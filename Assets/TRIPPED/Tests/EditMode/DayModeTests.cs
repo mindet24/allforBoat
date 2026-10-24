@@ -181,7 +181,16 @@ namespace Trouble.Tests
         private const float A1X = 2f, A2X = 4f, KettleX = 7.5f, ToasterX = 9f, PanelX = 6.6f;
 
         /// <summary>Holds a direction until the character is within 15 cm of <paramref name="metres"/>, then stops.</summary>
+        /// <summary>Walks to <paramref name="metres"/> along the open front (where the doors are), then to the back wall, where sockets, plugged appliances and the panel are in reach.</summary>
         private static void WalkTo(HouseSim sim, float metres)
+        {
+            WalkDepthTo(sim, 0);
+            WalkAlong(sim, metres);
+            WalkDepthTo(sim, sim.BackZCm);
+        }
+
+        /// <summary>Holds A/D until the character is at <paramref name="metres"/>, at whatever depth it stands.</summary>
+        private static void WalkAlong(HouseSim sim, float metres)
         {
             int dir = Math.Sign(metres - sim.Character.X);
             if (dir == 0) return;
@@ -194,12 +203,58 @@ namespace Trouble.Tests
             Submit(sim, Command.Walk(0));
         }
 
+        /// <summary>Holds W/S until the character is <paramref name="zCm"/> in from the open front.</summary>
+        private static void WalkDepthTo(HouseSim sim, int zCm)
+        {
+            int dir = Math.Sign(zCm - sim.Character.ZCm);
+            if (dir == 0) return;
+            Submit(sim, Command.WalkDepth(dir));
+            for (int guard = 0; guard < 1000 && Math.Sign(zCm - sim.Character.ZCm) == dir && !sim.Character.IsAirborne && sim.Phase == LevelPhase.Running; guard++)
+                sim.Step();
+            Submit(sim, Command.WalkDepth(0));
+        }
+
+        /// <summary>Day rules with the jetpack instead of the jump (rules verticalMove "jetpack").</summary>
+        private static RulesConfig Jetpack(RulesConfig rules)
+        {
+            rules.verticalMove = "jetpack";
+            return rules;
+        }
+
+        /// <summary>The demo level (seed 3) started with the shipped catalog; the character starts in the living room.</summary>
+        private static HouseSim StartedDemo(RulesConfig rules)
+        {
+            var level = Demo();
+            level.day.seed = 3;
+            var sim = Sim(level, rules, ShippedCatalog());
+            sim.Start();
+            return sim;
+        }
+
+        /// <summary>Holds Space until the character is in <paramref name="roomId"/>, lets go, and waits until it lands.</summary>
+        private static void FlyInto(HouseSim sim, string roomId)
+        {
+            Submit(sim, Command.Thrust(true));
+            for (int guard = 0; guard < 200 && sim.Character.RoomId != roomId; guard++) sim.Step();
+            Submit(sim, Command.Thrust(false));
+            Land(sim);
+            Assert.AreEqual(roomId, sim.Character.RoomId, "never flew into " + roomId);
+        }
+
+        /// <summary>Steps until the character is standing on a floor.</summary>
+        private static void Land(HouseSim sim)
+        {
+            for (int guard = 0; guard < 200 && sim.Character.IsAirborne; guard++) sim.Step();
+            Assert.IsFalse(sim.Character.IsAirborne, "never landed");
+        }
+
         private static void Carry(HouseSim sim, float fromX, float toX)
         {
             WalkTo(sim, fromX);
             Submit(sim, Command.Interact());
             WalkTo(sim, toX);
             Submit(sim, Command.Interact());
+            Submit(sim, Command.TogglePlug());
         }
 
         /// <summary>Kettle 6 and toaster 3 both wanted in room a, which holds 6; both carried there.</summary>
@@ -355,7 +410,7 @@ namespace Trouble.Tests
             Assert.That(errors, Has.Some.Contains("Room a starts with load 6"));
         }
 
-        // ---- walking and stairs -------------------------------------------------------
+        // ---- walking, jumping and the jetpack -------------------------------------------
 
         [Test]
         public void WalkThroughOpenDoor_EntersNextRoom()
@@ -389,42 +444,500 @@ namespace Trouble.Tests
         }
 
         [Test]
-        public void ClimbAtStairs_ReachesTheFloorAboveAfterStairsTicks()
+        public void JumpUp_LandsInTheRoomAboveAfterJumpTicks_AtTheSameX()
         {
-            // Arrange: the demo starts in the living room, by the stairs up to the bedroom.
-            var level = Demo();
-            level.day.seed = 3;
+            // Arrange: living (floor 1, x 0..9) is under the bedroom (floor 2, x 0..6).
             var rules = Rules(instant: false);
-            var sim = Sim(level, rules, ShippedCatalog());
-            sim.Start();
+            rules.verticalMove = "jump";
+            var sim = StartedDemo(rules);
+            WalkAlong(sim, 2f);
+            float x = sim.Character.X;
 
             // Act
-            Submit(sim, Command.Climb(1));
-            Run(sim, rules.stairsTicks - 1);
+            Submit(sim, Command.Jump(1));
+            Run(sim, rules.jumpTicks - 1);
             string midway = sim.Character.RoomId;
+            bool midAir = sim.Character.IsJumping;
             Run(sim, 1);
 
             // Assert
             Assert.AreEqual("living", midway);
+            Assert.IsTrue(midAir);
+            Assert.AreEqual("bedroom", sim.Character.RoomId);
+            Assert.IsFalse(sim.Character.IsAirborne);
+            Assert.AreEqual(x, sim.Character.X, 1e-4f);
+        }
+
+        [Test]
+        public void JumpDown_LandsInTheRoomBelow()
+        {
+            // Arrange: the laundry (floor 0, x 4..13) is under the living room's right part.
+            var rules = Rules(instant: false);
+            rules.verticalMove = "jump";
+            var sim = StartedDemo(rules);
+            WalkAlong(sim, 7f);
+
+            // Act
+            Submit(sim, Command.Jump(-1));
+            Run(sim, rules.jumpTicks);
+
+            // Assert
+            Assert.AreEqual("laundry", sim.Character.RoomId);
+        }
+
+        [Test]
+        public void JumpWithNoRoomThere_IsRejected()
+        {
+            // Arrange: nothing over the bedroom left of x 4 (the study starts there), nothing under the kitchen right of
+            // x 13 (the basement ends there).
+            var rules = Rules(instant: false);
+            rules.verticalMove = "jump";
+            var sim = StartedDemo(rules);
+            WalkAlong(sim, 2f);
+            Submit(sim, Command.Jump(1));
+            Run(sim, rules.jumpTicks);
+
+            // Act
+            bool up = sim.Submit(Command.Jump(1), out var upReason);
+            Submit(sim, Command.Jump(-1));
+            Run(sim, rules.jumpTicks);
+            WalkAlong(sim, 15f);
+            bool down = sim.Submit(Command.Jump(-1), out var downReason);
+
+            // Assert
+            Assert.IsFalse(up, "bedroom at x 2 has nothing above");
+            Assert.IsFalse(down, "kitchen at x 15 has nothing below");
+            Assert.AreEqual("kitchen", sim.Character.RoomId);
+            Assert.IsNotEmpty(upReason);
+            Assert.IsNotEmpty(downReason);
+        }
+
+        [Test]
+        public void JumpWhileInTheAir_IsRejected()
+        {
+            // Arrange
+            var rules = Rules(instant: false);
+            rules.verticalMove = "jump";
+            var sim = StartedDemo(rules);
+            WalkAlong(sim, 2f);
+            Submit(sim, Command.Jump(1));
+            sim.Step();
+
+            // Act
+            bool again = sim.Submit(Command.Jump(1), out _);
+            Run(sim, rules.jumpTicks);
+
+            // Assert
+            Assert.IsFalse(again);
             Assert.AreEqual("bedroom", sim.Character.RoomId);
         }
 
         [Test]
-        public void ClimbAwayFromStairs_IsRejected()
+        public void JumpMode_ThrustAndDropAreRefused_JetpackMode_JumpIsRefused()
         {
             // Arrange
-            var level = Demo();
-            level.day.seed = 3;
-            var sim = Sim(level, Rules(instant: false), ShippedCatalog());
-            sim.Start();
-            WalkTo(sim, 8.5f);
+            var jumping = StartedDemo(Rules(instant: false));
+            var flying = StartedDemo(Jetpack(Rules(instant: false)));
 
             // Act
-            bool accepted = sim.Submit(Command.Climb(1), out _);
+            bool thrust = jumping.Submit(Command.Thrust(true), out _);
+            bool drop = jumping.Submit(Command.Drop(), out _);
+            bool jump = flying.Submit(Command.Jump(1), out _);
+
+            // Assert: each mode only takes its own keys.
+            Assert.IsFalse(thrust);
+            Assert.IsFalse(drop);
+            Assert.IsFalse(jump);
+        }
+
+        [Test]
+        public void HoldSpace_FliesUpThroughTheCeiling_LandsInTheRoomAboveAtTheSameX()
+        {
+            // Arrange: living (floor 1, x 0..9) is under the bedroom (floor 2, x 0..6).
+            var sim = StartedDemo(Jetpack(Rules(instant: false)));
+            WalkAlong(sim, 2f);
+            float x = sim.Character.X;
+
+            // Act
+            FlyInto(sim, "bedroom");
+
+            // Assert
+            Assert.AreEqual(0, sim.Character.AirCm);
+            Assert.AreEqual(x, sim.Character.X, 1e-4f);
+        }
+
+        [Test]
+        public void ReleaseSpaceBeforeTheCeiling_FallsBackOntoTheSameFloor()
+        {
+            // Arrange
+            var sim = StartedDemo(Jetpack(Rules(instant: false)));
+            WalkAlong(sim, 2f);
+            Submit(sim, Command.Thrust(true));
+            Run(sim, 3);
+            bool rose = sim.Character.AirCm > 0;
+
+            // Act
+            Submit(sim, Command.Thrust(false));
+            Land(sim);
+
+            // Assert
+            Assert.IsTrue(rose);
+            Assert.AreEqual("living", sim.Character.RoomId);
+        }
+
+        [Test]
+        public void FlyingUpThenFalling_LandsOnTheFloorItPassed()
+        {
+            // Arrange: through the living-room ceiling into the bedroom, still rising.
+            var sim = StartedDemo(Jetpack(Rules(instant: false)));
+            WalkAlong(sim, 2f);
+            Submit(sim, Command.Thrust(true));
+            for (int guard = 0; guard < 200 && sim.Character.RoomId != "bedroom"; guard++) sim.Step();
+
+            // Act: let go mid-air over the bedroom floor.
+            Submit(sim, Command.Thrust(false));
+            Land(sim);
+
+            // Assert: lands on the bedroom floor, not back down in the living room.
+            Assert.AreEqual("bedroom", sim.Character.RoomId);
+        }
+
+        [Test]
+        public void Drop_PassesThroughTheFloorIntoTheRoomBelow()
+        {
+            // Arrange: the laundry (floor 0, x 4..13) is under the living room's right part.
+            var sim = StartedDemo(Jetpack(Rules(instant: false)));
+            WalkAlong(sim, 7f);
+
+            // Act
+            Submit(sim, Command.Drop());
+            Land(sim);
+
+            // Assert
+            Assert.AreEqual("laundry", sim.Character.RoomId);
+        }
+
+        [Test]
+        public void Drop_PassesOnlyOneFloor()
+        {
+            // Arrange: in the bedroom at x 5: the living room below it, and the laundry below that.
+            var sim = StartedDemo(Jetpack(Rules(instant: false)));
+            WalkAlong(sim, 5f);
+            FlyInto(sim, "bedroom");
+
+            // Act
+            Submit(sim, Command.Drop());
+            Land(sim);
+
+            // Assert: in the living room, not on through to the laundry under it.
+            Assert.AreEqual("living", sim.Character.RoomId);
+        }
+
+        [Test]
+        public void DropWithNoRoomBelow_IsRejected()
+        {
+            // Arrange: nothing under the kitchen right of x 13 (the basement ends there).
+            var sim = StartedDemo(Jetpack(Rules(instant: false)));
+            WalkAlong(sim, 15f);
+
+            // Act
+            bool accepted = sim.Submit(Command.Drop(), out var reason);
+            Run(sim, 20);
 
             // Assert
             Assert.IsFalse(accepted);
+            Assert.IsNotEmpty(reason);
+            Assert.AreEqual("kitchen", sim.Character.RoomId);
+            Assert.IsFalse(sim.Character.IsAirborne);
+        }
+
+        [Test]
+        public void HoldSpaceUnderACeilingWithNothingAbove_StopsAHeadroomUnderIt()
+        {
+            // Arrange: the bedroom at x 2 has nothing above (the study starts at x 4).
+            var rules = Jetpack(Rules(instant: false));
+            var sim = StartedDemo(rules);
+            WalkAlong(sim, 2f);
+            FlyInto(sim, "bedroom");
+
+            // Act
+            Submit(sim, Command.Thrust(true));
+            Run(sim, 60);
+
+            // Assert
+            Assert.AreEqual("bedroom", sim.Character.RoomId);
+            Assert.AreEqual((int)System.Math.Round((rules.floorHeightMetres - rules.headroomMetres) * 100f), sim.Character.AirCm);
+        }
+
+        [Test]
+        public void InTheAir_InteractAndPlugAreRefused()
+        {
+            // Arrange
+            var sim = AtKettle(Jetpack(Rules(instant: false)));
+            Submit(sim, Command.Thrust(true));
+            Run(sim, 2);
+
+            // Act
+            bool e = sim.Submit(Command.Interact(), out _);
+            bool f = sim.Submit(Command.TogglePlug(), out _);
+
+            // Assert
+            Assert.IsTrue(sim.Character.IsAirborne);
+            Assert.IsFalse(e);
+            Assert.IsFalse(f);
+        }
+
+        [Test]
+        public void CarryingAHeavyAppliance_TheJetpackPushesLess()
+        {
+            // Arrange: the kettle made weight 3.
+            var rules = Jetpack(Rules(instant: false));
+            var sim = AtKettle(rules);
+            sim.Catalog.Find("kettle").weight = 3;
+            int empty = sim.JetpackThrustCm();
+
+            // Act
+            Submit(sim, Command.Interact());
+            int carrying = sim.JetpackThrustCm();
+
+            // Assert: 4 m/s² less per weight point (cm per tick per tick at 10 ticks a second).
+            Assert.AreEqual("kettle", sim.Character.CarryingId);
+            Assert.AreEqual(empty - (int)System.Math.Round(3 * rules.jetpackWeightThrust * 100f / (rules.ticksPerSecond * rules.ticksPerSecond)), carrying);
+        }
+
+        [Test]
+        public void FromTheOpenFront_ASocketAtTheBackIsInReach()
+        {
+            // Arrange: at the kettle's socket x, but at the open front (the socket is 2 m back).
+            var sim = Sim(TwoRooms(10, new[] { "toaster" }), Rules(instant: false));
+            sim.Start();
+            WalkAlong(sim, SocketXOf(sim, "B1"));
+
+            // Act
+            bool picked = sim.Submit(Command.Interact(), out var reason);
+
+            // Assert
+            Assert.AreEqual(0, sim.Character.ZCm);
+            Assert.IsTrue(picked, reason);
+        }
+
+        [Test]
+        public void WalkIntoADoorWallDeepInTheRoom_SlidesOutToTheDoorwayAndThrough()
+        {
+            // Arrange: in room b at the back of the floor, door to room a on the left.
+            var sim = Sim(TwoRooms(10, new[] { "kettle" }), Rules(instant: false));
+            sim.Start();
+            WalkDepthTo(sim, sim.BackZCm);
+
+            // Act
+            Submit(sim, Command.Walk(-1));
+            Run(sim, 80);
+
+            // Assert
+            Assert.AreEqual("a", sim.Character.RoomId);
+        }
+
+        [Test]
+        public void HoldW_WalksInWithoutLeavingTheFloor()
+        {
+            // Arrange
+            var sim = StartedDemo(Rules(instant: false));
+            WalkAlong(sim, 8.5f);
+
+            // Act
+            Submit(sim, Command.WalkDepth(1));
+            Run(sim, 200);
+
+            // Assert
+            Assert.IsFalse(sim.Character.IsAirborne);
             Assert.AreEqual("living", sim.Character.RoomId);
+            Assert.AreEqual(sim.BackZCm, sim.Character.ZCm);
+        }
+
+        // ---- put down, plug in (F), throw (hold E) ----------------------------------------
+
+        private static float SocketXOf(HouseSim sim, string socketId) => sim.SocketX(sim.FindSocket(socketId));
+
+        /// <summary>A sim at the start of the day with the character standing at socket B1 (the kettle).</summary>
+        private static HouseSim AtKettle(RulesConfig rules = null)
+        {
+            var sim = Sim(TwoRooms(10, new[] { "toaster" }), rules ?? Rules(instant: false));
+            sim.Start();
+            WalkTo(sim, SocketXOf(sim, "B1"));
+            return sim;
+        }
+
+        [Test]
+        public void DayStart_EveryApplianceIsPluggedInAndPowered()
+        {
+            // Arrange
+            var sim = Sim(TwoRooms(10, new[] { "kettle" }));
+
+            // Act
+            sim.Start();
+
+            // Assert
+            foreach (var app in sim.Appliances)
+            {
+                if (app.SocketId.Length == 0) continue;
+                Assert.IsFalse(app.Unplugged, app.Id);
+                Assert.IsTrue(app.Powered, app.Id);
+            }
+        }
+
+        [Test]
+        public void PressE_WhileCarrying_PutsDownBesideSocketUnplugged()
+        {
+            // Arrange
+            var sim = AtKettle();
+            Submit(sim, Command.Interact());
+            int loadCarrying = sim.FindCircuit("b").Load;
+
+            // Act
+            Submit(sim, Command.Interact());
+
+            // Assert
+            var kettle = sim.FindAppliance("kettle");
+            Assert.AreEqual("B1", kettle.SocketId);
+            Assert.IsTrue(kettle.Unplugged);
+            Assert.IsFalse(kettle.Powered);
+            Assert.AreEqual(loadCarrying, sim.FindCircuit("b").Load, "An unplugged appliance draws nothing.");
+            Assert.AreEqual("", sim.Character.CarryingId);
+        }
+
+        [Test]
+        public void PressF_AfterPuttingDown_PlugsInAndDrawsLoad()
+        {
+            // Arrange
+            var sim = AtKettle();
+            Submit(sim, Command.Interact());
+            Submit(sim, Command.Interact());
+            int before = sim.FindCircuit("b").Load;
+
+            // Act
+            Submit(sim, Command.TogglePlug());
+
+            // Assert
+            var kettle = sim.FindAppliance("kettle");
+            Assert.IsFalse(kettle.Unplugged);
+            Assert.IsTrue(kettle.Powered);
+            Assert.AreEqual(before + 6, sim.FindCircuit("b").Load);
+        }
+
+        [Test]
+        public void PressF_NextToPluggedAppliance_UnplugsItInPlace()
+        {
+            // Arrange
+            var sim = AtKettle();
+            int before = sim.FindCircuit("b").Load;
+
+            // Act
+            Submit(sim, Command.TogglePlug());
+
+            // Assert
+            var kettle = sim.FindAppliance("kettle");
+            Assert.AreEqual("B1", kettle.SocketId);
+            Assert.IsTrue(kettle.Unplugged);
+            Assert.AreEqual(before - 6, sim.FindCircuit("b").Load);
+        }
+
+        [Test]
+        public void HoldE_WhileCarrying_ThrowsAheadToFreeSocketUnplugged()
+        {
+            // Arrange: carry the kettle and face the far end of room B.
+            var sim = AtKettle();
+            Submit(sim, Command.Interact());
+            int facing = SocketXOf(sim, "B3") > sim.Character.X ? 1 : -1;
+            Submit(sim, Command.Walk(facing));
+            Submit(sim, Command.Walk(0));
+            float from = sim.Character.X;
+
+            // Act
+            var accepted = sim.Submit(Command.Throw(), out var reason);
+            Run(sim, 1);
+
+            // Assert
+            Assert.IsTrue(accepted, reason);
+            var kettle = sim.FindAppliance("kettle");
+            Assert.AreEqual("", sim.Character.CarryingId);
+            Assert.AreNotEqual("", kettle.SocketId);
+            Assert.IsTrue(kettle.Unplugged);
+            float landed = SocketXOf(sim, kettle.SocketId);
+            Assert.IsTrue(facing > 0 ? landed >= from : landed <= from, "It lands ahead of the character.");
+            Assert.LessOrEqual(Math.Abs(landed - from), sim.Rules.throwMetres + 0.01f);
+        }
+
+        [Test]
+        public void HoldE_WithEmptyHands_IsRefused()
+        {
+            // Arrange
+            var sim = AtKettle();
+
+            // Act
+            bool accepted = sim.Submit(Command.Throw(), out _);
+
+            // Assert
+            Assert.IsFalse(accepted);
+        }
+
+        [Test]
+        public void FloorMode_PressE_PutsDownOnFloorAndFPlugsIntoNearestSocket()
+        {
+            // Arrange
+            var rules = Rules(instant: false);
+            rules.placeMode = "floor";
+            var sim = AtKettle(rules);
+            Submit(sim, Command.Interact());
+
+            // Act
+            Submit(sim, Command.Interact());
+            var kettle = sim.FindAppliance("kettle");
+            string floorRoom = kettle.FloorRoomId;
+            string socketWhileOnFloor = kettle.SocketId;
+            Submit(sim, Command.TogglePlug());
+
+            // Assert
+            Assert.AreEqual("b", floorRoom);
+            Assert.AreEqual("", socketWhileOnFloor);
+            Assert.AreEqual("", kettle.FloorRoomId);
+            Assert.AreNotEqual("", kettle.SocketId);
+            Assert.IsTrue(kettle.Powered);
+        }
+
+        [Test]
+        public void FloorMode_PressE_PicksUpFromFloor()
+        {
+            // Arrange
+            var rules = Rules(instant: false);
+            rules.placeMode = "floor";
+            var sim = AtKettle(rules);
+            Submit(sim, Command.Interact());
+            Submit(sim, Command.Interact());
+
+            // Act
+            Submit(sim, Command.Interact());
+
+            // Assert
+            Assert.AreEqual("kettle", sim.Character.CarryingId);
+            Assert.AreEqual("", sim.FindAppliance("kettle").FloorRoomId);
+        }
+
+        [Test]
+        public void PlaceUnpluggedOff_PressE_PlugsInAtOnce()
+        {
+            // Arrange
+            var rules = Rules(instant: false);
+            rules.placeUnplugged = false;
+            var sim = AtKettle(rules);
+            Submit(sim, Command.Interact());
+
+            // Act
+            Submit(sim, Command.Interact());
+
+            // Assert
+            var kettle = sim.FindAppliance("kettle");
+            Assert.IsFalse(kettle.Unplugged);
+            Assert.IsTrue(kettle.Powered);
         }
 
         // ---- blackout and hearts ------------------------------------------------------
@@ -482,6 +995,40 @@ namespace Trouble.Tests
         }
 
         [Test]
+        public void PersonWithActiveRequest_StandsInRequestRoom()
+        {
+            // Arrange: Mum asks from room A; her request is due long after the check.
+            var level = TwoRooms(10, new[] { "kettle" });
+            var sim = Sim(level);
+            sim.Start();
+
+            // Act
+            Run(sim, 2);
+            string room = Trouble.Game.FamilyRules.RoomOf("mum", level.day.people[0].rooms, sim.Requests);
+
+            // Assert
+            Assert.IsTrue(Trouble.Game.FamilyRules.IsWaiting("Mum", sim.Requests));
+            Assert.AreEqual(sim.Requests[0].RoomId, room);
+        }
+
+        [Test]
+        public void PersonWhoseRequestWasMissed_GoesBackToFirstRoomAndStopsWaiting()
+        {
+            // Arrange
+            var level = TwoRooms(10, new[] { "kettle" }, dueSec: 2f);
+            var sim = Sim(level);
+            sim.Start();
+
+            // Act
+            Run(sim, 30);
+
+            // Assert
+            Assert.IsTrue(sim.Requests[0].Missed);
+            Assert.IsFalse(Trouble.Game.FamilyRules.IsWaiting("Mum", sim.Requests));
+            Assert.AreEqual("a", Trouble.Game.FamilyRules.RoomOf("Mum", level.day.people[0].rooms, sim.Requests));
+        }
+
+        [Test]
         public void UrgentRequestNotStartedInTime_IsMissedAndCostsHeart()
         {
             // Arrange
@@ -500,8 +1047,8 @@ namespace Trouble.Tests
         [Test]
         public void StartedRequest_IsNotMissedAfterItsDueTime()
         {
-            // Arrange: due 5 s, takes 8 s to finish.
-            var sim = Sim(TwoRooms(10, new[] { "kettle" }, dueSec: 5f), Rules(instant: false));
+            // Arrange: due 7 s (the carry, front and back, takes about 5), takes 8 s to finish.
+            var sim = Sim(TwoRooms(10, new[] { "kettle" }, dueSec: 7f), Rules(instant: false));
             sim.Start();
             Run(sim, 1);
             Carry(sim, KettleX, A1X);

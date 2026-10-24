@@ -106,8 +106,10 @@ namespace Trouble.Sim
                 case "move": return Command.MoveTo(d.a, append);
                 case "cancel": return Command.CancelAction(int.Parse(d.a));
                 case "walk": return Command.Walk(int.Parse(d.a));
-                case "climb": return Command.Climb(int.Parse(d.a));
+                case "walkdepth": return Command.WalkDepth(int.Parse(d.a));
                 case "interact": return Command.Interact();
+                case "plugkey": return Command.TogglePlug();
+                case "throw": return Command.Throw();
                 default: throw new ArgumentException($"Unknown command '{d.cmd}'.");
             }
         }
@@ -128,8 +130,10 @@ namespace Trouble.Sim
                 case CommandType.MoveTo: d.cmd = "move"; break;
                 case CommandType.CancelAction: d.cmd = "cancel"; d.a = c.Index.ToString(); d.replace = false; break;
                 case CommandType.Walk: d.cmd = "walk"; d.a = c.Index.ToString(); d.replace = false; break;
-                case CommandType.Climb: d.cmd = "climb"; d.a = c.Index.ToString(); d.replace = false; break;
+                case CommandType.WalkDepth: d.cmd = "walkdepth"; d.a = c.Index.ToString(); d.replace = false; break;
                 case CommandType.Interact: d.cmd = "interact"; d.a = "e"; d.replace = false; break;
+                case CommandType.TogglePlug: d.cmd = "plugkey"; d.a = "f"; d.replace = false; break;
+                case CommandType.Throw: d.cmd = "throw"; d.a = "e"; d.replace = false; break;
             }
             return d;
         }

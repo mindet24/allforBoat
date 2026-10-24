@@ -63,7 +63,7 @@ namespace Trouble.EditorTools
                     if (height <= 0 || width % height != 0)
                         plan.Problems.Add($"{name}.png is {width}x{height}; a strip must be square frames side by side (width a multiple of height).");
                     if (!IsCharacterName(name))
-                        plan.Problems.Add($"{name}.png should be named player_{string.Join("/", CharacterStates)}.png.");
+                        plan.Problems.Add($"{name}.png should be named player_{string.Join("/", CharacterStates)}.png or family_<owner>.png.");
                     break;
 
                 case "props":
@@ -91,6 +91,7 @@ namespace Trouble.EditorTools
 
         private static bool IsCharacterName(string name)
         {
+            if (name.StartsWith("family_") && name.Length > "family_".Length) return true;
             foreach (var state in CharacterStates)
                 if (name == "player_" + state) return true;
             return false;

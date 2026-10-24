@@ -36,8 +36,63 @@ namespace Trouble.Sim
         /// <summary>Extra ticks to use stairs.</summary>
         public int stairsTicks = 20;
         public int actionQueueSize = 3;
-        /// <summary>Day mode, keyboard: how close (metres) the character must be to a socket, appliance, panel or stairs to use it.</summary>
+        /// <summary>Day mode, keyboard: how close (metres, across the floor) the character must be to a socket, appliance or panel to use it.</summary>
         public float reachMetres = 1.5f;
+        /// <summary>Day mode: metres per second walking into the room (W) or toward the open front (S); as quick as walking along.</summary>
+        public float depthWalkSpeed = 3f;
+        /// <summary>
+        /// Day mode: how deep the walkable floor of a room is, metres from the open front. Sockets, the appliances in
+        /// them and the panel are reached from this depth (the furniture fills the room behind it).
+        /// </summary>
+        public float walkDepthMetres = 2f;
+        /// <summary>Day mode: a door to the next room is only passable this close to the open front, metres (the doorway).</summary>
+        public float doorDepthMetres = 1f;
+        /// <summary>
+        /// Day mode: how the character changes floor. "stairs" (default): walk onto a flight of stairs with A/D from the
+        /// front of the room and up or down it. "jump": Space jumps to the room straight above, Shift+Space to the one
+        /// below, in <see cref="jumpTicks"/>. "jetpack": Space held flies up, release falls, S/Shift+Space drops through
+        /// the floor (the jetpack values below).
+        /// </summary>
+        public string verticalMove = "stairs";
+        /// <summary>Day mode, stairs: length of a flight along the floor, metres, unless the level gives its own.</summary>
+        public float stairsRunMetres = 3f;
+        /// <summary>
+        /// Day mode, stairs: the flights stand at the open front of the house, this deep (metres). Walking along within
+        /// this depth steps onto them; deeper in, the character walks past behind them.
+        /// </summary>
+        public float stairsDepthMetres = 1f;
+        /// <summary>Day mode, stairs: metres per second along the floor while on the stairs.</summary>
+        public float stairsSpeed = 2.2f;
+        /// <summary>Day mode, verticalMove "jump": ticks a jump to the floor above or below takes; it lands on the last.</summary>
+        public int jumpTicks = 6;
+        /// <summary>Day mode: height of one floor, metres (floor to floor; the view's roomHeight matches it).</summary>
+        public float floorHeightMetres = 3f;
+        /// <summary>Day mode: upward push of the jetpack while Space is held, metres per second squared.</summary>
+        public float jetpackThrust = 35f;
+        /// <summary>Day mode: thrust lost per weight point of the carried appliance (catalog "weight"), m/s².</summary>
+        public float jetpackWeightThrust = 4f;
+        /// <summary>Day mode: pull down, metres per second squared.</summary>
+        public float gravity = 20f;
+        /// <summary>Day mode: fastest climb with the jetpack, metres per second.</summary>
+        public float jetpackMaxRise = 6f;
+        /// <summary>Day mode: fastest fall, metres per second.</summary>
+        public float maxFallSpeed = 9f;
+        /// <summary>Day mode: under a ceiling with no room above, the feet stop this far below it (the character's height), metres.</summary>
+        public float headroomMetres = 1.7f;
+        /// <summary>
+        /// Day mode: how much depth (in and out of the room) counts toward reach, against 1 for distance along the room.
+        /// Below 1 sockets and appliances at the back are in reach from nearer the front.
+        /// </summary>
+        public float reachDepthWeight = 0.5f;
+        /// <summary>
+        /// Day mode, keyboard: true = E puts what is carried down unplugged and F plugs it in. false = E plugs it in at
+        /// once (the first day-mode rule).
+        /// </summary>
+        public bool placeUnplugged = true;
+        /// <summary>Day mode: "socket" = E puts down beside the nearest free socket in reach; "floor" = where the character stands.</summary>
+        public string placeMode = "socket";
+        /// <summary>Day mode: how far ahead (metres) a held-E throw can land.</summary>
+        public float throwMetres = 4f;
         /// <summary>true = during planning every action except breakers happens at once, with no walking.</summary>
         public bool planningIsFree = true;
 

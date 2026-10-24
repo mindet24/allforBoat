@@ -27,6 +27,7 @@ namespace Trouble.Game
         private Transform _wireRoot;
         private Transform _cableRoot;
         private CharacterView _character;
+        private FamilyView _family;
         private Transform _socketRoot;
         private string _highlightedSocket;
 
@@ -46,7 +47,9 @@ namespace Trouble.Game
         /// <summary>Builds the house for the controller's current sim.</summary>
         public void Build(LevelController controller, TrippedViewConfig config, ArtLibrary art)
         {
+            Transform kitRoot = null;
             _controller = controller;
+            controller.CommandAccepted += OnCommandAccepted;
             _sim = controller.Sim;
             _config = config;
             Bounds = HouseLayout.HouseBounds(_sim.Rooms, config.roomHeight);
@@ -56,6 +59,7 @@ namespace Trouble.Game
             {
                 var kitGo = new GameObject("HouseKit");
                 kitGo.transform.SetParent(transform, false);
+                kitRoot = kitGo.transform;
                 var kitView = kitGo.AddComponent<HouseKitView>();
                 kitView.Build(_sim, config);
                 // Frame what was really built: roof peak, chimney and foundation included.
@@ -76,7 +80,10 @@ namespace Trouble.Game
             }
 
             if (!_kit) BuildWalls();
-            BuildStairs();
+            if (!_day) BuildStairs();
+            // Day mode, rules verticalMove "stairs": solid steps at the open front, under the kit so they fade like
+            // any wall when the character walks behind them.
+            else if (_sim.UsesStairs) BuildDayStairs(kitRoot != null ? kitRoot : transform);
 
             _wireRoot = new GameObject("Wires").transform;
             _wireRoot.SetParent(transform, false);
@@ -119,13 +126,33 @@ namespace Trouble.Game
 
             if (_day)
             {
+                var familyGo = new GameObject("Family");
+                familyGo.transform.SetParent(transform, false);
+                _family = familyGo.AddComponent<FamilyView>();
+                _family.Build(_sim, config, art);
+
                 var promptGo = new GameObject("Prompts");
                 promptGo.transform.SetParent(transform, false);
                 _prompts = promptGo.AddComponent<DayPromptView>();
                 _prompts.Build(this, config);
+
+                // Walls, floors and furniture in front of the character, an appliance or a family member go see-through.
+                var cam = controller.HouseCam != null ? controller.HouseCam.Cam : Camera.main;
+                if (kitRoot != null && cam != null)
+                    gameObject.AddComponent<OccluderFader>().Build(kitRoot, new[] { chGo.transform, appRoot, familyGo.transform }, cam, config);
             }
 
             LateUpdate();
+        }
+
+        private void OnCommandAccepted(Command command)
+        {
+            if (_character != null && _sim != null) _character.OnCommandAccepted(command, _sim);
+        }
+
+        private void OnDestroy()
+        {
+            if (_controller != null) _controller.CommandAccepted -= OnCommandAccepted;
         }
 
         /// <summary>Highlights one socket (the drop target under the pointer while an appliance is selected). Null = none.</summary>
@@ -192,6 +219,7 @@ namespace Trouble.Game
                 _appliances[i].Sync(_sim, selected != null && selected == _appliances[i].Appliance.Id, time);
 
             _character.Sync(_sim, _controller.TickFraction, time);
+            if (_family != null) _family.Sync(_sim, time, _appliances);
             if (_prompts != null) _prompts.Sync(_sim);
         }
 
@@ -283,8 +311,8 @@ namespace Trouble.Game
         }
 
         /// <summary>
-        /// Stairs between rooms on different floors: a slanted plank with rungs, drawn on the front edge of the
-        /// house inside the x range the two rooms share, so it reads from the camera without hiding the rooms.
+        /// Stairs between rooms on different floors (not in day mode): a slanted plank with rungs, drawn on the front
+        /// edge of the house inside the x range the two rooms share, so it reads from the camera without hiding the rooms.
         /// </summary>
         private void BuildStairs()
         {
@@ -300,29 +328,12 @@ namespace Trouble.Game
                 var upper = lower == a ? b : a;
                 float yLow = HouseLayout.FloorY(lower.Floor, _config.roomHeight);
                 float yHigh = HouseLayout.FloorY(upper.Floor, _config.roomHeight);
-                Vector2 p0, p1;
-                float z, depth;
-                if (_day)
-                {
-                    // Day mode: the flight is centred on sim.StairsX (where W/S work and the climb runs), drawn just
-                    // behind the character's walking line so a climbing character is in front of it.
-                    float sx = _sim.StairsX(door);
-                    p0 = HouseLayout.ClimbPoint(sx, yLow, yHigh, _config.stairsLanding, _config.stairsHalfRun, _config.stairsLanding);
-                    p1 = HouseLayout.ClimbPoint(sx, yLow, yHigh, 1f - _config.stairsLanding, _config.stairsHalfRun, _config.stairsLanding);
-                    p0.y += 0.05f;
-                    p1.y += 0.05f;
-                    depth = Mathf.Max(0.05f, _config.characterInset * 0.6f);
-                    z = _config.roomDepth - _config.characterInset * 0.5f + 0.02f;
-                }
-                else
-                {
-                    var span = HouseLayout.OverlapSpan(lower, upper);
-                    if (span.y - span.x < 1f) continue;
-                    p0 = new Vector2(span.x + 0.8f, yLow + 0.1f);
-                    p1 = new Vector2(span.y - 0.8f, yHigh + 0.1f);
-                    z = -0.3f;
-                    depth = 0.5f;
-                }
+                var span = HouseLayout.OverlapSpan(lower, upper);
+                if (span.y - span.x < 1f) continue;
+                var p0 = new Vector2(span.x + 0.8f, yLow + 0.1f);
+                var p1 = new Vector2(span.y - 0.8f, yHigh + 0.1f);
+                const float z = -0.3f;
+                const float depth = 0.5f;
                 var delta = p1 - p0;
                 float length = delta.magnitude;
                 float angle = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
@@ -334,6 +345,37 @@ namespace Trouble.Game
                 {
                     var at = Vector2.Lerp(p0, p1, (float)i / rungs);
                     Prims.Box(root, "Rung", new Vector3(at.x, at.y + 0.12f, z), new Vector3(0.22f, 0.07f, depth), _config.slabColor);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Day mode: each flight of stairs as a row of solid wooden steps from its bottom step to its top step (the sim's
+        /// <see cref="DoorState.BottomXCm"/> / <see cref="DoorState.TopXCm"/>), from the open front of the house to
+        /// <see cref="RulesConfig.stairsDepthMetres"/> deep. Their tops are where <see cref="HouseSim.StairsHeight"/>
+        /// puts the character's feet.
+        /// </summary>
+        private void BuildDayStairs(Transform parent)
+        {
+            var root = new GameObject("Day stairs").transform;
+            root.SetParent(parent, false);
+            float depth = Mathf.Max(0.2f, _sim.Rules.stairsDepthMetres);
+            float rise = Mathf.Max(0.05f, _config.dayStairsRise);
+            foreach (var door in _sim.Doors)
+            {
+                if (!door.IsFlight) continue;
+                var lower = _sim.FindRoom(door.LowerRoomId);
+                float yLow = HouseLayout.FloorY(lower.Floor, _config.roomHeight);
+                float bottom = door.BottomXCm / 100f, top = door.TopXCm / 100f;
+                int steps = Mathf.Max(3, Mathf.RoundToInt(_config.roomHeight / rise));
+                float run = (top - bottom) / steps;
+                for (int i = 0; i < steps; i++)
+                {
+                    float x0 = bottom + run * i;
+                    float h = _config.roomHeight * (i + 1) / steps;
+                    Prims.Box(root, "Stair step " + door.Id + " " + i,
+                        new Vector3(x0 + run * 0.5f, yLow + h * 0.5f, depth * 0.5f),
+                        new Vector3(Mathf.Abs(run), h, depth), _config.dayStairsColor);
                 }
             }
         }

@@ -10,7 +10,8 @@ namespace Trouble.Game
     /// <remarks>
     /// Expected files (all under Assets/TRIPPED/Resources/):
     /// Art/Appliances/{catalog id}.png · Art/Characters/player_{idle|walk|interact|panic}.png (square frames side by
-    /// side) · Art/Faces/face_{owner lower case}.png · Art/Rooms/{room theme}.png (back wall background).
+    /// side) · Art/Characters/family_{owner lower case}.png (same strip format, drawn at the player's pixel scale) ·
+    /// Art/Faces/face_{owner lower case}.png · Art/Rooms/{room theme}.png (back wall background).
     /// </remarks>
     public sealed class ArtLibrary
     {
@@ -62,9 +63,14 @@ namespace Trouble.Game
 
         private readonly Dictionary<string, Sprite[]> _stripsByState = new Dictionary<string, Sprite[]>();
 
-        private Sprite[] LoadStrip(string state)
+        /// <summary>Frames of a family member (Art/Characters/family_{owner}.png), sliced like the player's. Null if missing.</summary>
+        public Sprite[] FamilyFrames(string owner) =>
+            string.IsNullOrEmpty(owner) ? null : LoadStripAt(_config.characterArtFolder + "/family_" + owner.ToLowerInvariant());
+
+        private Sprite[] LoadStrip(string state) => LoadStripAt(_config.characterArtFolder + "/player_" + state);
+
+        private Sprite[] LoadStripAt(string path)
         {
-            string path = _config.characterArtFolder + "/player_" + state;
             if (_strips.TryGetValue(path, out var frames)) return frames;
             frames = null;
             var tex = Resources.Load<Texture2D>(path);

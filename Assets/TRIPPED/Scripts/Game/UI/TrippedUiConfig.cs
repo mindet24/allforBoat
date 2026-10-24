@@ -48,14 +48,14 @@ namespace Trouble.Game
         public Color panel = new Color(0.12f, 0.16f, 0.27f, 0.95f);
         public Color iconOutline = TrippedViewConfig.Hex("#1F2A44");
 
-        [Header("Family colours (placeholder portraits until Art/Faces/{name}.png exist)")]
+        [Header("Family colours (placeholder portraits until Art/Faces/face_{name}.png exist)")]
         public string[] personNames = { "Mom", "Dad", "Daughter", "Grandma" };
         public Color[] personColors =
         {
             TrippedViewConfig.Hex("#E85D75"), TrippedViewConfig.Hex("#3FA2F6"), TrippedViewConfig.Hex("#8E5BD9"), TrippedViewConfig.Hex("#7DBE4E"),
         };
         public Color personFallback = TrippedViewConfig.Hex("#D6B98C");
-        [Tooltip("Resources folder of face portraits, named mom.png, dad.png, daughter.png, grandma.png.")]
+        [Tooltip("Resources folder of face portraits, named face_mom.png, face_dad.png, face_daughter.png, face_grandma.png.")]
         public string faceFolder = "Art/Faces";
 
         [Header("Fonts (OFL, Resources/Fonts)")]

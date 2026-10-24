@@ -125,45 +125,43 @@ namespace Trouble.Game
             return new Vector2((point.x - camera.x) / visible.x + 0.5f, (point.y - camera.y) / visible.y + 0.5f);
         }
 
-        // ---- tilted perspective: the camera orbits the focus point and looks down by tilt degrees ---------------
-        // At tilt 0 these match the view-height functions above for points on the focus plane.
+        // ---- tilted perspective: the camera orbits the focus point, looks down by tilt degrees and turns by yaw ----
+        // At tilt 0 and yaw 0 these match the view-height functions above for points on the focus plane.
 
         /// <summary>
         /// World position of a perspective camera that shows <paramref name="viewHeight"/> at the focus point
         /// (<paramref name="focus"/>, on the plane z = <paramref name="focusZ"/>) while looking down by
-        /// <paramref name="tiltDeg"/> degrees. The camera's rotation is Euler(tiltDeg, 0, 0).
+        /// <paramref name="tiltDeg"/> degrees and turned by <paramref name="yawDeg"/> (positive = the camera swings
+        /// left and looks right). The camera's rotation is Euler(tiltDeg, yawDeg, 0).
         /// </summary>
-        public static Vector3 TiltedCameraPosition(Vector2 focus, float focusZ, float viewHeight, float verticalFovDeg, float tiltDeg)
+        public static Vector3 TiltedCameraPosition(Vector2 focus, float focusZ, float viewHeight, float verticalFovDeg, float tiltDeg, float yawDeg = 0f)
         {
             float d = DistanceForViewHeight(viewHeight, verticalFovDeg);
-            float t = tiltDeg * Mathf.Deg2Rad;
-            return new Vector3(focus.x, focus.y + d * Mathf.Sin(t), focusZ - d * Mathf.Cos(t));
+            return new Vector3(focus.x, focus.y, focusZ) - Quaternion.Euler(tiltDeg, yawDeg, 0f) * Vector3.forward * d;
         }
 
         /// <summary>Viewport position (0..1, may be outside) of a world point seen by the tilted camera.</summary>
         public static Vector2 WorldToViewportTilted(Vector2 focus, float focusZ, float viewHeight, float verticalFovDeg,
-            float tiltDeg, float aspect, Vector3 point)
+            float tiltDeg, float aspect, Vector3 point, float yawDeg = 0f)
         {
-            var cam = TiltedCameraPosition(focus, focusZ, viewHeight, verticalFovDeg, tiltDeg);
-            float t = tiltDeg * Mathf.Deg2Rad;
-            var forward = new Vector3(0f, -Mathf.Sin(t), Mathf.Cos(t));
-            var up = new Vector3(0f, Mathf.Cos(t), Mathf.Sin(t));
+            var cam = TiltedCameraPosition(focus, focusZ, viewHeight, verticalFovDeg, tiltDeg, yawDeg);
+            var rotation = Quaternion.Euler(tiltDeg, yawDeg, 0f);
             var v = point - cam;
-            float z = Mathf.Max(0.001f, Vector3.Dot(v, forward));
+            float z = Mathf.Max(0.001f, Vector3.Dot(v, rotation * Vector3.forward));
             float tan = Mathf.Tan(verticalFovDeg * 0.5f * Mathf.Deg2Rad);
-            return new Vector2(0.5f + 0.5f * v.x / (z * tan * aspect), 0.5f + 0.5f * Vector3.Dot(v, up) / (z * tan));
+            return new Vector2(0.5f + 0.5f * Vector3.Dot(v, rotation * Vector3.right) / (z * tan * aspect),
+                0.5f + 0.5f * Vector3.Dot(v, rotation * Vector3.up) / (z * tan));
         }
 
         /// <summary>The point on the plane z = <paramref name="focusZ"/> under a viewport position, for the tilted camera.</summary>
         public static Vector2 ViewportToPlaneTilted(Vector2 focus, float focusZ, float viewHeight, float verticalFovDeg,
-            float tiltDeg, float aspect, Vector2 viewportPoint)
+            float tiltDeg, float aspect, Vector2 viewportPoint, float yawDeg = 0f)
         {
-            var cam = TiltedCameraPosition(focus, focusZ, viewHeight, verticalFovDeg, tiltDeg);
-            float t = tiltDeg * Mathf.Deg2Rad;
+            var cam = TiltedCameraPosition(focus, focusZ, viewHeight, verticalFovDeg, tiltDeg, yawDeg);
+            var rotation = Quaternion.Euler(tiltDeg, yawDeg, 0f);
             float tan = Mathf.Tan(verticalFovDeg * 0.5f * Mathf.Deg2Rad);
-            var forward = new Vector3(0f, -Mathf.Sin(t), Mathf.Cos(t));
-            var up = new Vector3(0f, Mathf.Cos(t), Mathf.Sin(t));
-            var dir = forward + Vector3.right * (2f * (viewportPoint.x - 0.5f) * tan * aspect) + up * (2f * (viewportPoint.y - 0.5f) * tan);
+            var dir = rotation * Vector3.forward + rotation * Vector3.right * (2f * (viewportPoint.x - 0.5f) * tan * aspect)
+                      + rotation * Vector3.up * (2f * (viewportPoint.y - 0.5f) * tan);
             float s = (focusZ - cam.z) / Mathf.Max(0.0001f, dir.z);
             var p = cam + dir * s;
             return new Vector2(p.x, p.y);

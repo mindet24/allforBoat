@@ -7,7 +7,7 @@ namespace Trouble.Game
     /// <summary>
     /// The house shell built from the artist's 3D kit (Art/Models/HouseKit.fbx, Room_Kitchen.fbx) instead of
     /// greybox boxes: per room a floor and back wall scaled to the room's width, ceilings where nothing is above,
-    /// side walls (with a door opening where a door is), roofs over the top, a foundation under the ground floor.
+    /// side walls (with a door opening at the open front where a door is, so the character walks through it), roofs over the top, a foundation under the ground floor.
     /// Purely decorative: every gameplay position (sockets, panel, stairs, character) still comes from the sim.
     /// </summary>
     /// <remarks>
@@ -19,6 +19,8 @@ namespace Trouble.Game
     {
         private TrippedViewConfig _config;
         private Transform _kit;
+        /// <summary>The day's seed, which rolls the optional (*_Random*) parts of the room models.</summary>
+        private int _daySeed;
 
         /// <summary>True when the config asks for the kit and the kit is assigned.</summary>
         public static bool Available(TrippedViewConfig config) => config != null && config.useHouseKit && config.houseKit != null;
@@ -32,6 +34,7 @@ namespace Trouble.Game
         /// <summary>Builds the whole shell for these rooms and doors.</summary>
         public void Build(HouseSim sim, TrippedViewConfig config)
         {
+            _daySeed = sim.Level.day != null ? sim.Level.day.seed : 0;
             _config = config;
             _kit = config.houseKit.transform;
             float h = config.roomHeight;
@@ -72,8 +75,25 @@ namespace Trouble.Game
 
             foreach (var wall in HouseLayout.Walls(sim.Rooms, sim.Doors))
             {
-                var holder = Holder("Wall x" + wall.X.ToString("0.##"), new Vector3(wall.X, HouseLayout.FloorY(wall.Floor, h), 0f), 1f);
-                Piece(holder, string.IsNullOrEmpty(wall.DoorId) ? "Room_SideWall_Solid" : "Room_SideWall_Door");
+                string name = "Wall x" + wall.X.ToString("0.##");
+                float y = HouseLayout.FloorY(wall.Floor, h);
+                if (string.IsNullOrEmpty(wall.DoorId))
+                {
+                    Piece(Holder(name, new Vector3(wall.X, y, 0f), 1f), "Room_SideWall_Solid");
+                    continue;
+                }
+                // The kit's own door wall has its opening mid-depth, behind the line the character walks along (just
+                // in front of z = 0). Build the wall from two squeezed solid pieces instead, leaving the opening at
+                // the open front: a lintel over the full depth, and the wall behind the doorway.
+                float depth = Mathf.Max(0.1f, config.kitModuleDepth);
+                float doorH = Mathf.Clamp(config.doorHeight, 0.1f, h - 0.1f);
+                float doorW = Mathf.Clamp(config.doorWidth, 0.1f, depth - 0.1f);
+                var lintel = Holder(name + " lintel", new Vector3(wall.X, y + doorH, 0f), 1f);
+                lintel.localScale = new Vector3(1f, (h - doorH) / h, 1f);
+                Piece(lintel, "Room_SideWall_Solid");
+                var back = Holder(name + " back", new Vector3(wall.X, y, doorW), 1f);
+                back.localScale = new Vector3(1f, doorH / h, (depth - doorW) / depth);
+                Piece(back, "Room_SideWall_Solid");
             }
             Extent = FrontRect(transform);
         }
@@ -135,8 +155,14 @@ namespace Trouble.Game
             bool rescaled = !Mathf.Approximately(scaleX, 1f);
             holder.localScale = new Vector3(scaleX, 1f, 1f);
 
+            int seed = _daySeed;
             foreach (Transform part in copy.transform)
             {
+                if (!RoomModelRules.ShowsRandomPart(part.name, room.Id, seed, _config.randomPropChance))
+                {
+                    part.gameObject.SetActive(false);
+                    continue;
+                }
                 if (!RoomModelRules.Hides(part.name, entry.hideParts, entry.hideWhenRescaled, rescaled)) continue;
                 part.gameObject.SetActive(false);
                 Debug.Log($"[TRIPPED] Room {room.Id}: hid {part.name} of {entry.model.name}" + (rescaled ? $" (model {modelWidth:0.##} m stretched to {room.Width:0.##} m)." : "."));

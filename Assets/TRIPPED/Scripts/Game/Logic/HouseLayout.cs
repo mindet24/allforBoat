@@ -107,12 +107,14 @@ namespace Trouble.Game
         /// two room centres by the sim's segment progress; <paramref name="tickFraction"/> (0..1, how far the
         /// clock is into the next tick) smooths the motion between ticks without changing the sim.
         /// </summary>
-        /// <remarks>Day mode: the sim's own x (<see cref="CharacterState.X"/>), and the stairs path while climbing.</remarks>
-        public static Vector2 CharacterPoint(HouseSim sim, float tickFraction, float roomHeight,
-            float stairsHalfRun = 1f, float stairsLanding = 0.15f)
+        /// <remarks>
+        /// Day mode: the sim's own x (<see cref="CharacterState.X"/>); mid-jump on an arc <paramref name="jumpArc"/>
+        /// metres above the straight line between the two floors; with the jetpack its height above its room's floor.
+        /// </remarks>
+        public static Vector2 CharacterPoint(HouseSim sim, float tickFraction, float roomHeight, float jumpArc = 0f)
         {
             var ch = sim.Character;
-            if (sim.IsDayMode) return DayCharacterPoint(sim, tickFraction, roomHeight, stairsHalfRun, stairsLanding);
+            if (sim.IsDayMode) return DayCharacterPoint(sim, tickFraction, roomHeight, jumpArc);
             if (ch.IsWalking)
             {
                 var from = sim.FindRoom(ch.FromRoomId);
@@ -130,47 +132,62 @@ namespace Trouble.Game
         }
 
         /// <summary>
-        /// Day mode: the character's feet. Standing or walking it is at the sim's x on its room's floor; while
-        /// climbing it follows <see cref="ClimbPoint"/> along the stairs at sim.StairsX.
+        /// Day mode: the character's feet. x glides from where the last tick started to where it ended
+        /// (<see cref="DayX"/>). Mid-jump on <see cref="JumpPoint"/>, as far along as the sim's jump plus
+        /// <paramref name="tickFraction"/>. Otherwise its room's floor plus its height in the air
+        /// (<see cref="CharacterState.AirCm"/>, the jetpack) moved on by its vertical speed for
+        /// <paramref name="tickFraction"/> of a tick, so flying looks smooth between ticks. Never under the floor unless
+        /// it is dropping through it.
         /// </summary>
-        public static Vector2 DayCharacterPoint(HouseSim sim, float tickFraction, float roomHeight, float stairsHalfRun, float stairsLanding)
+        public static Vector2 DayCharacterPoint(HouseSim sim, float tickFraction, float roomHeight, float jumpArc = 0f)
         {
             var ch = sim.Character;
-            if (ch.IsClimbing)
+            float x = DayX(ch, tickFraction);
+            if (ch.IsJumping)
             {
-                var from = sim.FindRoom(ch.ClimbFromRoomId);
-                var to = sim.FindRoom(ch.ClimbToRoomId);
-                var door = from != null && to != null ? DayInteraction.StairsBetween(sim, from.Id, to.Id) : null;
-                if (door != null)
+                var from = sim.FindRoom(ch.JumpFromRoomId);
+                var to = sim.FindRoom(ch.JumpToRoomId);
+                if (from != null && to != null)
                 {
-                    float p = WalkProgress(ch.ClimbTicks - ch.ClimbTicksLeft, ch.ClimbTicks, tickFraction);
-                    return ClimbPoint(sim.StairsX(door), FloorY(from.Floor, roomHeight), FloorY(to.Floor, roomHeight), p, stairsHalfRun, stairsLanding);
+                    float p = WalkProgress(ch.JumpTicks - ch.JumpTicksLeft, ch.JumpTicks, tickFraction);
+                    return new Vector2(x, JumpPoint(FloorY(from.Floor, roomHeight), FloorY(to.Floor, roomHeight), p, jumpArc));
                 }
             }
+            float scale = sim.Rules.floorHeightMetres > 0f ? roomHeight / sim.Rules.floorHeightMetres : 1f;
+            if (ch.OnStairs)
+            {
+                // On a flight the feet follow the steps under the (smoothed) x, not the per-tick height.
+                var door = sim.FindDoor(ch.StairsDoorId);
+                var lower = door != null ? sim.FindRoom(door.LowerRoomId) : null;
+                if (lower != null) return new Vector2(x, FloorY(lower.Floor, roomHeight) + sim.StairsHeight(door, x) * scale);
+            }
             var room = sim.FindRoom(ch.RoomId);
-            return new Vector2(ch.X, room == null ? 0f : FloorY(room.Floor, roomHeight));
+            float floorY = room == null ? 0f : FloorY(room.Floor, roomHeight);
+            if (!ch.IsAirborne) return new Vector2(x, floorY);
+            float air = (ch.AirCm + ch.VyCm * Mathf.Clamp01(tickFraction)) / 100f;
+            if (!ch.DropThrough) air = Mathf.Max(0f, air);
+            return new Vector2(x, floorY + air * scale);
         }
 
         /// <summary>
-        /// A point on a climb between two floors. The stairs rise left to right from (x − halfRun, low floor) to
-        /// (x + halfRun, high floor); the climb starts and ends at <paramref name="stairsX"/> (where the sim puts the
-        /// character), stepping to the foot of the stairs over the first <paramref name="landing"/> of the progress
-        /// and off the top over the last. Going down runs the same path backwards.
+        /// Day mode: the character's x in metres, <paramref name="tickFraction"/> of the way from where the last tick
+        /// started (<see cref="CharacterState.PrevXCm"/>) to where it ended, so walking moves every frame, not every tick.
         /// </summary>
-        /// <param name="progress">0 = at the start floor, 1 = arrived.</param>
-        public static Vector2 ClimbPoint(float stairsX, float yFrom, float yTo, float progress, float halfRun, float landing)
+        public static float DayX(CharacterState ch, float tickFraction) =>
+            Mathf.Lerp(ch.PrevXCm, ch.XCm, Mathf.Clamp01(tickFraction)) / 100f;
+
+        /// <summary>Day mode: the character's depth into the room in metres, glided between ticks like <see cref="DayX"/>.</summary>
+        public static float DayZ(CharacterState ch, float tickFraction) =>
+            Mathf.Lerp(ch.PrevZCm, ch.ZCm, Mathf.Clamp01(tickFraction)) / 100f;
+
+        /// <summary>
+        /// Height of the feet on a jump from <paramref name="yFrom"/> to <paramref name="yTo"/>: <paramref name="progress"/>
+        /// 0 = take-off, 1 = landing, with a parabola <paramref name="arc"/> metres high at the middle on top.
+        /// </summary>
+        public static float JumpPoint(float yFrom, float yTo, float progress, float arc)
         {
-            bool up = yTo >= yFrom;
-            float yLow = Mathf.Min(yFrom, yTo), yHigh = Mathf.Max(yFrom, yTo);
-            float q = Mathf.Clamp01(up ? progress : 1f - progress);
-            landing = Mathf.Clamp(landing, 0f, 0.45f);
-            var bottom = new Vector2(stairsX, yLow);
-            var foot = new Vector2(stairsX - halfRun, yLow);
-            var top = new Vector2(stairsX + halfRun, yHigh);
-            var off = new Vector2(stairsX, yHigh);
-            if (landing > 0f && q < landing) return Vector2.Lerp(bottom, foot, q / landing);
-            if (landing > 0f && q > 1f - landing) return Vector2.Lerp(top, off, (q - (1f - landing)) / landing);
-            return Vector2.Lerp(foot, top, (q - landing) / (1f - 2f * landing));
+            float t = Mathf.Clamp01(progress);
+            return Mathf.Lerp(yFrom, yTo, t) + arc * 4f * t * (1f - t);
         }
 
         /// <summary>Segment progress 0..1 with the fraction of the next tick added.</summary>

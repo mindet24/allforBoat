@@ -61,7 +61,11 @@
         { "key": "lost_hearts", "text": "Out of hearts. The family has had enough." },
         { "key": "day_missed", "text": "{owner} gave up waiting for the {appliance}." },
         { "key": "reject_no_stairs", "text": "No stairs here." },
+        { "key": "reject_no_floor", "text": "Nothing to jump to." },
+        { "key": "reject_no_floor_below", "text": "Nothing below to drop to." },
         { "key": "reject_no_free_socket", "text": "No free socket in reach." },
+        { "key": "reject_nothing_to_plug", "text": "Nothing to plug in here." },
+        { "key": "reject_nothing_carried", "text": "Your hands are empty." },
         { "key": "reject_not_implemented", "text": "Not implemented yet." }
     ]
 }

@@ -33,13 +33,13 @@ namespace Trouble.Game
         /// <summary>The PNG sprite of an appliance (Resources/Art/Appliances/{type}.png), or null.</summary>
         public Sprite IconOf(HouseSim sim, string applianceId) => Art?.Appliance(TypeOf(sim, applianceId));
 
-        /// <summary>A face portrait from Resources/{faceFolder}/{name}.png (lower case), or null until the art exists.</summary>
+        /// <summary>A face portrait from Resources/{faceFolder}/face_{name}.png (lower case), or null until the art exists.</summary>
         public static Sprite FaceOf(TrippedUiConfig ui, string owner)
         {
             if (string.IsNullOrEmpty(owner)) return null;
             string key = owner.ToLowerInvariant();
             if (Faces.TryGetValue(key, out var s)) return s;
-            s = Resources.Load<Sprite>(ui.faceFolder + "/" + key);
+            s = Resources.Load<Sprite>(ui.faceFolder + "/face_" + key);
             Faces[key] = s;
             return s;
         }
@@ -534,7 +534,7 @@ namespace Trouble.Game
             var ui = _cx.Ui;
             bool following = cam.DayFollowing && !cam.Overview;
             var ch = sim.Character;
-            string currentRoom = ch.IsClimbing && !string.IsNullOrEmpty(ch.ClimbToRoomId) ? ch.ClimbToRoomId : ch.RoomId;
+            string currentRoom = ch.RoomId;
             float rh = _cx.Config.roomHeight;
             var size = _cx.CanvasSize;
             float pxPerMetre = size.y / Mathf.Max(0.01f, cam.ViewHeight);

@@ -33,6 +33,9 @@ namespace Trouble.Game
         private GameObject _hudObject;
         private float _accumulator;
         private int _sentWalk;
+        private int _sentDepth;
+        private bool _sentThrust;
+        private bool _dropHeld;
         private string _lastTripText = "";
         private readonly List<string> _errors = new List<string>();
         private readonly List<string> _toastLog = new List<string>();
@@ -86,6 +89,9 @@ namespace Trouble.Game
         /// <summary>Raised when the sim accepted a player command (at once in planning, or into the queue).</summary>
         public event Action<Command> CommandAccepted;
 
+        /// <summary>Raised when the sim refused a player command at once, with the reason (also when no toast was shown).</summary>
+        public event Action<Command, string> CommandRefused;
+
         /// <summary>Raised when Esc is pressed while no appliance is selected (the screen flow goes to Level Select).</summary>
         public event Action EscapePressed;
 
@@ -135,6 +141,10 @@ namespace Trouble.Game
             Holding = Held.None;
             _accumulator = 0f;
             _sentWalk = 0;
+            _sentDepth = 0;
+            _sentThrust = false;
+            _dropHeld = false;
+            _interactArmed = false;
             TickFraction = 0f;
             _lastTripText = "";
             _toastLog.Clear();
@@ -157,7 +167,7 @@ namespace Trouble.Game
                 _camera.KeyPan = !Sim.IsDayMode;
                 // Day mode: the house fills nearly all of the screen the HUD leaves free.
                 _camera.HomeMargin = Sim.IsDayMode ? _config.dayHomeMargin : -1f;
-                _camera.Frame(House.Bounds, () => HouseLayout.CharacterPoint(Sim, TickFraction, _config.roomHeight, _config.stairsHalfRun, _config.stairsLanding));
+                _camera.Frame(House.Bounds, () => HouseLayout.CharacterPoint(Sim, TickFraction, _config.roomHeight, _config.jumpArc));
             }
             LevelLoaded?.Invoke(n);
             return true;
@@ -201,11 +211,12 @@ namespace Trouble.Game
         }
 
         /// <summary>
-        /// Hands a player command to the sim. If the sim refuses it now, the reason is shown as a toast.
-        /// Later refusals (when the character arrives) come back as CommandRejected events.
+        /// Hands a player command to the sim. If the sim refuses it now, the reason is shown as a toast (unless
+        /// <paramref name="quiet"/>: keys the player mashes, like the jump, only buzz). Later refusals (when the
+        /// character arrives) come back as CommandRejected events.
         /// </summary>
         /// <returns>false if refused now.</returns>
-        public bool Submit(Command command)
+        public bool Submit(Command command, bool quiet = false)
         {
             if (Sim == null) return false;
             if (Sim.Submit(command, out var reason))
@@ -213,7 +224,8 @@ namespace Trouble.Game
                 CommandAccepted?.Invoke(command);
                 return true;
             }
-            Toast(reason);
+            if (!quiet) Toast(reason);
+            CommandRefused?.Invoke(command, reason);
             return false;
         }
 
@@ -224,7 +236,7 @@ namespace Trouble.Game
         public void HandleClick(ClickInput click)
         {
             if (Sim == null || Sim.Phase == LevelPhase.Won || Sim.Phase == LevelPhase.Lost) return;
-            // Day mode is played with the keyboard (walk, W/S stairs, E); the sim rejects click commands there.
+            // Day mode is played with the keyboard (walk, Space jump, E); the sim rejects click commands there.
             if (Sim.IsDayMode) return;
             if (click.Kind == ClickKind.TrayAppliance) click.Shift = ShiftHeld;
             click.DayMode = Sim.IsDayMode;
@@ -258,8 +270,13 @@ namespace Trouble.Game
         {
             var kb = Keyboard.current;
             if (kb == null) return;
-            if (kb.spaceKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame) StartOrTogglePause();
-            if (kb.rKey.wasPressedThisFrame)
+            // While the day runs Space jumps (rules verticalMove "jump") or flies ("jetpack": HandleJetpack); with stairs
+            // (the default) it pauses like everywhere else. P always pauses.
+            bool spaceMoves = Sim.IsDayMode && Sim.Phase == LevelPhase.Running && !Sim.UsesStairs;
+            if (KeyDown(kb, _config.pauseKey) || (KeyDown(kb, _config.startKey) && !spaceMoves)) StartOrTogglePause();
+            else if (spaceMoves && Sim.UsesJetpack) HandleJetpack(kb);
+            else if (spaceMoves && KeyDown(kb, _config.startKey)) Submit(Command.Jump(KeyHeld(kb, _config.downModifierKey) ? -1 : 1), quiet: true);
+            if (KeyDown(kb, _config.restartKey))
             {
                 Restart();
                 return;
@@ -283,29 +300,83 @@ namespace Trouble.Game
         }
 
         /// <summary>
+        /// Day mode jetpack (rules verticalMove "jetpack"): Space held flies up (sent once when it changes, released = falls back down); Space pressed
+        /// with S, Down or Shift held drops through the floor into the room below instead, and does not fly until
+        /// Space is let go and pressed again.
+        /// </summary>
+        private void HandleJetpack(Keyboard kb)
+        {
+            if (KeyDown(kb, _config.startKey) && (KeyHeld(kb, _config.downModifierKey) || KeyHeld(kb, _config.walkOutKey) || KeyHeld(kb, _config.walkOutAltKey)))
+            {
+                _dropHeld = true;
+                Submit(Command.Drop(), quiet: true);
+            }
+            if (!KeyHeld(kb, _config.startKey)) _dropHeld = false;
+            bool thrust = KeyHeld(kb, _config.startKey) && !_dropHeld;
+            if (thrust != _sentThrust && Submit(Command.Thrust(thrust))) _sentThrust = thrust;
+        }
+
+        /// <summary>
         /// Day mode: A/D or Left/Right hold a walking direction (sent once when it changes, 0 when released),
-        /// W/Up climbs, S/Down goes down, E interacts. Keys only act while the day is running.
+        /// W/Up walks into the room, S/Down toward the open front, F (plugKey) plugs in or unplugs. (Space, the jump or the
+        /// jetpack, is read in <see cref="HandleKeys"/>.) E (interactKey) picks up at once; while
+        /// carrying it acts on release (put down), or throws once held for throwHoldSeconds. Keys only act while the
+        /// day is running.
         /// </summary>
         private void HandleDayKeys(Keyboard kb)
         {
             if (Sim.Phase != LevelPhase.Running) return;
             int dir = 0;
-            if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) dir += 1;
-            if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) dir -= 1;
+            if (KeyHeld(kb, _config.walkRightKey) || KeyHeld(kb, _config.walkRightAltKey)) dir += 1;
+            if (KeyHeld(kb, _config.walkLeftKey) || KeyHeld(kb, _config.walkLeftAltKey)) dir -= 1;
             if (dir != _sentWalk && Submit(Command.Walk(dir))) _sentWalk = dir;
-            if (kb.wKey.wasPressedThisFrame || kb.upArrowKey.wasPressedThisFrame) Submit(Command.Climb(1));
-            if (kb.sKey.wasPressedThisFrame || kb.downArrowKey.wasPressedThisFrame) Submit(Command.Climb(-1));
-            if (kb.eKey.wasPressedThisFrame) Submit(Command.Interact());
+            int depth = 0;
+            if (KeyHeld(kb, _config.walkInKey) || KeyHeld(kb, _config.walkInAltKey)) depth += 1;
+            if (KeyHeld(kb, _config.walkOutKey) || KeyHeld(kb, _config.walkOutAltKey)) depth -= 1;
+            if (depth != _sentDepth && Submit(Command.WalkDepth(depth))) _sentDepth = depth;
+            var interact = _config.interactKey != Key.None ? kb[_config.interactKey] : null;
+            if (interact != null)
+            {
+                bool carrying = !string.IsNullOrEmpty(Sim.Character.CarryingId);
+                if (interact.wasPressedThisFrame)
+                {
+                    _interactHeld = 0f;
+                    _interactArmed = carrying;
+                    if (!carrying) Submit(Command.Interact());
+                }
+                else if (_interactArmed && interact.isPressed)
+                {
+                    _interactHeld += Time.unscaledDeltaTime;
+                    if (_interactHeld >= _config.throwHoldSeconds)
+                    {
+                        _interactArmed = false;
+                        Submit(Command.Throw());
+                    }
+                }
+                else if (_interactArmed && interact.wasReleasedThisFrame)
+                {
+                    _interactArmed = false;
+                    Submit(Command.Interact());
+                }
+            }
+            if (_config.plugKey != Key.None && kb[_config.plugKey].wasPressedThisFrame) Submit(Command.TogglePlug());
         }
+
+        /// <summary>True while <paramref name="key"/> is held (Key.None = never).</summary>
+        private static bool KeyHeld(Keyboard kb, Key key) => key != Key.None && kb[key].isPressed;
+
+        /// <summary>True on the frame <paramref name="key"/> goes down (Key.None = never).</summary>
+        private static bool KeyDown(Keyboard kb, Key key) => key != Key.None && kb[key].wasPressedThisFrame;
+
+        /// <summary>Seconds the interact key has been held while carrying; armed = a release or a long hold still acts.</summary>
+        private float _interactHeld;
+        private bool _interactArmed;
 
         /// <summary>Steps the sim every 1/ticksPerSecond of real time while running, at most maxStepsPerFrame per frame.</summary>
         private void Tick()
         {
-            if (Sim.Phase != LevelPhase.Running)
-            {
-                TickFraction = 0f;
-                return;
-            }
+            // Paused or over: TickFraction stays where it was, so what glides between ticks holds still there.
+            if (Sim.Phase != LevelPhase.Running) return;
             float tickSeconds = 1f / Mathf.Max(1, Sim.Rules.ticksPerSecond);
             _accumulator += Time.unscaledDeltaTime * Mathf.Max(0f, TimeScale);
             int steps = 0;
@@ -318,7 +389,7 @@ namespace Trouble.Game
             }
             // After a long hitch, drop the backlog instead of fast-forwarding.
             if (_accumulator > tickSeconds) _accumulator = tickSeconds;
-            TickFraction = Sim.Phase == LevelPhase.Running ? Mathf.Clamp01(_accumulator / tickSeconds) : 0f;
+            TickFraction = Mathf.Clamp01(_accumulator / tickSeconds);
         }
 
         /// <summary>

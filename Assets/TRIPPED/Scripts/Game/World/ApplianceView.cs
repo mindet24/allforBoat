@@ -5,7 +5,8 @@ using UnityEngine;
 namespace Trouble.Game
 {
     /// <summary>
-    /// A plugged-in appliance standing on the floor next to its socket: the real sprite if Art/Appliances/{type}.png
+    /// An appliance standing on the floor next to its socket (dimmed while it is unplugged, day mode) or lying on the
+    /// floor away from any socket (rules placeMode "floor"): the real sprite if Art/Appliances/{type}.png
     /// exists, otherwise a cream card with the short label (GDD v1.1 §3.6). Glows yellow when switched on and powered,
     /// blinks red when switched on without power. In a room the player cannot see, it shows what was last seen
     /// (Seen* fields) as a faint ghost with no glow, so hidden state never leaks.
@@ -25,9 +26,27 @@ namespace Trouble.Game
         private TextMeshPro _seenText;
         private int _shownSeenSecond = -2;
         private bool _ghostOrder;
+        private Vector3 _flyFrom;
+        private float _flyStart = float.NegativeInfinity;
 
         /// <summary>The sim appliance this view shows.</summary>
         public ApplianceState Appliance => _app;
+
+        /// <summary>Room the appliance is drawn in, or null while it is not in a socket.</summary>
+        public string ShownRoomId => gameObject.activeSelf ? _target.RoomId : null;
+
+        /// <summary>Left and right x of the drawn appliance in the house's local space.</summary>
+        public Vector2 SpanX => new Vector2(transform.localPosition.x - _width * 0.5f, transform.localPosition.x + _width * 0.5f);
+
+        /// <summary>
+        /// Draws the appliance flying in an arc from <paramref name="from"/> (house-local) to where it lands, for a
+        /// throw. The sim already has it at the landing spot; this only moves the drawing for a moment.
+        /// </summary>
+        public void FlyFrom(Vector3 from, float time)
+        {
+            _flyFrom = from;
+            _flyStart = time;
+        }
 
         /// <summary>Middle of the top edge of the drawn appliance, in the house's local space (for the "E" prompt).</summary>
         public Vector3 TopPoint => transform.localPosition + new Vector3(0f, _height, 0f);
@@ -91,8 +110,9 @@ namespace Trouble.Game
         public void Sync(HouseSim sim, bool selected, float time)
         {
             string socketId = _app.SeenSocketId ?? "";
+            string floorRoomId = _app.SeenFloorRoomId ?? "";
             var socket = socketId.Length > 0 ? sim.FindSocket(socketId) : null;
-            var room = socket != null ? sim.FindRoom(socket.RoomId) : null;
+            var room = socket != null ? sim.FindRoom(socket.RoomId) : floorRoomId.Length > 0 ? sim.FindRoom(floorRoomId) : null;
             if (room == null)
             {
                 if (gameObject.activeSelf) gameObject.SetActive(false);
@@ -101,13 +121,19 @@ namespace Trouble.Game
             if (!gameObject.activeSelf) gameObject.SetActive(true);
 
             _target.RoomId = room.Id;
-            float socketX = HouseLayout.SocketX(room.X, room.Width, socket.Pos);
-            float x = socketX + _config.socketSize * 0.5f + _width * 0.5f + 0.06f;
-            // Day mode: in front of the furnished room models so counters never hide an appliance sprite.
-            // Taller appliances sit a hair further back, so a kettle beside the fridge always draws in front of it
-            // (same sorting order otherwise ties and flips with the camera).
-            float z = sim.IsDayMode ? _config.dayFrontZ + _height * 0.02f : _config.roomDepth - _config.applianceInset;
-            transform.localPosition = new Vector3(x, HouseLayout.FloorY(room.Floor, _config.roomHeight), z);
+            float x = socket != null
+                ? HouseLayout.SocketX(room.X, room.Width, socket.Pos) + _config.socketSize * 0.5f + _width * 0.5f + 0.06f
+                : _app.SeenFloorX;
+            // Day mode: where the sim reaches it from, at the back of the walkable floor (in a socket) or where it lies,
+            // so the character walks up to it. Taller appliances sit a hair further back, so a kettle beside the fridge
+            // always draws in front of it (same sorting order otherwise ties and flips with the camera).
+            float depth = socket != null ? sim.Rules.walkDepthMetres : _app.SeenFloorZ;
+            float z = sim.IsDayMode ? _config.dayFrontZ + depth + _height * 0.02f : _config.roomDepth - _config.applianceInset;
+            var landed = new Vector3(x, HouseLayout.FloorY(room.Floor, _config.roomHeight), z);
+            float flight = (time - _flyStart) / Mathf.Max(0.01f, _config.throwFlightSeconds);
+            transform.localPosition = flight < 1f
+                ? Vector3.Lerp(_flyFrom, landed, flight) + Vector3.up * (4f * flight * (1f - flight) * _config.throwArcHeight)
+                : landed;
 
             bool ghost = !room.Visible;
             SetGhostOrder(ghost);
@@ -118,6 +144,8 @@ namespace Trouble.Game
 
             Color cardColor = _hasArt ? Color.white : (on ? _config.applianceCard : _config.applianceOffCard);
             if (_hasArt && on && !powered && !ghost) cardColor = new Color(0.6f, 0.6f, 0.6f);
+            // Day mode: not plugged in (put down with E, or lying on the floor) draws nothing until F.
+            if (sim.IsDayMode && (_app.SeenUnplugged || socket == null) && !ghost) cardColor = _config.unpluggedTint;
             cardColor.a = alpha;
             _card.color = cardColor;
             if (_outline != null)

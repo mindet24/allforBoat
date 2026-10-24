@@ -111,7 +111,7 @@ namespace Trouble.Game
             var hint = UiKit.Card(root, "KeyHints", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, inset), ui.keyHintSize, panel, ui, false);
             hint.sprite = UiArt.Pill;
             _hintRoot = (RectTransform)hint.transform.parent;
-            var hintText = UiKit.Fill(hint.transform, "Text", text.Get("g6_keys_hud"), 24, ui.cream, TextAlignmentOptions.Center, false);
+            var hintText = UiKit.Fill(hint.transform, "Text", text.Get(HudFormat.MoveKeys(sim, "g6_keys_hud")), 24, ui.cream, TextAlignmentOptions.Center, false);
             hintText.enableAutoSizing = true;
             hintText.fontSizeMin = 14;
             hintText.fontSizeMax = 24;

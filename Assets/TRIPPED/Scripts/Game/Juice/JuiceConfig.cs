@@ -25,7 +25,7 @@ namespace Trouble.Game
         [Header("Sound volumes, by name (a name missing here plays at 0.5)")]
         public SoundVolume[] soundVolumes =
         {
-            new SoundVolume(SynthBank.Step, 0.2f), new SoundVolume(SynthBank.StairsStep, 0.25f),
+            new SoundVolume(SynthBank.Step, 0.2f), new SoundVolume(SynthBank.Jump, 0.3f), new SoundVolume(SynthBank.Jetpack, 0.25f),
             new SoundVolume(SynthBank.Pickup, 0.5f), new SoundVolume(SynthBank.PlugIn, 0.6f),
             new SoundVolume(SynthBank.Reject, 0.45f),
             new SoundVolume(SynthBank.RequestNewRelaxed, 0.4f), new SoundVolume(SynthBank.RequestNewNormal, 0.45f),
@@ -64,8 +64,6 @@ namespace Trouble.Game
         [Header("Footsteps")]
         [Tooltip("Seconds between two footsteps while walking.")]
         public float stepInterval = 0.26f;
-        [Tooltip("Seconds between two footsteps while on the stairs.")]
-        public float climbStepInterval = 0.18f;
         [Tooltip("Pitch of the left and right foot alternate by this much around 1.")]
         public float stepPitchSpread = 0.08f;
 
@@ -166,9 +164,10 @@ namespace Trouble.Game
         public float leanDegrees = 8f;
         [Tooltip("How fast the lean follows (per second).")]
         public float leanSpeed = 12f;
-        [Tooltip("Hop height on the stairs and hops per second.")]
-        public float stairsHopHeight = 0.12f;
-        public float stairsHopHz = 5f;
+        [Tooltip("Pitch of the footstep played on landing.")]
+        public float landPitch = 0.8f;
+        [Tooltip("Seconds between two jetpack puffs while Space is held.")]
+        public float jetpackPuffInterval = 0.14f;
 
         [Header("Running appliances")]
         [Tooltip("Wobble (degrees) and speed of an appliance working on a request.")]

@@ -10,7 +10,7 @@ namespace Trouble.Tests
 {
     /// <summary>
     /// Day-mode keyboard prompts (<see cref="DayInteraction"/>) must show exactly what the sim does with E, W and S,
-    /// and the climb path (<see cref="HouseLayout.ClimbPoint"/>) must start and end where the sim puts the character.
+    /// and the character's feet (<see cref="HouseLayout.DayCharacterPoint"/>) must be where the sim puts them.
     /// </summary>
     public class DayInteractionTests
     {
@@ -58,12 +58,15 @@ namespace Trouble.Tests
             return sim;
         }
 
-        private static HouseSim Demo()
+        /// <summary>The shipped demo level, floors joined the way <paramref name="verticalMove"/> says (default: jumping).</summary>
+        private static HouseSim Demo(string verticalMove = "jump")
         {
             var level = JsonUtility.FromJson<LevelData>(Resources.Load<TextAsset>("Levels/level_demo").text);
             level.day.seed = 3;
             var catalog = new Catalog(JsonUtility.FromJson<CatalogData>(Resources.Load<TextAsset>("Config/catalog").text));
-            var sim = new HouseSim(level, Rules(), catalog, TestData.Strings());
+            var rules = Rules();
+            rules.verticalMove = verticalMove;
+            var sim = new HouseSim(level, rules, catalog, TestData.Strings());
             sim.Start();
             return sim;
         }
@@ -80,7 +83,16 @@ namespace Trouble.Tests
             Submit(sim, Command.Walk(0));
         }
 
+        /// <summary>Walks to <paramref name="metres"/> along the open front (where the doors are), then to the back wall, where sockets, plugged appliances and the panel are in reach.</summary>
         private static void WalkTo(HouseSim sim, float metres)
+        {
+            WalkDepthTo(sim, 0);
+            WalkAlong(sim, metres);
+            WalkDepthTo(sim, sim.BackZCm);
+        }
+
+        /// <summary>Holds A/D until the character is at <paramref name="metres"/>, at whatever depth it stands.</summary>
+        private static void WalkAlong(HouseSim sim, float metres)
         {
             int dir = Math.Sign(metres - sim.Character.X);
             if (dir == 0) return;
@@ -91,6 +103,32 @@ namespace Trouble.Tests
                 sim.Step();
             }
             Submit(sim, Command.Walk(0));
+        }
+
+        /// <summary>Holds W/S until the character is <paramref name="zCm"/> in from the open front.</summary>
+        private static void WalkDepthTo(HouseSim sim, int zCm)
+        {
+            int dir = Math.Sign(zCm - sim.Character.ZCm);
+            if (dir == 0) return;
+            Submit(sim, Command.WalkDepth(dir));
+            for (int guard = 0; guard < 1000 && Math.Sign(zCm - sim.Character.ZCm) == dir && !sim.Character.IsAirborne && sim.Phase == LevelPhase.Running; guard++)
+                sim.Step();
+            Submit(sim, Command.WalkDepth(0));
+        }
+
+        /// <summary>Starts a jump up from x 2 in the demo's living room (under the bedroom).</summary>
+        private static void JumpUp(HouseSim sim)
+        {
+            WalkAlong(sim, 2f);
+            Submit(sim, Command.Jump(1));
+        }
+
+        /// <summary>Takes off with the jetpack from x 2 in the demo's living room (under the bedroom): Space held, one tick.</summary>
+        private static void TakeOff(HouseSim sim)
+        {
+            WalkAlong(sim, 2f);
+            Submit(sim, Command.Thrust(true));
+            sim.Step();
         }
 
         // ---- E: what the prompt shows is what E does -------------------------------------
@@ -173,10 +211,12 @@ namespace Trouble.Tests
             Submit(sim, Command.Interact());
             WalkTo(sim, 2f);
             Submit(sim, Command.Interact());
+            Submit(sim, Command.TogglePlug());
             WalkTo(sim, 9f);
             Submit(sim, Command.Interact());
             WalkTo(sim, 4f);
             Submit(sim, Command.Interact());
+            Submit(sim, Command.TogglePlug());
             for (int i = 0; i < 60 && !DayInteraction.AnyBreakerOff(sim); i++) sim.Step();
             Assert.IsTrue(DayInteraction.AnyBreakerOff(sim), "The overload should have blacked out the house.");
             WalkTo(sim, 6.6f);
@@ -206,101 +246,80 @@ namespace Trouble.Tests
         }
 
         [Test]
-        public void WhileClimbing_NothingIsPrompted()
-        {
-            // Arrange: the demo starts by the stairs up to the bedroom.
-            var sim = Demo();
-            Submit(sim, Command.Climb(1));
-            sim.Step();
-            var stairs = new List<StairsPrompt>();
-
-            // Act
-            var target = DayInteraction.InteractTarget(sim);
-            DayInteraction.StairsInReach(sim, stairs);
-
-            // Assert
-            Assert.IsTrue(sim.Character.IsClimbing);
-            Assert.AreEqual(DayTargetKind.None, target.Kind);
-            Assert.IsEmpty(stairs);
-        }
-
-        // ---- W / S -----------------------------------------------------------------------
-
-        [Test]
-        public void AlongTheLivingRoom_StairsPromptMatchesWhetherClimbIsAccepted()
-        {
-            for (int ticks = 0; ticks <= 30; ticks += 2)
-            {
-                // Arrange
-                var sim = Demo();
-                WalkTicks(sim, 1, ticks);
-                var stairs = new List<StairsPrompt>();
-                DayInteraction.StairsInReach(sim, stairs);
-                bool upShown = stairs.Exists(p => p.Direction == 1);
-
-                // Act
-                bool accepted = sim.Submit(Command.Climb(1), out _);
-
-                // Assert
-                Assert.AreEqual(accepted, upShown, $"{ticks} ticks, x {sim.Character.X}");
-            }
-        }
-
-        [Test]
-        public void AtTheBedroomStairs_OnlyDownIsPrompted()
+        public void WhileJumping_NothingIsPrompted()
         {
             // Arrange
             var sim = Demo();
-            Submit(sim, Command.Climb(1));
-            for (int i = 0; i < 100 && sim.Character.IsClimbing; i++) sim.Step();
-            var stairs = new List<StairsPrompt>();
+            JumpUp(sim);
+            sim.Step();
 
             // Act
-            DayInteraction.StairsInReach(sim, stairs);
+            var e = DayInteraction.InteractTarget(sim);
+            var f = DayInteraction.PlugTarget(sim);
 
             // Assert
-            Assert.AreEqual("bedroom", sim.Character.RoomId);
-            Assert.AreEqual(1, stairs.Count);
-            Assert.AreEqual(-1, stairs[0].Direction);
-            Assert.AreEqual("S_living_bedroom", stairs[0].DoorId);
+            Assert.IsTrue(sim.Character.IsJumping);
+            Assert.AreEqual(DayTargetKind.None, e.Kind);
+            Assert.AreEqual(DayTargetKind.None, f.Kind);
         }
 
-        // ---- climb path --------------------------------------------------------------------
-
-        [TestCase(0f, 5f, 0f)]
-        [TestCase(1f, 5f, 3f)]
-        [TestCase(0.5f, 5f, 1.5f)]
-        public void ClimbPointGoingUp_StartsAndEndsAtStairsXAndPassesTheMiddle(float progress, float expectedX, float expectedY)
+        [TestCase(0f, 0f)]
+        [TestCase(1f, 3f)]
+        [TestCase(0.5f, 2.5f)]
+        public void JumpPoint_RisesFromTheFloorToTheNextWithTheArcOnTop(float progress, float expectedY)
         {
-            // Arrange + Act
-            var p = HouseLayout.ClimbPoint(5f, 0f, 3f, progress, 1f, 0.15f);
+            // Arrange + Act: floor 0 to floor 3, 1 m arc.
+            float y = HouseLayout.JumpPoint(0f, 3f, progress, 1f);
 
             // Assert
-            Assert.AreEqual(expectedX, p.x, 1e-4f);
-            Assert.AreEqual(expectedY, p.y, 1e-4f);
+            Assert.AreEqual(expectedY, y, 1e-4f);
         }
 
         [Test]
-        public void ClimbPointAtEndOfLanding_IsTheFootOfTheStairs()
+        public void DayCharacterPoint_HalfwayThroughAJump_IsAboveTheMiddleAtTheSimX()
         {
-            // Arrange + Act
-            var up = HouseLayout.ClimbPoint(5f, 0f, 3f, 0.15f, 1f, 0.15f);
-            var down = HouseLayout.ClimbPoint(5f, 3f, 0f, 0.85f, 1f, 0.15f);
+            // Arrange: living (floor 1, y 3) to bedroom (floor 2, y 6), 1 m arc.
+            var sim = Demo();
+            JumpUp(sim);
+            for (int i = 0; i < sim.Character.JumpTicks / 2; i++) sim.Step();
+
+            // Act
+            var p = HouseLayout.CharacterPoint(sim, 0f, 3f, 1f);
 
             // Assert
-            Assert.AreEqual(new Vector2(4f, 0f), up);
-            Assert.AreEqual(new Vector2(4f, 0f), down, "Going down runs the same path backwards.");
+            Assert.AreEqual(sim.Character.X, p.x, 1e-4f);
+            Assert.AreEqual(5.5f, p.y, 1e-3f);
         }
+
+        [Test]
+        public void WhileFlying_NothingIsPrompted()
+        {
+            // Arrange
+            var sim = Demo("jetpack");
+            TakeOff(sim);
+
+            // Act
+            var e = DayInteraction.InteractTarget(sim);
+            var f = DayInteraction.PlugTarget(sim);
+
+            // Assert
+            Assert.IsTrue(sim.Character.IsAirborne);
+            Assert.AreEqual(DayTargetKind.None, e.Kind);
+            Assert.AreEqual(DayTargetKind.None, f.Kind);
+        }
+
+        // ---- where the character is drawn -------------------------------------------------
 
         [Test]
         public void DayCharacterPoint_StandingIsTheSimXOnTheRoomFloor()
         {
-            // Arrange
+            // Arrange: walked, then stood still for a tick.
             var sim = Started();
             WalkTicks(sim, -1, 5);
+            sim.Step();
 
             // Act
-            var p = HouseLayout.CharacterPoint(sim, 0.5f, 3f, 1f, 0.15f);
+            var p = HouseLayout.CharacterPoint(sim, 0.5f, 3f);
 
             // Assert
             Assert.AreEqual(sim.Character.X, p.x, 1e-4f);
@@ -308,20 +327,133 @@ namespace Trouble.Tests
         }
 
         [Test]
-        public void DayCharacterPoint_HalfwayUpTheStairs_IsBetweenTheFloorsAtStairsX()
+        public void DayCharacterPoint_Walking_GlidesBetweenWhereTheTickStartedAndEnded()
         {
-            // Arrange: living (floor 1) to bedroom (floor 2) over 20 ticks.
-            var sim = Demo();
-            Submit(sim, Command.Climb(1));
-            for (int i = 0; i < sim.Character.ClimbTicks / 2; i++) sim.Step();
-            float stairsX = sim.StairsX(sim.FindDoor("S_living_bedroom"));
+            // Arrange: mid-walk to the left.
+            var sim = Started();
+            Submit(sim, Command.Walk(-1));
+            sim.Step();
+            sim.Step();
+            float before = sim.Character.PrevXCm / 100f;
+            float after = sim.Character.X;
 
             // Act
-            var p = HouseLayout.CharacterPoint(sim, 0f, 3f, 1f, 0.15f);
+            float atStart = HouseLayout.CharacterPoint(sim, 0f, 3f).x;
+            float half = HouseLayout.CharacterPoint(sim, 0.5f, 3f).x;
+            float atEnd = HouseLayout.CharacterPoint(sim, 1f, 3f).x;
 
             // Assert
-            Assert.AreEqual(stairsX, p.x, 1e-3f);
-            Assert.AreEqual(4.5f, p.y, 1e-3f);
+            Assert.Less(after, before);
+            Assert.AreEqual(before, atStart, 1e-4f);
+            Assert.AreEqual((before + after) * 0.5f, half, 1e-4f);
+            Assert.AreEqual(after, atEnd, 1e-4f);
+        }
+
+        [Test]
+        public void DayZ_WalkingIn_GlidesBetweenTicks()
+        {
+            // Arrange: one tick of W from the open front.
+            var sim = Started();
+            Submit(sim, Command.WalkDepth(1));
+            sim.Step();
+
+            // Act
+            float half = HouseLayout.DayZ(sim.Character, 0.5f);
+
+            // Assert
+            Assert.AreEqual(0f, sim.Character.PrevZCm);
+            Assert.Greater(sim.Character.ZCm, 0);
+            Assert.AreEqual(sim.Character.ZCm / 200f, half, 1e-4f);
+        }
+
+        [Test]
+        public void DayCharacterPoint_Flying_IsTheSimHeightAboveTheRoomFloor()
+        {
+            // Arrange: living room floor at y 3, a few ticks into the climb.
+            var sim = Demo("jetpack");
+            TakeOff(sim);
+            sim.Step();
+            sim.Step();
+
+            // Act
+            var p = HouseLayout.CharacterPoint(sim, 0f, 3f);
+
+            // Assert
+            Assert.AreEqual(sim.Character.X, p.x, 1e-4f);
+            Assert.AreEqual(3f + sim.Character.AirCm / 100f, p.y, 1e-4f);
+            Assert.Greater(sim.Character.AirCm, 0);
+        }
+
+        [Test]
+        public void DayCharacterPoint_Flying_MovesOnBySpeedBetweenTicks()
+        {
+            // Arrange
+            var sim = Demo("jetpack");
+            TakeOff(sim);
+
+            // Act
+            var atTick = HouseLayout.CharacterPoint(sim, 0f, 3f);
+            var half = HouseLayout.CharacterPoint(sim, 0.5f, 3f);
+
+            // Assert
+            Assert.AreEqual(atTick.y + sim.Character.VyCm * 0.5f / 100f, half.y, 1e-4f);
+        }
+
+        // ---- F: the plug prompt matches what F does --------------------------------------------
+
+        [Test]
+        public void PutDownUnplugged_PlugTargetIsThatApplianceToPlugIn()
+        {
+            // Arrange: pick the kettle up and put it straight back down (unplugged).
+            var sim = Started();
+            WalkTo(sim, 7.5f);
+            Submit(sim, Command.Interact());
+            Submit(sim, Command.Interact());
+
+            // Act
+            var target = DayInteraction.PlugTarget(sim);
+            bool accepted = sim.Submit(Command.TogglePlug(), out _);
+
+            // Assert
+            Assert.AreEqual(DayTargetKind.Appliance, target.Kind);
+            Assert.AreEqual("kettle", target.Id);
+            Assert.IsTrue(target.PlugIn);
+            Assert.IsTrue(accepted);
+            Assert.IsFalse(sim.FindAppliance("kettle").Unplugged);
+        }
+
+        [Test]
+        public void EverythingPluggedIn_PlugTargetWouldUnplug()
+        {
+            // Arrange: the day starts with every appliance plugged in.
+            var sim = Started();
+            WalkTo(sim, 7.5f);
+
+            // Act
+            var target = DayInteraction.PlugTarget(sim);
+
+            // Assert
+            Assert.AreEqual("kettle", target.Id);
+            Assert.IsFalse(target.PlugIn);
+        }
+
+        [Test]
+        public void FloorModeCarrying_InteractTargetsTheFloorUnderTheCharacter()
+        {
+            // Arrange
+            var rules = Rules();
+            rules.placeMode = "floor";
+            var sim = new HouseSim(TwoRooms(), rules, TestData.Catalog(), TestData.Strings());
+            sim.Start();
+            WalkTo(sim, 7.5f);
+            Submit(sim, Command.Interact());
+
+            // Act
+            var target = DayInteraction.InteractTarget(sim);
+
+            // Assert
+            Assert.AreEqual(DayTargetKind.Floor, target.Kind);
+            Assert.AreEqual(sim.Character.X, target.X, 1e-4f);
         }
 
         // ---- panel art import --------------------------------------------------------------

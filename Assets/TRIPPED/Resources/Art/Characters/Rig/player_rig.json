@@ -1,0 +1,48 @@
+{
+  "canvas": 512,
+  "contentHeight": 481,
+  "parts": [
+    {
+      "name": "legL",
+      "pivotX": 223,
+      "pivotY": 105,
+      "order": 0,
+      "pixels": 5955
+    },
+    {
+      "name": "legR",
+      "pivotX": 287,
+      "pivotY": 105,
+      "order": 0,
+      "pixels": 5700
+    },
+    {
+      "name": "body",
+      "pivotX": 255,
+      "pivotY": 109,
+      "order": 1,
+      "pixels": 23661
+    },
+    {
+      "name": "armL",
+      "pivotX": 229,
+      "pivotY": 289,
+      "order": 2,
+      "pixels": 2887
+    },
+    {
+      "name": "armR",
+      "pivotX": 283,
+      "pivotY": 289,
+      "order": 2,
+      "pixels": 2449
+    },
+    {
+      "name": "head",
+      "pivotX": 255,
+      "pivotY": 305,
+      "order": 3,
+      "pixels": 30694
+    }
+  ]
+}

@@ -6,12 +6,16 @@ using UnityEngine;
 namespace Trouble.Game
 {
     /// <summary>
-    /// The player character: a sprite standing on the floor, moved along the path the sim reports (ADR-0001).
-    /// Uses player_{idle,walk,interact,panic}.png strips when they exist, else a placeholder capsule.
+    /// The player character standing on the floor, moved along the path the sim reports (ADR-0001). Drawn as the
+    /// cut-out rig (<see cref="RigView"/>, Art/Characters/Rig) when its art is there: it walks, runs up stairs, carries
+    /// overhead, and plays a lift, put-down, throw or plug move when that command is accepted. Otherwise the
+    /// player_{idle,walk,interact,panic}.png strips, else a placeholder capsule.
     /// The queued actions are listed above its head.
     /// </summary>
     public sealed class CharacterView : MonoBehaviour
     {
+        /// <summary>Day mode sorting order: above appliance sprites (0..3) and family (-2), below room overlays (10).</summary>
+        private const int DaySortingOrder = 9;
         private TrippedViewConfig _config;
         private ArtLibrary _art;
         private SpriteRenderer _sprite;
@@ -19,9 +23,12 @@ namespace Trouble.Game
         private SpriteRenderer _carryCard;
         private TextMeshPro _carryText;
         private SpriteRenderer _carrySprite;
+        private SpriteRenderer _flame;
+        private RigView _rig;
+        /// <summary>What was carried at the end of the last frame, to tell a pick-up from a put-down.</summary>
+        private string _lastCarry = "";
         private string _shownCarry = "~";
-        private bool _placed;
-        private Vector2 _shown;
+        private Vector3 _shown3;
         private float _lastX;
         private bool _facingLeft;
         private readonly System.Collections.Generic.List<Command> _shownCommands = new System.Collections.Generic.List<Command>();
@@ -52,12 +59,27 @@ namespace Trouble.Game
             go.transform.localScale = Vector3.one * config.playerWorldHeight;
             _sprite = go.AddComponent<SpriteRenderer>();
             _sprite.sprite = PlaceholderArt.Character;
-            // Drawn before appliances and socket faces so gameplay objects stay readable in front of it.
+            // Other levels: drawn before appliances and socket faces so gameplay objects stay readable in front of it
+            // (day mode draws it on top, see Sync).
             _sprite.sortingOrder = -1;
+            _rig = RigView.TryCreate(transform, RigConfig.LoadOrDefault(), config.playerWorldHeight, -1);
+            if (_rig != null) _sprite.enabled = false;
             _queueText = Prims.Text(transform, "Queue", new Vector3(0f, config.playerWorldHeight + 0.35f, 0f),
                 new Vector2(2.4f, 0.6f), "", config.roomNameText, 1.6f, TextAlignmentOptions.Bottom, false);
             _queueText.textWrappingMode = TextWrappingModes.Normal;
             _queueText.sortingOrder = 6;
+
+            // Day mode jetpack flame, under the feet, shown while Space is held.
+            var flame = new GameObject("JetpackFlame");
+            flame.transform.SetParent(transform, false);
+            flame.transform.localPosition = new Vector3(0f, -0.05f, 0.02f);
+            _flame = flame.AddComponent<SpriteRenderer>();
+            _flame.sprite = PlaceholderArt.WorldRounded;
+            _flame.drawMode = SpriteDrawMode.Sliced;
+            _flame.size = config.jetpackFlameSize;
+            _flame.color = config.jetpackFlameColor;
+            _flame.sortingOrder = DaySortingOrder - 1;
+            flame.SetActive(false);
 
             // What the character carries (day mode): a small card above the head.
             var carry = new GameObject("Carrying");
@@ -88,25 +110,23 @@ namespace Trouble.Game
         public void Sync(HouseSim sim, float tickFraction, float time)
         {
             var ch = sim.Character;
-            var p = HouseLayout.CharacterPoint(sim, tickFraction, _config.roomHeight, _config.stairsHalfRun, _config.stairsLanding);
+            var p = HouseLayout.CharacterPoint(sim, tickFraction, _config.roomHeight, _config.jumpArc);
             bool day = sim.IsDayMode;
             if (day)
             {
-                // The sim moves in whole ticks; glide after it so walking looks smooth. A big jump (a restart) snaps.
-                float step = _config.characterFollowSpeed * Time.unscaledDeltaTime;
-                if (!_placed || ch.IsClimbing || (p - _shown).sqrMagnitude > 4f) _shown = p;
-                else _shown = Vector2.MoveTowards(_shown, p, step);
-                _placed = true;
-                p = _shown;
+                // The sim moves in whole ticks; the point and depth are already glided between ticks
+                // (HouseLayout.DayX / DayZ), so walking along, in and out moves every frame at a steady speed.
+                _shown3 = new Vector3(p.x, p.y, _config.dayFrontZ + HouseLayout.DayZ(ch, tickFraction));
+                p = _shown3;
                 _facingLeft = ch.Facing < 0;
             }
             else
             {
                 if (Mathf.Abs(p.x - _lastX) > 0.0005f) _facingLeft = p.x < _lastX;
             }
-            // Day mode: in front of the furnished room models (their open front is z = 0), so counters and sofas never
-            // hide the character. Sorting order still decides what draws over what among the sprites.
-            float z = day ? _config.dayFrontZ : _config.roomDepth - _config.characterInset;
+            // Day mode: at its depth on the walkable floor (W/S), from just in front of the furnished room models'
+            // open front (z = 0) inward, so furniture it walks behind hides it.
+            float z = day ? _shown3.z : _config.roomDepth - _config.characterInset;
             transform.localPosition = new Vector3(p.x, p.y, z);
             if (_carrySprite != null)
             {
@@ -117,18 +137,35 @@ namespace Trouble.Game
                 if (!Mathf.Approximately(lp.z, wantZ)) _carrySprite.transform.localPosition = new Vector3(lp.x, lp.y, wantZ);
             }
             _lastX = p.x;
+            // Day mode: the player is drawn over the appliance and family sprites standing at the same depth (but
+            // under a dark room's overlay); other levels keep it behind gameplay objects.
+            int order = day ? DaySortingOrder : -1;
+            if (_sprite.sortingOrder != order) _sprite.sortingOrder = order;
+            if (_rig != null) _rig.SortingOrder = order;
 
-            bool walking = day ? ch.WalkDir != 0 || ch.IsClimbing : ch.IsWalking;
+            bool walking = day ? ch.WalkDir != 0 && !ch.IsAirborne : ch.IsWalking;
+            bool flame = day && ch.Thrusting && sim.Phase == LevelPhase.Running;
+            if (_flame.gameObject.activeSelf != flame) _flame.gameObject.SetActive(flame);
+            if (flame) _flame.transform.localScale = new Vector3(1f, 0.8f + 0.35f * Mathf.Abs(Mathf.Sin(time * 31f)), 1f);
             string state = sim.Phase == LevelPhase.Lost ? "panic"
                 : walking ? "walk"
                 : ch.InteractTicksLeft > 0 ? "interact"
                 : "idle";
-            var frames = _art.CharacterFrames(state) ?? _art.CharacterFrames("idle");
-            if (frames != null && frames.Length > 0)
+            var frames = _rig != null ? null : _art.CharacterFrames(state) ?? _art.CharacterFrames("idle");
+            if (_rig != null)
+            {
+                bool climbing = day && ch.OnStairs && ch.WalkDir != 0;
+                bool carrying = (ch.CarryingId ?? "").Length > 0;
+                _rig.Sync(walking && !climbing, climbing, day && ch.IsAirborne, carrying, _facingLeft, time);
+            }
+            else if (frames != null && frames.Length > 0)
             {
                 int frame = (int)(time * _config.animationFps) % frames.Length;
                 _sprite.sprite = frames[frame];
                 _sprite.flipX = _facingLeft;
+                // One drawn frame (no walk strip): bob while walking so the art still reads as moving.
+                float bob = walking && frames.Length == 1 ? Mathf.Abs(Mathf.Sin(time * 12f)) * 0.06f : 0f;
+                _sprite.transform.localPosition = new Vector3(0f, bob, 0f);
             }
             else
             {
@@ -142,6 +179,31 @@ namespace Trouble.Game
 
             SyncCarry(sim);
             SyncQueue(sim);
+            _lastCarry = ch.CarryingId ?? "";
+        }
+
+        /// <summary>
+        /// Plays the rig's one-off move for an accepted day-mode command: E that picked something up lifts it, E that
+        /// put it down sets it down, hold-E throws, F reaches for the socket.
+        /// </summary>
+        public void OnCommandAccepted(Command command, HouseSim sim)
+        {
+            if (_rig == null || sim == null || !sim.IsDayMode) return;
+            string now = sim.Character.CarryingId ?? "";
+            switch (command.Type)
+            {
+                case CommandType.Throw:
+                    _rig.Play(RigAction.Throw);
+                    break;
+                case CommandType.TogglePlug:
+                    _rig.Play(RigAction.Plug);
+                    break;
+                case CommandType.Interact:
+                    if (_lastCarry.Length == 0 && now.Length > 0) _rig.Play(RigAction.Lift);
+                    else if (_lastCarry.Length > 0 && now.Length == 0) _rig.Play(RigAction.PutDown);
+                    break;
+            }
+            _lastCarry = now;
         }
 
         private void SyncCarry(HouseSim sim)

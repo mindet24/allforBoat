@@ -14,7 +14,8 @@ namespace Trouble.Game
     {
         // Player
         public const string Step = "step";
-        public const string StairsStep = "stairs_step";
+        public const string Jump = "jump";
+        public const string Jetpack = "jetpack";
         public const string Pickup = "pickup";
         public const string PlugIn = "plug_in";
         public const string Reject = "reject";
@@ -68,7 +69,7 @@ namespace Trouble.Game
         {
             string[] fixedNames =
             {
-                Step, StairsStep, Pickup, PlugIn, Reject,
+                Step, Jump, Jetpack, Pickup, PlugIn, Reject,
                 RequestNewRelaxed, RequestNewNormal, RequestNewUrgent, RequestDone, RequestMissed, UrgentTick, HeartLost, ComboUp,
                 OverloadHum, Spark, Blackout, PowerUp, BreakerFlip, ToasterPop,
                 UiHover, UiClick, UiBack, UiPause, CountdownBeep, DayStart,
@@ -111,8 +112,9 @@ namespace Trouble.Game
         {
             switch (name)
             {
-                case Step: return 0.07f;
-                case StairsStep: return 0.08f;
+                case Step: return 0.09f;
+                case Jump: return 0.18f;
+                case Jetpack: return 0.16f;
                 case Pickup: return 0.2f;
                 case PlugIn: return 0.11f;
                 case Reject: return 0.28f;
@@ -167,8 +169,18 @@ namespace Trouble.Game
             var g = new Gen(s, sampleRate, Seed(name));
             switch (name)
             {
-                case Step: g.Thump(0, n, 140, 70, 30, 0.8); g.Noise(0, n / 3, 0.6, 40, 0.3); break;
-                case StairsStep: g.Thump(0, n, 220, 110, 28, 0.7); g.Tone(0, n / 2, 520, Wave.Triangle, 0.3, 35); g.Noise(0, n / 4, 0.5, 50, 0.4); break;
+                case Step:
+                {
+                    // Barefoot on a wooden floor: a soft fleshy thud from the ball of the foot, the bright slap of skin
+                    // landing flat a few milliseconds later, and a dull pat under both. No click of a heel or sole.
+                    int slap = (int)(0.006 * sampleRate);
+                    g.Thump(0, n, 120, 58, 42, 0.7);
+                    g.Noise(0, n, 0.45, 70, 0.25);
+                    g.Noise(slap, n, 0.8, 150, 0.9);
+                    break;
+                }
+                case Jump: g.Sweep(0, n, 240, 760, Wave.Triangle, 0.9, 6, true); g.Noise(0, n / 4, 0.4, 50, 0.3); break;
+                case Jetpack: g.Noise(0, n, 0.8, 14, 0.25); g.Sweep(0, n, 180, 90, Wave.Triangle, 0.35, 10, true); break;
                 case Pickup: g.Sweep(0, n, 320, 1100, Wave.Sine, 1, 6, true); g.Sweep(0, n, 640, 2200, Wave.Sine, 0.25, 6, true); break;
                 case PlugIn:
                 {

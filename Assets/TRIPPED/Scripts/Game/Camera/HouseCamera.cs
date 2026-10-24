@@ -15,8 +15,10 @@ namespace Trouble.Game
     /// <remarks>
     /// The camera is moved through a parent pivot ("CameraRig"); the camera's own local position and rotation are
     /// never written after <see cref="Setup"/>, so a shake component may offset <see cref="ShakeTarget"/> freely.
-    /// Day mode (<see cref="FollowDay"/>): the view follows the character's room and holding the overview key
-    /// (Tab / Q, <see cref="TrippedViewConfig.overviewKey"/>) shows the whole house.
+    /// Day mode (<see cref="FollowDay"/>): the view follows the character closely and holding the overview key
+    /// (Tab / Q, <see cref="TrippedViewConfig.overviewKey"/>) shows the whole house. The player sets the angle by
+    /// right-dragging (turn left / right, tilt up / down, within the config's limits); middle-click or Home puts it
+    /// back. The follow zoom is fixed (no wheel).
     /// </remarks>
     [RequireComponent(typeof(Camera))]
     [DefaultExecutionOrder(-50)]
@@ -50,6 +52,14 @@ namespace Trouble.Game
         private HouseSim _daySim;
         private float _followVelX;
         private float _followVelY;
+        // The camera's angle: looking down by _tilt and turned by _yaw, easing toward the player's choice.
+        private float _tilt;
+        private float _yaw;
+        private float _targetTilt;
+        private float _targetYaw;
+        private float _tiltVelocity;
+        private float _yawVelocity;
+        private bool _orbiting;
 
         /// <summary>Name of the pivot object the camera hangs under.</summary>
         public const string RigName = "CameraRig";
@@ -89,6 +99,10 @@ namespace Trouble.Game
             if (_daySim != sim) return;
             _daySim = null;
             Overview = false;
+            _orbiting = false;
+            // Other levels always look from the config's angle.
+            _tilt = _targetTilt = _config.cameraTilt;
+            _yaw = _targetYaw = 0f;
         }
 
         /// <summary>
@@ -117,6 +131,30 @@ namespace Trouble.Game
         /// <summary>Current view height in world metres.</summary>
         public float ViewHeight => _distance;
 
+        /// <summary>Degrees the camera looks down now.</summary>
+        public float Tilt => _tilt;
+
+        /// <summary>Degrees the camera is turned now (positive = looking right).</summary>
+        public float Yaw => _yaw;
+
+        /// <summary>
+        /// Day mode: sets the angle the camera eases to, kept within the config's limits (the same thing a right-drag
+        /// does). <paramref name="snap"/> = no easing.
+        /// </summary>
+        public void SetDayView(float tilt, float yaw, bool snap)
+        {
+            _targetTilt = Mathf.Clamp(tilt, _config.cameraTiltRange.x, _config.cameraTiltRange.y);
+            _targetYaw = Mathf.Clamp(yaw, -_config.cameraYawLimit, _config.cameraYawLimit);
+            if (!snap) return;
+            _tilt = _targetTilt;
+            _yaw = _targetYaw;
+            _tiltVelocity = _yawVelocity = 0f;
+            Apply();
+        }
+
+        /// <summary>Day mode: back to the config's angle.</summary>
+        public void ResetDayView(bool snap) => SetDayView(_config.cameraTilt, 0f, snap);
+
         /// <summary>The Unity camera, for ray casts.</summary>
         public Camera Cam => _camera;
 
@@ -135,7 +173,7 @@ namespace Trouble.Game
         {
             if (_config == null || _config.orthographic)
                 return CameraMath.PlaneToViewportForHeight(position, viewHeight, Aspect(), point);
-            return CameraMath.WorldToViewportTilted(position, FocusZ, viewHeight, _config.fieldOfView, _config.cameraTilt, Aspect(), point);
+            return CameraMath.WorldToViewportTilted(position, FocusZ, viewHeight, _config.fieldOfView, _tilt, Aspect(), point, _yaw);
         }
 
         /// <summary>Zooms to a view height (clamped to the zoom limits). <paramref name="snap"/> = no easing.</summary>
@@ -193,6 +231,8 @@ namespace Trouble.Game
             }
             transform.localPosition = Vector3.zero;
             transform.localRotation = Quaternion.identity;
+            _tilt = _targetTilt = config.cameraTilt;
+            _yaw = _targetYaw = 0f;
         }
 
         /// <summary>Frames a new house and jumps to the whole-house view.</summary>
@@ -244,27 +284,28 @@ namespace Trouble.Game
                     if (_config.overviewAltKey != Key.None) held |= kb[_config.overviewAltKey].isPressed;
                 }
                 Overview = held;
+                DayAngleInput(kb, mouse);
                 return;
             }
 
             if (kb != null)
             {
-                if (kb.fKey.wasPressedThisFrame)
+                if (KeyDown(kb, _config.followKey))
                 {
                     Following = !Following;
                     _atHome = false;
                 }
-                if (kb.homeKey.wasPressedThisFrame)
+                if (KeyDown(kb, _config.homeKey))
                 {
                     Following = false;
                     Home(false);
                 }
 
                 var pan = Vector2.zero;
-                if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) pan.x -= 1f;
-                if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) pan.x += 1f;
-                if (kb.wKey.isPressed || kb.upArrowKey.isPressed) pan.y += 1f;
-                if (kb.sKey.isPressed || kb.downArrowKey.isPressed) pan.y -= 1f;
+                if (KeyHeld(kb, _config.walkLeftKey) || KeyHeld(kb, _config.walkLeftAltKey)) pan.x -= 1f;
+                if (KeyHeld(kb, _config.walkRightKey) || KeyHeld(kb, _config.walkRightAltKey)) pan.x += 1f;
+                if (KeyHeld(kb, _config.walkInKey) || KeyHeld(kb, _config.walkInAltKey)) pan.y += 1f;
+                if (KeyHeld(kb, _config.walkOutKey) || KeyHeld(kb, _config.walkOutAltKey)) pan.y -= 1f;
                 if (!KeyPan) pan = Vector2.zero;
                 if (pan != Vector2.zero)
                 {
@@ -342,7 +383,33 @@ namespace Trouble.Game
             Apply();
         }
 
-        /// <summary>Day mode: ease toward the follow view of the character's room, or the overview while it is held.</summary>
+        /// <summary>
+        /// Day mode: right-drag turns (sideways) and tilts (up and down) the camera, middle-click or Home resets it.
+        /// Drags that start over the HUD are left to it.
+        /// </summary>
+        private void DayAngleInput(Keyboard kb, Mouse mouse)
+        {
+            if (kb != null && KeyDown(kb, _config.homeKey)) ResetDayView(false);
+            if (mouse == null) return;
+            Vector2 mousePos = mouse.position.ReadValue();
+            bool overUi = UiHit.IsOverUi(mousePos);
+            if (mouse.middleButton.wasPressedThisFrame && !overUi) ResetDayView(false);
+
+            if (mouse.rightButton.wasPressedThisFrame && !overUi)
+            {
+                _orbiting = true;
+                _lastMouse = mousePos;
+            }
+            if (!mouse.rightButton.isPressed) _orbiting = false;
+            if (!_orbiting) return;
+            var delta = mousePos - _lastMouse;
+            _lastMouse = mousePos;
+            if (delta == Vector2.zero) return;
+            // Drag right = the camera swings left and looks right; drag up = look further down.
+            SetDayView(_targetTilt + delta.y * _config.orbitDegreesPerPixel, _targetYaw + delta.x * _config.orbitDegreesPerPixel, false);
+        }
+
+        /// <summary>Day mode: ease toward the follow view of the character, or the overview while it is held.</summary>
         private void DayLateUpdate()
         {
             float aspect = Aspect();
@@ -364,12 +431,12 @@ namespace Trouble.Game
             else
             {
                 var ch = _daySim.Character;
-                var room = _daySim.FindRoom(ch.IsClimbing && !string.IsNullOrEmpty(ch.ClimbToRoomId) ? ch.ClimbToRoomId : ch.RoomId);
+                var room = _daySim.FindRoom(ch.RoomId);
                 var feet = _followPoint();
-                float roomW = room != null ? room.Width : 6f;
-                float h = FollowFraming.ViewHeight(roomW, rh, aspect, _config.followNeighbourPeek, _config.followMinFloors, overviewHeight);
+                float h = FollowFraming.ViewHeight(rh, _config.followFloors, overviewHeight);
                 float fx = room != null ? FollowFraming.FocusX(feet.x, room.X, room.X + room.Width, _config.followRoomLock) : feet.x;
-                var focus = new Vector2(fx, feet.y + rh * 0.5f);
+                // The character's middle, not the room's: up close the room's middle would push its feet under the HUD.
+                var focus = new Vector2(fx, feet.y + _config.playerWorldHeight * 0.5f);
                 var centre = FollowFraming.Center(focus, h, aspect, _config.followScreenAnchor);
                 _targetDistance = h;
                 _targetPosition = FollowFraming.ClampToBounds(centre, h, aspect, pad);
@@ -379,6 +446,10 @@ namespace Trouble.Game
             _distance = Mathf.SmoothDamp(_distance, _targetDistance, ref _distanceVelocity, zoomSmooth, Mathf.Infinity, dt);
             _position.x = Mathf.SmoothDamp(_position.x, _targetPosition.x, ref _followVelX, Mathf.Max(0.01f, _config.followSmoothTime), Mathf.Infinity, dt);
             _position.y = Mathf.SmoothDamp(_position.y, _targetPosition.y, ref _followVelY, Mathf.Max(0.01f, _config.followFloorSmoothTime), Mathf.Infinity, dt);
+            // The overview always shows the house straight from the config's angle; the follow view uses the player's.
+            float angleSmooth = Mathf.Max(0.01f, _config.cameraAngleSmoothTime);
+            _tilt = Mathf.SmoothDamp(_tilt, Overview ? _config.cameraTilt : _targetTilt, ref _tiltVelocity, angleSmooth, Mathf.Infinity, dt);
+            _yaw = Mathf.SmoothDamp(_yaw, Overview ? 0f : _targetYaw, ref _yawVelocity, angleSmooth, Mathf.Infinity, dt);
             Apply();
         }
 
@@ -389,7 +460,7 @@ namespace Trouble.Game
             var viewport = new Vector2(screenPos.x / Mathf.Max(1, Screen.width), screenPos.y / Mathf.Max(1, Screen.height));
             var point = _config.orthographic
                 ? CameraMath.ViewportToPlaneForHeight(_targetPosition, _targetDistance, aspect, viewport)
-                : CameraMath.ViewportToPlaneTilted(_targetPosition, FocusZ, _targetDistance, _config.fieldOfView, _config.cameraTilt, aspect, viewport);
+                : CameraMath.ViewportToPlaneTilted(_targetPosition, FocusZ, _targetDistance, _config.fieldOfView, _tilt, aspect, viewport, _yaw);
             _targetPosition = CameraMath.ZoomToward(_targetPosition, _targetDistance, newDistance, point);
             _targetDistance = newDistance;
         }
@@ -406,10 +477,13 @@ namespace Trouble.Game
             else
             {
                 _camera.orthographic = false;
-                Pivot.position = CameraMath.TiltedCameraPosition(_position, FocusZ, _distance, _config.fieldOfView, _config.cameraTilt);
-                Pivot.rotation = Quaternion.Euler(_config.cameraTilt, 0f, 0f);
+                Pivot.position = CameraMath.TiltedCameraPosition(_position, FocusZ, _distance, _config.fieldOfView, _tilt, _yaw);
+                Pivot.rotation = Quaternion.Euler(_tilt, _yaw, 0f);
             }
         }
+
+        private static bool KeyHeld(Keyboard kb, Key key) => key != Key.None && kb[key].isPressed;
+        private static bool KeyDown(Keyboard kb, Key key) => key != Key.None && kb[key].wasPressedThisFrame;
 
         private Transform Pivot => _rig != null ? _rig : transform;
 

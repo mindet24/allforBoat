@@ -34,5 +34,37 @@ namespace Trouble.Tests
             Assert.IsFalse(RoomModelRules.Hides("Kitchen_Window", always, whenRescaled, true));
             Assert.IsFalse(RoomModelRules.Hides("Fridge", null, null, true));
         }
+
+        [Test]
+        public void ShowsRandomPart_FixedPart_IsAlwaysThere()
+        {
+            // Act + Assert
+            Assert.IsTrue(RoomModelRules.ShowsRandomPart("Workshop_Workbench", "workshop", 123, 0f));
+        }
+
+        [Test]
+        public void ShowsRandomPart_ChanceZeroOrOne_HidesOrShowsEveryOptionalPart()
+        {
+            // Act + Assert
+            Assert.IsFalse(RoomModelRules.ShowsRandomPart("Workshop_Bike_Random", "workshop", 123, 0f));
+            Assert.IsTrue(RoomModelRules.ShowsRandomPart("Workshop_Bike_Random", "workshop", 123, 1f));
+        }
+
+        [Test]
+        public void ShowsRandomPart_SameDay_SameAnswer_OtherDays_Vary()
+        {
+            // Arrange
+            bool first = RoomModelRules.ShowsRandomPart("Workshop_Bike_Random", "workshop", 77, 0.5f);
+            int shown = 0;
+
+            // Act
+            bool again = RoomModelRules.ShowsRandomPart("Workshop_Bike_Random", "workshop", 77, 0.5f);
+            for (int seed = 1; seed <= 200; seed++)
+                if (RoomModelRules.ShowsRandomPart("Workshop_Bike_Random", "workshop", seed, 0.5f)) shown++;
+
+            // Assert: stable for one day, and roughly half the days at chance 0.5.
+            Assert.AreEqual(first, again);
+            Assert.That(shown, Is.InRange(60, 140));
+        }
     }
 }

@@ -76,11 +76,27 @@ MonoBehaviour:
   applianceInset: 0.6
   characterInset: 0.2
   socketDepth: 0.3
-  playerWorldHeight: 1.4
+  playerWorldHeight: 1.2
   animationFps: 8
+  targetFrameRate: 60
+  vSyncCount: 1
   orthographic: 0
   fieldOfView: 30
   cameraTilt: 10
+  cameraTiltRange: {x: 0, y: 40}
+  cameraYawLimit: 35
+  orbitDegreesPerPixel: 0.2
+  cameraAngleSmoothTime: 0.08
+  roomLights: 1
+  roomLightColor: {r: 1, g: 0.83137256, b: 0.6039216, a: 1}
+  roomLightIntensity: 2.2
+  roomLightRange: 7
+  roomLightDrop: 0.45
+  roomLightDepth: 0.35
+  roomLightFadeIn: 0.4
+  roomLightFlicker: 0.35
+  sunIntensity: 0.55
+  ambientIntensity: 0.65
   zoomStep: 0.15
   zoomSmoothTime: 0.15
   homeMargin: 0.1
@@ -112,21 +128,54 @@ MonoBehaviour:
   daySocket: {r: 0.9372549, g: 0.8901961, b: 0.8117647, a: 1}
   blackoutOverlay: {r: 0, g: 0, b: 0, a: 0.62}
   cardExitSeconds: 0.7
-  stairsHalfRun: 1
-  stairsLanding: 0.15
+  followFloors: 1.5
+  followRoomLock: 0.1
+  followScreenAnchor: {x: 0.5, y: 0.45}
+  followSmoothTime: 0.16
+  followFloorSmoothTime: 0.25
+  overviewSmoothTime: 0.25
+  followBoundsPad: 0.6
+  overviewKey: 3
+  overviewAltKey: 31
+  overviewArea:
+    serializedVersion: 2
+    x: 0.03
+    y: 0.13
+    width: 0.94
+    height: 0.66
+  overviewMargin: 0.04
+  jumpArc: 0.8
+  occluderAlpha: 0.25
+  occluderFadeSpeed: 4
+  neverFadeParts:
+  - Floor
+  - Foundation
   characterFollowSpeed: 6
+  interactKey: 19
+  plugKey: 20
+  throwHoldSeconds: 0.35
+  throwFlightSeconds: 0.45
+  throwArcHeight: 1
+  unpluggedTint: {r: 0.55, g: 0.55, b: 0.6, a: 1}
   carryIconHeight: 0.55
   dayOverlayZ: -0.45
   promptBack: {r: 0.11764706, g: 0.11764706, b: 0.14117648, a: 0.9019608}
   promptText: {r: 1, g: 0.8784314, b: 0.4, a: 1}
   promptSize: {x: 0.5, y: 0.42}
-  stairsPromptSize: {x: 0.8, y: 0.42}
+  promptGap: 0.12
+  dayFrontZ: -0.2
+  familyDepth: 0.1
+  familyHalfWidth: 0.35
+  familyFadeTime: 0.25
+  familyHopHeight: 0.08
+  familyHopSpeed: 5
   panelArtPath: Art/Props/panel
   panelWorldHeight: 0.9
   panelMountHeight: 1
   useHouseKit: 1
   houseKit: {fileID: 919132149155446097, guid: ddaf319699e61504ea1bc167a75da7f1, type: 3}
   kitModuleWidth: 6
+  kitModuleDepth: 4.2
   kitYaw: 180
   roomModels:
   - roomId: living
@@ -155,6 +204,10 @@ MonoBehaviour:
     hideWhenRescaled: []
   - roomId: kitchen
     model: {fileID: 919132149155446097, guid: f72d05524e5eece47b87ac1b50202bf2, type: 3}
+    hideParts: []
+    hideWhenRescaled: []
+  - roomId: workshop
+    model: {fileID: 919132149155446097, guid: 37454935d3f64f84a01f7b28a9a49f09, type: 3}
     hideParts: []
     hideWhenRescaled: []
   roomModelWidthTolerance: 0.1

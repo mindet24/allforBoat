@@ -155,8 +155,16 @@ namespace Trouble.Game
         [Tooltip("Orthographic, straight-on side view. Off = perspective with fieldOfView, looking down by cameraTilt (shows floors and room depth).")]
         public bool orthographic = false;
         public float fieldOfView = 30f;
-        [Tooltip("Perspective only: degrees the camera looks down at the house (0 = straight on). The camera orbits the point it frames.")]
-        [Range(0f, 30f)] public float cameraTilt = 10f;
+        [Tooltip("Perspective only: degrees the camera looks down at the house (0 = straight on). The camera orbits the point it frames. Day mode: where the player's angle starts and resets to.")]
+        [Range(0f, 45f)] public float cameraTilt = 10f;
+        [Tooltip("Day mode, right-drag: how far the player may tilt the camera, degrees looking down (min, max).")]
+        public Vector2 cameraTiltRange = new Vector2(0f, 40f);
+        [Tooltip("Day mode, right-drag: how far the player may turn the camera left or right, degrees.")]
+        public float cameraYawLimit = 35f;
+        [Tooltip("Day mode, right-drag: degrees the camera turns per pixel dragged.")]
+        public float orbitDegreesPerPixel = 0.2f;
+        [Tooltip("Seconds the camera takes to ease to a new angle.")]
+        public float cameraAngleSmoothTime = 0.08f;
 
         [Header("Lighting (rooms lit by their own power)")]
         [Tooltip("Each room has a ceiling light that is on while the room's breaker is ON.")]
@@ -213,18 +221,16 @@ namespace Trouble.Game
         public float cardExitSeconds = 0.7f;
 
         [Header("Day follow camera (G6)")]
-        [Tooltip("Follow zoom: at least this many floors are on screen.")]
-        public float followMinFloors = 1.9f;
-        [Tooltip("Follow zoom: metres of each neighbouring room shown beside the character's room.")]
-        public float followNeighbourPeek = 1.2f;
+        [Tooltip("Follow zoom: floors on screen (top to bottom).")]
+        public float followFloors = 1.25f;
         [Tooltip("0 = the view follows the character exactly, 1 = it keeps the character's room centred.")]
-        [Range(0f, 1f)] public float followRoomLock = 0.45f;
-        [Tooltip("Where the middle of the character's room sits on screen (viewport units, origin bottom-left). Below the middle leaves room for the order tickets.")]
+        [Range(0f, 1f)] public float followRoomLock = 0.1f;
+        [Tooltip("Where the middle of the character sits on screen (viewport units, origin bottom-left). Below the middle leaves room for the order tickets.")]
         public Vector2 followScreenAnchor = new Vector2(0.5f, 0.45f);
         [Tooltip("Seconds the camera takes to catch up sideways while the character walks.")]
-        public float followSmoothTime = 0.28f;
+        public float followSmoothTime = 0.16f;
         [Tooltip("Seconds the camera takes to ease to a new floor.")]
-        public float followFloorSmoothTime = 0.45f;
+        public float followFloorSmoothTime = 0.25f;
         [Tooltip("Seconds to zoom between the follow view and the whole-house overview.")]
         public float overviewSmoothTime = 0.25f;
         [Tooltip("Metres the follow view may go past the house's outer walls.")]
@@ -236,26 +242,83 @@ namespace Trouble.Game
         public Rect overviewArea = new Rect(0.03f, 0.13f, 0.94f, 0.66f);
         public float overviewMargin = 0.04f;
 
-        [Header("Day mode keyboard (walk, stairs, E)")]
-        [Tooltip("Half the horizontal run of a flight of stairs, metres. The flight is centred on sim.StairsX.")]
-        public float stairsHalfRun = 1.0f;
-        [Tooltip("Part of a climb spent stepping from sim.StairsX to the foot of the stairs (and off the top).")]
-        [Range(0f, 0.45f)] public float stairsLanding = 0.15f;
+        [Header("Day mode keyboard (walk, jump, E)")]
+        [Tooltip("Height of a jump's arc above the straight line between the two floors, metres.")]
+        public float jumpArc = 0.8f;
+        [Tooltip("Day mode: colour and size (metres) of the jetpack flame under the character while Space is held.")]
+        public Color jetpackFlameColor = Hex("#FF8A1EE6");
+        public Vector2 jetpackFlameSize = new Vector2(0.28f, 0.45f);
+        [Tooltip("Day mode: opacity of a wall, floor or piece of furniture while it stands between the camera and a character or appliance.")]
+        [Range(0f, 1f)] public float occluderAlpha = 0.25f;
+        [Tooltip("How fast such a piece fades out and back in, opacity per second.")]
+        public float occluderFadeSpeed = 4f;
+        [Tooltip("House meshes whose name contains any of these never fade (the floor slabs hold the house together; a room below seen through the one above reads as broken).")]
+        public string[] neverFadeParts = { "Floor", "Foundation" };
         [Tooltip("How fast the drawn character catches up with the sim's position, metres per second.")]
         public float characterFollowSpeed = 6f;
+        [Header("Keys (Tools > TRIPPED > Studio > Keys lists them all)")]
+        [Tooltip("Day mode: walk left (and down a flight of stairs that climbs to the right).")]
+        public UnityEngine.InputSystem.Key walkLeftKey = UnityEngine.InputSystem.Key.A;
+        public UnityEngine.InputSystem.Key walkLeftAltKey = UnityEngine.InputSystem.Key.LeftArrow;
+        [Tooltip("Day mode: walk right (and up a flight of stairs that climbs to the right).")]
+        public UnityEngine.InputSystem.Key walkRightKey = UnityEngine.InputSystem.Key.D;
+        public UnityEngine.InputSystem.Key walkRightAltKey = UnityEngine.InputSystem.Key.RightArrow;
+        [Tooltip("Day mode: walk into the room, away from the open front.")]
+        public UnityEngine.InputSystem.Key walkInKey = UnityEngine.InputSystem.Key.W;
+        public UnityEngine.InputSystem.Key walkInAltKey = UnityEngine.InputSystem.Key.UpArrow;
+        [Tooltip("Day mode: walk toward the open front.")]
+        public UnityEngine.InputSystem.Key walkOutKey = UnityEngine.InputSystem.Key.S;
+        public UnityEngine.InputSystem.Key walkOutAltKey = UnityEngine.InputSystem.Key.DownArrow;
+        [Tooltip("Starts the day and pauses. While the day runs with rules verticalMove jump or jetpack it jumps / flies instead.")]
+        public UnityEngine.InputSystem.Key startKey = UnityEngine.InputSystem.Key.Space;
+        [Tooltip("Pauses at any time.")]
+        public UnityEngine.InputSystem.Key pauseKey = UnityEngine.InputSystem.Key.P;
+        [Tooltip("Starts the level again.")]
+        public UnityEngine.InputSystem.Key restartKey = UnityEngine.InputSystem.Key.R;
+        [Tooltip("Held with the start key (jump / jetpack only): jump or drop down instead of up.")]
+        public UnityEngine.InputSystem.Key downModifierKey = UnityEngine.InputSystem.Key.LeftShift;
+        [Tooltip("Other levels: the camera follows the character.")]
+        public UnityEngine.InputSystem.Key followKey = UnityEngine.InputSystem.Key.F;
+        [Tooltip("Back to the whole-house view (the day view resets too).")]
+        public UnityEngine.InputSystem.Key homeKey = UnityEngine.InputSystem.Key.Home;
+        [Tooltip("Day mode: the key that picks up and puts down (hold it while carrying to throw).")]
+        public UnityEngine.InputSystem.Key interactKey = UnityEngine.InputSystem.Key.E;
+        [Tooltip("Day mode: the key that plugs in or unplugs the appliance in reach.")]
+        public UnityEngine.InputSystem.Key plugKey = UnityEngine.InputSystem.Key.F;
+        [Tooltip("Seconds the interact key must be held while carrying to throw instead of putting down.")]
+        public float throwHoldSeconds = 0.35f;
+        [Tooltip("Seconds a thrown appliance takes to land.")]
+        public float throwFlightSeconds = 0.45f;
+        [Tooltip("Height of a throw's arc above the straight line, metres.")]
+        public float throwArcHeight = 1.0f;
+        [Tooltip("Tint of an appliance that is not plugged in (draws no power until F).")]
+        public Color unpluggedTint = new Color(0.55f, 0.55f, 0.6f, 1f);
         [Tooltip("Height of the carried appliance's sprite above the head, metres.")]
         public float carryIconHeight = 0.55f;
-        [Tooltip("z of day-mode labels, load bars and key prompts: in front of the house so stairs and walls never cover them.")]
+        [Tooltip("z of day-mode labels, load bars and key prompts: in front of the house so walls and props never cover them.")]
         public float dayOverlayZ = -0.45f;
         public Color promptBack = Hex("#1E1E24E6");
         public Color promptText = Hex("#FFE066");
-        [Tooltip("Size of a key prompt bubble (\"E\", \"W ↑\"), metres.")]
+        [Tooltip("Size of a key prompt bubble (\"E\", \"F\"), metres.")]
         public Vector2 promptSize = new Vector2(0.5f, 0.42f);
-        public Vector2 stairsPromptSize = new Vector2(0.8f, 0.42f);
-        [Tooltip("Smallest space between the E prompt and a stairs prompt, metres.")]
+        [Tooltip("Smallest space between the E and F prompts, metres.")]
         public float promptGap = 0.12f;
         [Tooltip("Day mode: z of the character and appliance sprites, just in front of the furnished room models' open front (z = 0) and behind the prompts (dayOverlayZ).")]
         public float dayFrontZ = -0.2f;
+        [Tooltip("Day mode: colour of the walkable stairs (one block per step, at the open front of the house).")]
+        public Color dayStairsColor = Hex("#9C6B43");
+        [Tooltip("Day mode: height of one step of the stairs, metres (the step count follows from the floor height).")]
+        public float dayStairsRise = 0.25f;
+        [Tooltip("Day mode: how far behind the player and the appliances the family stands, metres.")]
+        public float familyDepth = 0.1f;
+        [Tooltip("Half the width of a family member, metres: they step aside until this much is clear of every appliance.")]
+        public float familyHalfWidth = 0.35f;
+        [Tooltip("Seconds a family member takes to fade out of one room (and back in at the next).")]
+        public float familyFadeTime = 0.25f;
+        [Tooltip("Height of the waiting hop of a family member with a request, metres.")]
+        public float familyHopHeight = 0.08f;
+        [Tooltip("Speed of the waiting hop.")]
+        public float familyHopSpeed = 5f;
         [Tooltip("Resources path of the breaker panel sprite (bottom-centre pivot, 1 unit tall).")]
         public string panelArtPath = "Art/Props/panel";
         [Tooltip("Height the panel sprite is drawn at, metres.")]
@@ -270,6 +333,8 @@ namespace Trouble.Game
         public GameObject houseKit;
         [Tooltip("Width of one kit room module, metres. Pieces are scaled in x by room width / this.")]
         public float kitModuleWidth = 6f;
+        [Tooltip("Depth of one kit room module, metres (open front at z = 0 to the back wall).")]
+        public float kitModuleDepth = 4.2f;
         [Tooltip("Yaw applied to every kit piece so it faces the camera. The FBX comes in turned 180° (x and depth negated).")]
         public float kitYaw = 180f;
         [Tooltip("Furnished room models (Art/Models/Room_<Id>.fbx) by sim room id. A room with a model uses its own floor and back wall instead of the kit's.")]
@@ -277,8 +342,10 @@ namespace Trouble.Game
         {
             new RoomModelEntry("living"), new RoomModelEntry("bedroom"), new RoomModelEntry("bathroom"),
             new RoomModelEntry("kidroom"), new RoomModelEntry("study"), new RoomModelEntry("laundry"),
-            new RoomModelEntry("kitchen"),
+            new RoomModelEntry("kitchen"), new RoomModelEntry("workshop"),
         };
+        [Tooltip("Chance (0..1) that each part of a room model named *_Random* is there on a given day. Rolled from the day's seed, so a replay of the day looks the same.")]
+        [Range(0f, 1f)] public float randomPropChance = 0.6f;
         [Tooltip("A room model is used at scale 1 when its width is within this many metres of the room's; otherwise it is stretched in x to fit.")]
         public float roomModelWidthTolerance = 0.1f;
         [Tooltip("Scale of the kit's Socket_Plate (0.26 m) on each socket.")]

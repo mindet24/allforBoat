@@ -10,7 +10,7 @@ namespace Trouble.Game
     /// moment felt: the day sound table, footsteps, overload hum, appliance loops and music (through
     /// <see cref="FeedbackController"/>, so every play is in its PlayLog), plus overload pulses and sparks, the
     /// blackout (dark rooms, dimmed lights, flash, slow motion, shake) and its room-by-room relight, squash and
-    /// stretch, carried-item bob, lean and stairs hop, appliance wobble, score popups and coins, and the last-30-s
+    /// stretch, carried-item bob, lean, jump, jetpack and landing, appliance wobble, score popups and coins, and the last-30-s
     /// vignette. Never changes sim state. All numbers come from <see cref="JuiceConfig"/>.
     /// </summary>
     /// <remarks>
@@ -59,12 +59,14 @@ namespace Trouble.Game
 
         private string _lastCarry = "";
         private bool _interactAccepted;
-        private bool _climbAccepted;
         private int _combo;
         private float _lastCompleteTime = -100f;
         private float _stepTimer;
         private int _stepParity;
         private float _characterSquashAt = -100f;
+        private bool _wasAirborne;
+        private bool _wasJumping;
+        private float _puffTimer;
         private float _lean;
         private bool _wasBlackout;
         private float _resetAt = -100f;
@@ -118,6 +120,7 @@ namespace Trouble.Game
             controller.LevelUnloaded += OnLevelUnloaded;
             controller.TickEvents += OnTickEvents;
             controller.CommandAccepted += OnCommandAccepted;
+            controller.CommandRefused += OnCommandRefused;
         }
 
         // ---- level lifetime ----------------------------------------------------------------
@@ -235,16 +238,18 @@ namespace Trouble.Game
 
         // ---- events -------------------------------------------------------------------------
 
+        /// <summary>A jump with nowhere to land, or a drop with no room below, gets the reject buzz instead of a toast.</summary>
+        private void OnCommandRefused(Command command, string reason)
+        {
+            if (command.Type == CommandType.Jump || command.Type == CommandType.Drop) _feedback.Play(SynthBank.Reject);
+        }
+
         private void OnCommandAccepted(Command command)
         {
             var sim = _controller.Sim;
             if (sim == null || !sim.IsDayMode) return;
-            if (command.Type == CommandType.Climb)
-            {
-                _climbAccepted = true;
-                return;
-            }
-            if (command.Type != CommandType.Interact) return;
+            // F has its feedback on the PluggedIn / Unplugged events (React), which name the appliance.
+            if (command.Type != CommandType.Interact && command.Type != CommandType.Throw) return;
             _interactAccepted = true;
             string now = sim.Character.CarryingId ?? "";
             if (_lastCarry.Length == 0 && now.Length > 0)
@@ -254,16 +259,37 @@ namespace Trouble.Game
             }
             else if (_lastCarry.Length > 0 && now.Length == 0)
             {
-                string plugged = _lastCarry;
-                _feedback.Play(SynthBank.PlugIn);
+                var app = sim.FindAppliance(_lastCarry);
                 _characterSquashAt = Time.unscaledTime;
-                _applianceSquash[plugged] = Time.unscaledTime;
-                if (_shake != null) _shake.Kick(_juice.plugShake);
-                var app = sim.FindAppliance(plugged);
-                var socket = app != null && app.SocketId.Length > 0 ? sim.FindSocket(app.SocketId) : null;
-                if (socket != null && _fx != null) _fx.Sparks(SocketPoint(sim, socket), 6, 0.5f);
+                if (command.Type == CommandType.Throw && app != null)
+                {
+                    // Fly from above the character's head to where it landed.
+                    var view = _controller.House != null ? _controller.House.FindApplianceView(app.Id) : null;
+                    var feet = HouseLayout.CharacterPoint(sim, 0f, _config.roomHeight, _config.jumpArc);
+                    if (view != null)
+                        view.FlyFrom(new Vector3(feet.x, feet.y + _config.playerWorldHeight, _config.dayFrontZ), Time.unscaledTime);
+                    _feedback.Play(SynthBank.Pickup);
+                }
+                else if (app != null && !app.Unplugged && app.SocketId.Length > 0) PlugJuice(sim, app);
+                else
+                {
+                    // Put down unplugged: a soft set-down, no sparks.
+                    _feedback.Play(SynthBank.Step);
+                    if (app != null) _applianceSquash[app.Id] = Time.unscaledTime;
+                }
             }
             _lastCarry = now;
+        }
+
+        /// <summary>Plug-in feedback: the plug sound, a squash, a small shake and sparks at the socket.</summary>
+        private void PlugJuice(HouseSim sim, ApplianceState app)
+        {
+            _feedback.Play(SynthBank.PlugIn);
+            _characterSquashAt = Time.unscaledTime;
+            _applianceSquash[app.Id] = Time.unscaledTime;
+            if (_shake != null) _shake.Kick(_juice.plugShake);
+            var socket = app.SocketId.Length > 0 ? sim.FindSocket(app.SocketId) : null;
+            if (socket != null && _fx != null) _fx.Sparks(SocketPoint(sim, socket), 6, 0.5f);
         }
 
         private void OnTickEvents(IReadOnlyList<SimEvent> events)
@@ -292,6 +318,16 @@ namespace Trouble.Game
 
             switch (e.Type)
             {
+                case SimEventType.PluggedIn:
+                {
+                    var plugged = sim.FindAppliance(e.Appliance);
+                    if (plugged != null) PlugJuice(sim, plugged);
+                    break;
+                }
+                case SimEventType.Unplugged:
+                    _feedback.Play(SynthBank.Pickup);
+                    if (e.Appliance != null) _applianceSquash[e.Appliance] = now;
+                    break;
                 case SimEventType.RequestSpawned:
                     PlayAll(1f);
                     if (urgency == UrgencyLevel.Urgent || Random.value < _juice.heyChance) _feedback.Play(SynthBank.VoiceHey);
@@ -450,7 +486,6 @@ namespace Trouble.Game
             if (sim != null && sim.IsDayMode && sim.Phase == LevelPhase.Running && !_controller.KeysSuspended)
                 DetectRejects(sim);
             _interactAccepted = false;
-            _climbAccepted = false;
         }
 
         /// <summary>
@@ -466,9 +501,6 @@ namespace Trouble.Game
                 _feedback.Play(SynthBank.Reject);
                 if (_shake != null) _shake.Kick(_juice.rejectShake);
             }
-            bool climbKey = kb.wKey.wasPressedThisFrame || kb.upArrowKey.wasPressedThisFrame
-                || kb.sKey.wasPressedThisFrame || kb.downArrowKey.wasPressedThisFrame;
-            if (climbKey && !_climbAccepted && !sim.Character.IsClimbing) _feedback.Play(SynthBank.Reject, 1.25f, 0.5f);
         }
 
         private void LateUpdate()
@@ -598,7 +630,33 @@ namespace Trouble.Game
         private void UpdateFootsteps(HouseSim sim, bool running)
         {
             var ch = sim.Character;
-            bool moving = running && (ch.WalkDir != 0 || ch.IsClimbing);
+            // Jetpack: puffs while Space is held. Landing: a heavier footstep and a squash.
+            if (running && ch.Thrusting)
+            {
+                _puffTimer -= Time.unscaledDeltaTime;
+                if (_puffTimer <= 0f)
+                {
+                    _puffTimer = _juice.jetpackPuffInterval;
+                    _feedback.Play(SynthBank.Jetpack, 1f + (_stepParity == 0 ? -_juice.stepPitchSpread : _juice.stepPitchSpread), 1f);
+                    _stepParity ^= 1;
+                }
+            }
+            else _puffTimer = 0f;
+            if (ch.IsJumping != _wasJumping)
+            {
+                _wasJumping = ch.IsJumping;
+                if (running && ch.IsJumping) _feedback.Play(SynthBank.Jump);
+            }
+            if (ch.IsAirborne != _wasAirborne)
+            {
+                _wasAirborne = ch.IsAirborne;
+                if (running && !ch.IsAirborne)
+                {
+                    _feedback.Play(SynthBank.Step, _juice.landPitch, 1f);
+                    _characterSquashAt = Time.unscaledTime;
+                }
+            }
+            bool moving = running && ch.WalkDir != 0 && !ch.IsAirborne;
             if (!moving)
             {
                 _stepTimer = 0f;
@@ -606,10 +664,10 @@ namespace Trouble.Game
             }
             _stepTimer -= Time.unscaledDeltaTime;
             if (_stepTimer > 0f) return;
-            _stepTimer = ch.IsClimbing ? _juice.climbStepInterval : _juice.stepInterval;
+            _stepTimer = _juice.stepInterval;
             _stepParity ^= 1;
             float pitch = 1f + (_stepParity == 0 ? -_juice.stepPitchSpread : _juice.stepPitchSpread);
-            _feedback.Play(ch.IsClimbing ? SynthBank.StairsStep : SynthBank.Step, pitch, 1f);
+            _feedback.Play(SynthBank.Step, pitch, 1f);
         }
 
         private void UpdateAppliances(HouseSim sim, float now, bool running)
@@ -694,15 +752,12 @@ namespace Trouble.Game
             var character = _characterRoot;
             if (character == null) return;
             var ch = sim.Character;
-            float target = running && !ch.IsClimbing ? -ch.WalkDir * _juice.leanDegrees : 0f;
+            float target = running ? -ch.WalkDir * _juice.leanDegrees : 0f;
             _lean = Mathf.MoveTowards(_lean, target, _juice.leanSpeed * _juice.leanDegrees * Time.unscaledDeltaTime);
             character.localRotation = Quaternion.Euler(0f, 0f, _lean);
 
             JuiceMath.Squash(now - _characterSquashAt, _juice.squashSeconds, _juice.squashAmount, out float sx, out float sy);
             character.localScale = new Vector3(sx, sy, 1f);
-
-            if (running && ch.IsClimbing)
-                character.localPosition += new Vector3(0f, Mathf.Abs(Mathf.Sin(now * _juice.stairsHopHz * Mathf.PI)) * _juice.stairsHopHeight, 0f);
 
             float bob = Mathf.Sin(now * _juice.carryBobHz * Mathf.PI * 2f) * _juice.carryBobHeight;
             if (_carrySprite != null) _carrySprite.localPosition = _carrySpriteBase + new Vector3(0f, bob, 0f);
@@ -819,7 +874,7 @@ namespace Trouble.Game
 
         private Vector2 CharacterPoint(HouseSim sim)
         {
-            return HouseLayout.CharacterPoint(sim, _controller.TickFraction, _config.roomHeight, _config.stairsHalfRun, _config.stairsLanding);
+            return HouseLayout.CharacterPoint(sim, _controller.TickFraction, _config.roomHeight, _config.jumpArc);
         }
 
         private void OnDestroy()
@@ -831,6 +886,7 @@ namespace Trouble.Game
             _controller.LevelUnloaded -= OnLevelUnloaded;
             _controller.TickEvents -= OnTickEvents;
             _controller.CommandAccepted -= OnCommandAccepted;
+            _controller.CommandRefused -= OnCommandRefused;
         }
     }
 }

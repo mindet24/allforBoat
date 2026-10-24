@@ -139,7 +139,7 @@ namespace Trouble.Game
             var cam = _cx.Controller.HouseCam;
             bool following = cam != null && cam.DayFollowing && !cam.Overview;
             var ch = sim.Character;
-            string current = ch.IsClimbing && !string.IsNullOrEmpty(ch.ClimbToRoomId) ? ch.ClimbToRoomId : ch.RoomId;
+            string current = ch.RoomId;
             var show = PowerPanelRules.RowsToShow(_power, following, current);
 
             float y = ui.powerHeaderHeight + 4f;

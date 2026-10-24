@@ -76,6 +76,16 @@ namespace Trouble.Sim
         /// <summary>"door" or "stairs".</summary>
         public string kind = "door";
         public bool open = true;
+        /// <summary>
+        /// Day mode, stairs: x (metres) where the flight starts on the lower floor. Used only when
+        /// <see cref="stairsRun"/> is not 0; otherwise the flight is placed inside the x range the two rooms share.
+        /// </summary>
+        public float stairsBottomX;
+        /// <summary>
+        /// Day mode, stairs: length of the flight along x, metres; positive climbs toward +x, negative toward -x.
+        /// 0 = <see cref="RulesConfig.stairsRunMetres"/>, climbing toward +x from the left end of the shared range.
+        /// </summary>
+        public float stairsRun;
     }
 
     [Serializable]

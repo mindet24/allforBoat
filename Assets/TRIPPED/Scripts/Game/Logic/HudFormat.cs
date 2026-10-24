@@ -11,6 +11,16 @@ namespace Trouble.Game
     /// </summary>
     public static class HudFormat
     {
+        /// <summary>
+        /// The key-help text id for the way this day changes floor: <paramref name="key"/> for stairs (the default),
+        /// key + "_jump" or key + "_jetpack" for the other rules verticalMove values. A null sim = stairs.
+        /// </summary>
+        public static string MoveKeys(Trouble.Sim.HouseSim sim, string key)
+        {
+            if (sim == null || sim.UsesStairs) return key;
+            return key + (sim.UsesJetpack ? "_jetpack" : "_jump");
+        }
+
         /// <summary>Ticks as m:ss, rounded down to the second (same rule as the cause sentences).</summary>
         public static string Clock(int ticks, int ticksPerSecond)
         {

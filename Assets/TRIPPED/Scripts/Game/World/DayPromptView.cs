@@ -7,17 +7,15 @@ namespace Trouble.Game
 {
     /// <summary>
     /// Day mode key prompts in the house: a small "E" bubble over whatever E would act on now (the panel in a
-    /// blackout, the free socket for what is carried, or the appliance to pick up), and "W ↑" / "S ↓" at stairs in
-    /// reach. What to show comes from <see cref="DayInteraction"/>, so a prompt appears exactly when the key works.
+    /// blackout, where what is carried goes down, or the appliance to pick up), an "F" bubble over an appliance F
+    /// would plug in. What to show comes from <see cref="DayInteraction"/>, so a prompt appears exactly when the key works.
     /// </summary>
     public sealed class DayPromptView : MonoBehaviour
     {
-        private const int MaxStairsPrompts = 2;
         private TrippedViewConfig _config;
         private HouseView _house;
         private Bubble _interact;
-        private readonly Bubble[] _stairs = new Bubble[MaxStairsPrompts];
-        private readonly List<StairsPrompt> _stairsInReach = new List<StairsPrompt>();
+        private Bubble _plug;
 
         private sealed class Bubble
         {
@@ -32,7 +30,7 @@ namespace Trouble.Game
         public void CollectShownRects(List<Rect> into)
         {
             Add(_interact, _config.promptSize, into);
-            for (int i = 0; i < MaxStairsPrompts; i++) Add(_stairs[i], _config.stairsPromptSize, into);
+            Add(_plug, _config.promptSize, into);
         }
 
         private static void Add(Bubble bubble, Vector2 size, List<Rect> into)
@@ -42,16 +40,13 @@ namespace Trouble.Game
             into.Add(new Rect(p.x - size.x * 0.5f, p.y - size.y * 0.5f, size.x, size.y));
         }
 
-        /// <summary>Number of stairs prompts on screen now (for checks).</summary>
-        public int StairsShown { get; private set; }
-
         /// <summary>Builds the (hidden) bubbles.</summary>
         public void Build(HouseView house, TrippedViewConfig config)
         {
             _house = house;
             _config = config;
             _interact = MakeBubble("PromptE", "E", config.promptSize);
-            for (int i = 0; i < MaxStairsPrompts; i++) _stairs[i] = MakeBubble("PromptStairs" + i, "", config.stairsPromptSize);
+            _plug = MakeBubble("PromptF", "F", config.promptSize);
         }
 
         /// <summary>Moves and shows the prompts for this frame.</summary>
@@ -63,33 +58,17 @@ namespace Trouble.Game
             var at = target.Kind == DayTargetKind.None ? (Vector3?)null : PointOver(sim, target);
             Place(_interact, at);
 
-            _stairsInReach.Clear();
-            if (live) DayInteraction.StairsInReach(sim, _stairsInReach);
-            StairsShown = 0;
-            var room = sim.FindRoom(sim.Character.RoomId);
-            // The E prompt wins its spot; a stairs prompt that would touch it moves to the other side of the character.
-            Rect? eRect = null;
-            if (at.HasValue) eRect = new Rect(at.Value.x - _config.promptSize.x * 0.5f, at.Value.y - _config.promptSize.y * 0.5f, _config.promptSize.x, _config.promptSize.y);
-            for (int i = 0; i < MaxStairsPrompts; i++)
+            // F only when it would plug something in (unplugging is allowed but not advertised); beside E if they share a spot.
+            var plug = live ? DayInteraction.PlugTarget(sim) : DayTarget.None;
+            Vector3? plugAt = null;
+            if (plug.Kind != DayTargetKind.None && plug.PlugIn)
             {
-                if (i >= _stairsInReach.Count || room == null)
-                {
-                    Place(_stairs[i], null);
-                    continue;
-                }
-                var p = _stairsInReach[i];
-                bool up = p.Direction > 0;
-                string text = up ? "W ↑" : "S ↓";
-                if (_stairs[i].Text.text != text) _stairs[i].Text.text = text;
-                float floorY = HouseLayout.FloorY(room.Floor, _config.roomHeight);
-                // Beside the flight, right of the character: W at head height (below the room's label and load bar),
-                // S lower, above the sockets.
-                float x = p.X + _config.stairsHalfRun * 0.5f + 0.3f;
-                float y = floorY + (up ? _config.playerWorldHeight + 0.15f : 0.95f);
-                var c = PromptLayout.StairsCentre(new Vector2(x, y), _config.stairsPromptSize, eRect, sim.Character.X, _config.promptGap);
-                Place(_stairs[i], new Vector3(c.x, c.y, _config.dayOverlayZ));
-                StairsShown++;
+                var p = PointOver(sim, plug);
+                if (at.HasValue && (at.Value - p).sqrMagnitude < _config.promptSize.x * _config.promptSize.x)
+                    p.x = at.Value.x + _config.promptSize.x + _config.promptGap;
+                plugAt = p;
             }
+            Place(_plug, plugAt);
         }
 
         private Vector3 PointOver(HouseSim sim, DayTarget target)
@@ -103,6 +82,8 @@ namespace Trouble.Game
                     // Beside the panel, not above it: the room's label and load bar hang just over it.
                     return new Vector3(target.X + _config.panelWorldHeight * 0.5f + _config.promptSize.x * 0.5f + 0.1f,
                         floorY + _config.panelMountHeight + _config.panelWorldHeight * 0.5f, _config.dayOverlayZ);
+                case DayTargetKind.Floor:
+                    return new Vector3(target.X, floorY + _config.playerWorldHeight * 0.5f + lift, _config.dayOverlayZ);
                 case DayTargetKind.Socket:
                     return new Vector3(target.X, floorY + _config.socketHeight + _config.socketSize * 0.5f + lift, _config.dayOverlayZ);
                 default:

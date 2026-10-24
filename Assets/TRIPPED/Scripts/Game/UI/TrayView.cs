@@ -90,13 +90,13 @@ namespace Trouble.Game
             }
             string hintKey = holding.Kind == HeldKind.Cord ? "hud_cord_selected"
                 : holding.Kind == HeldKind.CordFrom ? "hud_cord_room|" + holding.Id
-                : selection == null ? (day ? "day_hint" : "hud_tray_help") : "hud_selected|" + selection;
+                : selection == null ? (day ? HudFormat.MoveKeys(sim, "day_hint") : "hud_tray_help") : "hud_selected|" + selection;
             if (hintKey != _shownHint)
             {
                 _shownHint = hintKey;
                 if (holding.Kind == HeldKind.Cord) _hint.text = _text.Get("hud_cord_selected");
                 else if (holding.Kind == HeldKind.CordFrom) _hint.text = _text.Format("hud_cord_room", ("socket", holding.Id));
-                else if (selection == null) _hint.text = _text.Get(day ? "day_hint" : "hud_tray_help");
+                else if (selection == null) _hint.text = _text.Get(day ? HudFormat.MoveKeys(sim, "day_hint") : "hud_tray_help");
                 else _hint.text = _text.Format("hud_selected", ("appliance", NameOf(sim, selection)));
                 _hint.color = holding.Kind == HeldKind.None ? _config.textSecondary : _config.selection;
             }

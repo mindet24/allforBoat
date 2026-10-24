@@ -13,6 +13,7 @@
   "panelRoom": "laundry",
   "panelPos": 0.12,
   "rooms": [
+    { "id": "workshop", "name": "Workshop",    "floor": 0, "x": 0,  "width": 4, "theme": "laundry",  "capRandom": true, "capMin": 4, "capMax": 9 },
     { "id": "laundry",  "name": "Basement",    "floor": 0, "x": 4,  "width": 9, "theme": "laundry",  "capRandom": true, "capMin": 9, "capMax": 12 },
     { "id": "living",   "name": "Living room", "floor": 1, "x": 0,  "width": 9, "theme": "living",   "capRandom": true, "capMin": 7, "capMax": 12 },
     { "id": "kitchen",  "name": "Kitchen",     "floor": 1, "x": 9,  "width": 8, "theme": "kitchen",  "capRandom": true, "capMin": 10, "capMax": 12 },
@@ -23,6 +24,7 @@
   ],
   "doors": [
     { "id": "D_living_kitchen",   "a": "living",   "b": "kitchen",  "kind": "door",   "open": true },
+    { "id": "D_workshop_laundry", "a": "workshop", "b": "laundry",  "kind": "door",   "open": true },
     { "id": "S_kitchen_laundry",  "a": "kitchen",  "b": "laundry",  "kind": "stairs", "open": true },
     { "id": "S_living_bedroom",   "a": "living",   "b": "bedroom",  "kind": "stairs", "open": true },
     { "id": "D_bedroom_bathroom", "a": "bedroom",  "b": "bathroom", "kind": "door",   "open": true },
@@ -31,6 +33,8 @@
   ],
   "circuits": [],
   "sockets": [
+    { "id": "G1", "room": "workshop", "circuit": "" },
+    { "id": "G2", "room": "workshop", "circuit": "" },
     { "id": "B1", "room": "laundry",  "circuit": "" },
     { "id": "B2", "room": "laundry",  "circuit": "" },
     { "id": "B3", "room": "laundry",  "circuit": "" },
@@ -84,7 +88,7 @@
     ],
     "people": [
       { "name": "Mom",      "rooms": ["kitchen", "living", "laundry"], "wants": ["kettle", "microwave", "toaster", "fridge", "washer", "blender"] },
-      { "name": "Dad",      "rooms": ["living", "study", "kitchen"],   "wants": ["tv", "heater", "microwave", "kettle", "toaster"] },
+      { "name": "Dad",      "rooms": ["living", "study", "kitchen", "workshop"],   "wants": ["tv", "heater", "microwave", "kettle", "toaster"] },
       { "name": "Daughter", "rooms": ["kidroom", "bathroom"],          "wants": ["dryer", "blender", "tv", "microwave"] },
       { "name": "Grandma",  "rooms": ["living", "bedroom"],            "wants": ["heater", "tv", "kettle"] }
     ]

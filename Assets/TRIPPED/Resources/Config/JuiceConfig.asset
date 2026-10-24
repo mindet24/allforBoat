@@ -20,7 +20,7 @@ MonoBehaviour:
   soundVolumes:
   - name: step
     volume: 0.2
-  - name: stairs_step
+  - name: jetpack
     volume: 0.25
   - name: pickup
     volume: 0.5
@@ -110,7 +110,6 @@ MonoBehaviour:
   countdownSeconds: 5
   sparkSoundInterval: 0.22
   stepInterval: 0.26
-  climbStepInterval: 0.18
   stepPitchSpread: 0.08
   comboWindow: 4
   comboPitchStep: 0.12
@@ -159,8 +158,8 @@ MonoBehaviour:
   carryBobHz: 3.2
   leanDegrees: 8
   leanSpeed: 12
-  stairsHopHeight: 0.12
-  stairsHopHz: 5
+  landPitch: 0.8
+  jetpackPuffInterval: 0.14
   wobbleDegrees: 4
   wobbleHz: 7
   workPulse: 0.04

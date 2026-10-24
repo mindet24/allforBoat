@@ -78,15 +78,15 @@ namespace Trouble.Tests
         }
 
         [Test]
-        public void DemoLevel_LoadsAsADayWithSevenRoomsOnFourFloorsAndARoomCircuitEach()
+        public void DemoLevel_LoadsAsADayWithEightRoomsOnFourFloorsAndARoomCircuitEach()
         {
             // Arrange + Act
             var sim = Demo();
 
             // Assert
             Assert.IsTrue(sim.IsDayMode);
-            Assert.AreEqual(7, sim.Rooms.Count);
-            Assert.AreEqual(7, sim.Circuits.Count);
+            Assert.AreEqual(8, sim.Rooms.Count);
+            Assert.AreEqual(8, sim.Circuits.Count);
             int maxFloor = 0;
             foreach (var room in sim.Rooms)
             {
@@ -147,7 +147,7 @@ namespace Trouble.Tests
         }
 
         [Test]
-        public void Walls_DemoHouse_HasElevenWallsAndOnlyDoorsMakeOpenings()
+        public void Walls_DemoHouse_HasTwelveWallsAndOnlyDoorsMakeOpenings()
         {
             // Arrange
             var sim = Demo();
@@ -155,10 +155,11 @@ namespace Trouble.Tests
             // Act
             var walls = HouseLayout.Walls(sim.Rooms, sim.Doors);
 
-            // Assert: 2 + 3 + 4 + 2 edges; doors at x 9 (floor 1), 6 and 11 (floor 2); stairs never open a wall.
-            Assert.AreEqual(11, walls.Count);
+            // Assert: 3 + 3 + 4 + 2 edges; doors at x 4 (floor 0), 9 (floor 1), 6 and 11 (floor 2); stairs never open a wall.
+            Assert.AreEqual(12, walls.Count);
             var withDoor = walls.FindAll(w => !string.IsNullOrEmpty(w.DoorId));
-            Assert.AreEqual(3, withDoor.Count);
+            Assert.AreEqual(4, withDoor.Count);
+            Assert.IsTrue(withDoor.Exists(w => w.DoorId == "D_workshop_laundry" && Mathf.Approximately(w.X, 4f) && w.Floor == 0));
             Assert.IsTrue(withDoor.Exists(w => w.DoorId == "D_living_kitchen" && Mathf.Approximately(w.X, 9f) && w.Floor == 1));
             Assert.IsTrue(withDoor.Exists(w => w.DoorId == "D_bedroom_bathroom" && Mathf.Approximately(w.X, 6f) && w.Floor == 2));
             Assert.IsTrue(withDoor.Exists(w => w.DoorId == "D_bathroom_kidroom" && Mathf.Approximately(w.X, 11f) && w.Floor == 2));

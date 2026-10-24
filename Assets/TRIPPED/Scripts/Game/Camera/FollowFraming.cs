@@ -10,13 +10,12 @@ namespace Trouble.Game
     public static class FollowFraming
     {
         /// <summary>
-        /// View height that shows a room of <paramref name="roomWidth"/> plus <paramref name="peek"/> metres of each
-        /// neighbour, and at least <paramref name="minFloors"/> floors, never more than <paramref name="maxViewHeight"/>.
+        /// View height that shows <paramref name="floors"/> floors of <paramref name="roomHeight"/>, never more than
+        /// <paramref name="maxViewHeight"/>.
         /// </summary>
-        public static float ViewHeight(float roomWidth, float roomHeight, float aspect, float peek, float minFloors, float maxViewHeight)
+        public static float ViewHeight(float roomHeight, float floors, float maxViewHeight)
         {
-            float byWidth = (roomWidth + 2f * peek) / Mathf.Max(0.01f, aspect);
-            float h = Mathf.Max(byWidth, roomHeight * minFloors);
+            float h = roomHeight * floors;
             return maxViewHeight > 0f ? Mathf.Min(h, maxViewHeight) : h;
         }
 

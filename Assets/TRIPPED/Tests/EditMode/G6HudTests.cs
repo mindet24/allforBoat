@@ -336,33 +336,23 @@ namespace Trouble.Tests
         private const float Aspect = 16f / 9f;
 
         [Test]
-        public void ViewHeight_WideRoom_ShowsRoomPlusPeekOnEachSide()
+        public void ViewHeight_ShowsTheFollowFloors()
         {
             // Act
-            float h = FollowFraming.ViewHeight(9f, 3f, Aspect, 1f, 1.5f, 100f);
+            float h = FollowFraming.ViewHeight(3f, 1.25f, 100f);
 
             // Assert
-            Assert.AreEqual(11f / Aspect, h, 1e-3f);
-        }
-
-        [Test]
-        public void ViewHeight_NarrowRoom_ShowsAtLeastMinFloors()
-        {
-            // Act
-            float h = FollowFraming.ViewHeight(4f, 3f, Aspect, 1f, 1.9f, 100f);
-
-            // Assert
-            Assert.AreEqual(3f * 1.9f, h, 1e-3f);
+            Assert.AreEqual(3.75f, h, 1e-4f);
         }
 
         [Test]
         public void ViewHeight_NeverMoreThanTheOverview()
         {
             // Act
-            float h = FollowFraming.ViewHeight(40f, 3f, Aspect, 1f, 1.9f, 12f);
+            float h = FollowFraming.ViewHeight(3f, 5f, 12f);
 
             // Assert
-            Assert.AreEqual(12f, h, 1e-3f);
+            Assert.AreEqual(12f, h, 1e-4f);
         }
 
         [Test]
@@ -443,65 +433,6 @@ namespace Trouble.Tests
         {
             // Act / Assert
             Assert.AreEqual(0, new Progress(new MemoryProgressStore()).BestScore(100));
-        }
-    }
-
-    /// <summary>G6 key prompts: the stairs prompt never touches the E prompt.</summary>
-    public class PromptLayoutTests
-    {
-        private static readonly Vector2 StairsSize = new Vector2(0.8f, 0.42f);
-        private const float Gap = 0.12f;
-
-        [Test]
-        public void StairsCentre_NoEPrompt_StaysWhereWanted()
-        {
-            // Act
-            var c = PromptLayout.StairsCentre(new Vector2(5f, 1.5f), StairsSize, null, 5f, Gap);
-
-            // Assert
-            Assert.AreEqual(new Vector2(5f, 1.5f), c);
-        }
-
-        [Test]
-        public void StairsCentre_FarFromE_StaysWhereWanted()
-        {
-            // Arrange
-            var e = new Rect(9f, 1.3f, 0.5f, 0.42f);
-
-            // Act
-            var c = PromptLayout.StairsCentre(new Vector2(5f, 1.5f), StairsSize, e, 5f, Gap);
-
-            // Assert
-            Assert.AreEqual(new Vector2(5f, 1.5f), c);
-        }
-
-        [Test]
-        public void StairsCentre_EOverlapsRightOfCharacter_MovesLeftWithGap()
-        {
-            // Arrange: E right of the character, on top of where W wants to be.
-            var e = new Rect(5.0f, 1.3f, 0.5f, 0.42f);
-
-            // Act
-            var c = PromptLayout.StairsCentre(new Vector2(5.2f, 1.5f), StairsSize, e, 4.8f, Gap);
-            var stairs = new Rect(c - StairsSize * 0.5f, StairsSize);
-
-            // Assert
-            Assert.LessOrEqual(stairs.xMax, e.xMin - Gap + 1e-4f);
-            Assert.AreEqual(1.5f, c.y, 1e-4f);
-        }
-
-        [Test]
-        public void StairsCentre_EOverlapsLeftOfCharacter_MovesRightWithGap()
-        {
-            // Arrange
-            var e = new Rect(4.6f, 1.3f, 0.5f, 0.42f);
-
-            // Act
-            var c = PromptLayout.StairsCentre(new Vector2(4.9f, 1.5f), StairsSize, e, 5.5f, Gap);
-            var stairs = new Rect(c - StairsSize * 0.5f, StairsSize);
-
-            // Assert
-            Assert.GreaterOrEqual(stairs.xMin, e.xMax + Gap - 1e-4f);
         }
     }
 

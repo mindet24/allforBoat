@@ -205,8 +205,10 @@ namespace Trouble.Sim
 
             if (IsDayMode)
             {
-                // Day mode is played with the keyboard: walk, climb and interact happen at once while time runs.
-                bool keyboard = command.Type == CommandType.Walk || command.Type == CommandType.Climb || command.Type == CommandType.Interact;
+                // Day mode is played with the keyboard: walk, jump (or fly) and interact happen at once while time runs.
+                bool keyboard = command.Type == CommandType.Walk || command.Type == CommandType.WalkDepth || command.Type == CommandType.Interact
+                                || command.Type == CommandType.TogglePlug || command.Type == CommandType.Throw
+                                || command.Type == CommandType.Jump || command.Type == CommandType.Thrust || command.Type == CommandType.Drop;
                 if (!keyboard) return Reject("reject_unknown", out reason);
                 if (Phase != LevelPhase.Running) return Reject("reject_unpause_walk", out reason);
                 bool done = Apply(command, out reason);
@@ -538,8 +540,13 @@ namespace Trouble.Sim
                 case CommandType.ToggleDoor: ok = ApplyDoor(cmd.A, out reason); break;
                 case CommandType.MoveTo: ok = FindRoom(cmd.A) != null || Reject("reject_no_path", out reason); break;
                 case CommandType.Walk: ok = ApplyWalk(cmd.Index, out reason); break;
-                case CommandType.Climb: ok = ApplyClimb(cmd.Index, out reason); break;
+                case CommandType.WalkDepth: ok = ApplyWalkDepth(cmd.Index, out reason); break;
                 case CommandType.Interact: ok = ApplyInteract(out reason); break;
+                case CommandType.TogglePlug: ok = ApplyTogglePlug(out reason); break;
+                case CommandType.Throw: ok = ApplyThrow(out reason); break;
+                case CommandType.Jump: ok = ApplyJump(cmd.Index, out reason); break;
+                case CommandType.Thrust: ok = ApplyThrust(cmd.Index, out reason); break;
+                case CommandType.Drop: ok = ApplyDrop(out reason); break;
                 default: ok = Reject("reject_unknown", out reason); break;
             }
             if (ok) NoteLostPower();
@@ -686,6 +693,8 @@ namespace Trouble.Sim
             if (app.SocketId.Length > 0) FindSocket(app.SocketId).OccupantId = "";
             app.SocketId = "";
             app.SwitchedOn = false;
+            app.Unplugged = false;
+            app.FloorRoomId = "";
         }
 
         /// <summary>
@@ -768,11 +777,11 @@ namespace Trouble.Sim
                 Emit(new SimEvent { Type = SimEventType.RequestSpawned, Appliance = _requests[i].ApplianceId, Room = _requests[i].RoomId });
         }
 
-        /// <summary>Day mode: every appliance in a socket draws its load from that room; one being carried draws nothing.</summary>
+        /// <summary>Day mode: every appliance plugged into a socket draws its load from that room; one carried, unplugged or on the floor draws nothing.</summary>
         private void DayAutoSwitch()
         {
             foreach (var app in _appliances)
-                app.SwitchedOn = app.SocketId.Length > 0;
+                app.SwitchedOn = app.SocketId.Length > 0 && !app.Unplugged;
         }
 
         /// <summary>Day mode: a request only progresses while its appliance is powered in the requesting room.</summary>
@@ -910,15 +919,48 @@ namespace Trouble.Sim
             {
                 RequireRoom(d.a, $"Door {d.id}");
                 RequireRoom(d.b, $"Door {d.id}");
-                _doors.Add(new DoorState
+                var door = new DoorState
                 {
                     Id = d.id,
                     RoomA = d.a,
                     RoomB = d.b,
                     IsStairs = d.kind == "stairs",
                     IsOpen = d.open,
-                });
+                };
+                if (door.IsStairs) PlaceFlight(door, d);
+                _doors.Add(door);
             }
+        }
+
+        /// <summary>
+        /// Day mode: where a flight of stairs between two floors runs. The level's own <see cref="DoorData.stairsBottomX"/>
+        /// and <see cref="DoorData.stairsRun"/> when it gives a run; otherwise <see cref="RulesConfig.stairsRunMetres"/>
+        /// long (shortened to fit), climbing toward +x from half a metre inside the x range both rooms share.
+        /// </summary>
+        private void PlaceFlight(DoorState door, DoorData d)
+        {
+            var a = FindRoom(d.a);
+            var b = FindRoom(d.b);
+            if (a.Floor == b.Floor) return;
+            var lower = a.Floor < b.Floor ? a : b;
+            var upper = lower == a ? b : a;
+            float lo = Math.Max(lower.X, upper.X), hi = Math.Min(lower.X + lower.Width, upper.X + upper.Width);
+            float bottom, run;
+            if (d.stairsRun != 0f)
+            {
+                bottom = d.stairsBottomX;
+                run = d.stairsRun;
+            }
+            else
+            {
+                if (hi - lo < 1.5f) return;
+                run = Math.Min(Rules.stairsRunMetres, hi - lo - 1f);
+                bottom = lo + 0.5f;
+            }
+            door.LowerRoomId = lower.Id;
+            door.UpperRoomId = upper.Id;
+            door.BottomXCm = Cm(bottom);
+            door.TopXCm = Cm(bottom + run);
         }
 
         private void BuildCircuits()
@@ -1075,6 +1117,7 @@ namespace Trouble.Sim
             Character.ToRoomId = start;
             var startRoom = FindRoom(start);
             Character.XCm = Cm(startRoom.CenterX);
+            Character.PrevXCm = Character.XCm;
         }
 
         // ---- character -----------------------------------------------------------------
@@ -1161,22 +1204,86 @@ namespace Trouble.Sim
             return room.X + s.Pos * room.Width;
         }
 
-        /// <summary>
-        /// Day mode: where a stairs door can be used, in metres: the middle of the stretch both rooms share.
-        /// The view draws the stairs there.
-        /// </summary>
-        public float StairsX(DoorState door)
-        {
-            var a = FindRoom(door.RoomA);
-            var b = FindRoom(door.RoomB);
-            float left = Math.Max(a.X, b.X);
-            float right = Math.Min(a.X + a.Width, b.X + b.Width);
-            return right > left ? (left + right) * 0.5f : (a.CenterX + b.CenterX) * 0.5f;
-        }
-
         private static int Cm(float metres) => (int)Math.Round(metres * 100f, MidpointRounding.AwayFromZero);
         private static float Clamp01(float v) => v < 0f ? 0f : v > 1f ? 1f : v;
-        private int ReachCm => Cm(Rules.reachMetres);
+        /// <summary>Day mode: how far (centimetres, across the floor) the character reaches for sockets, appliances and the panel.</summary>
+        public int ReachCm => Cm(Rules.reachMetres);
+
+        /// <summary>
+        /// Day mode: depth (centimetres) the character reaches sockets, the appliances in them and the panel from: the
+        /// back of the walkable floor.
+        /// </summary>
+        public int BackZCm => Cm(Rules.walkDepthMetres);
+
+        /// <summary>
+        /// True when (x, z) is within <paramref name="rangeCm"/> of (tx, tz) across the floor (all centimetres), depth
+        /// counting <see cref="RulesConfig.reachDepthWeight"/> of distance along the room.
+        /// </summary>
+        public bool Within(int xCm, int zCm, int txCm, int tzCm, int rangeCm) => Dist2(xCm, zCm, txCm, tzCm) <= (long)rangeCm * rangeCm;
+
+        private long Dist2(int xCm, int zCm, int txCm, int tzCm)
+        {
+            long dx = xCm - txCm;
+            long dz = (long)Math.Round((zCm - tzCm) * (double)Rules.reachDepthWeight);
+            return dx * dx + dz * dz;
+        }
+
+        /// <summary>Day mode: the character can reach the panel now (in its room, at the back of the floor by it).</summary>
+        public bool CanReachPanel => Character.RoomId == PanelRoomId && Within(Character.XCm, Character.ZCm, Cm(PanelX), BackZCm, ReachCm);
+
+        /// <summary>Day mode: true when the character flies with the jetpack (rules verticalMove "jetpack") instead of jumping.</summary>
+        public bool UsesJetpack => Rules.verticalMove == "jetpack";
+        /// <summary>Day mode: true when floors are joined by walkable stairs (rules verticalMove "stairs").</summary>
+        public bool UsesStairs => Rules.verticalMove == "stairs";
+        /// <summary>Day mode: true when Space jumps between floors (rules verticalMove "jump").</summary>
+        public bool UsesJump => Rules.verticalMove == "jump";
+
+        /// <summary>
+        /// Day mode: height (metres) over the lower floor of a point on a flight of stairs at x metres, from 0 at the
+        /// bottom step to one floor at the top, clamped to the flight.
+        /// </summary>
+        public float StairsHeight(DoorState door, float x)
+        {
+            float bottom = door.BottomXCm / 100f, top = door.TopXCm / 100f;
+            if (top == bottom) return 0f;
+            float t = (x - bottom) / (top - bottom);
+            return Math.Max(0f, Math.Min(1f, t)) * Rules.floorHeightMetres;
+        }
+
+        /// <summary>
+        /// Day mode, verticalMove "jump": the room a jump would land in (<paramref name="direction"/> 1 = up, Space;
+        /// -1 = down, Shift+Space): the room on the next floor up or down over (or under) the character's x, or null.
+        /// Not while already in the air.
+        /// </summary>
+        public RoomState JumpTarget(int direction) => Character.IsAirborne ? null : RoomAcross(direction);
+
+        /// <summary>Day mode: the room on the next floor up (1) or down (-1) over or under the character's x, or null.</summary>
+        public RoomState RoomAcross(int direction)
+        {
+            var here = FindRoom(Character.RoomId);
+            if (here == null || direction == 0) return null;
+            int floor = here.Floor + Math.Sign(direction);
+            int x = Character.XCm;
+            foreach (var room in _rooms)
+                if (room.Floor == floor && x > Cm(room.X) && x < Cm(room.X + room.Width)) return room;
+            return null;
+        }
+
+        /// <summary>
+        /// Day mode: upward push of the jetpack now, cm per tick per tick: <see cref="RulesConfig.jetpackThrust"/> less
+        /// <see cref="RulesConfig.jetpackWeightThrust"/> per weight point of what is carried.
+        /// </summary>
+        public int JetpackThrustCm()
+        {
+            float thrust = Rules.jetpackThrust;
+            var carried = Character.CarryingId.Length > 0 ? FindAppliance(Character.CarryingId) : null;
+            var def = carried != null ? Catalog.Find(carried.Type) : null;
+            if (def != null) thrust -= def.weight * Rules.jetpackWeightThrust;
+            return AccelCm(Math.Max(0f, thrust));
+        }
+
+        private int AccelCm(float metresPerSecond2) => (int)Math.Round(metresPerSecond2 * 100f / (Rules.ticksPerSecond * Rules.ticksPerSecond), MidpointRounding.AwayFromZero);
+        private int SpeedCm(float metresPerSecond) => (int)Math.Round(metresPerSecond * 100f / Rules.ticksPerSecond, MidpointRounding.AwayFromZero);
 
         private bool ApplyWalk(int direction, out string reason)
         {
@@ -1186,77 +1293,80 @@ namespace Trouble.Sim
             return true;
         }
 
-        private bool ApplyClimb(int direction, out string reason)
+        private bool ApplyWalkDepth(int direction, out string reason)
         {
+            Character.DepthDir = Math.Sign(direction);
+            reason = "";
+            return true;
+        }
+
+        /// <summary>Space / Shift+Space (verticalMove "jump"): start a jump to the room straight above or below (<see cref="JumpTarget"/>).</summary>
+        private bool ApplyJump(int direction, out string reason)
+        {
+            if (!UsesJump) return Reject("reject_unknown", out reason);
+            var to = JumpTarget(direction);
+            if (to == null) return Reject("reject_no_floor", out reason);
             var ch = Character;
-            if (ch.IsClimbing) return Reject("reject_unknown", out reason);
-            var here = FindRoom(ch.RoomId);
-            int dir = Math.Sign(direction);
-            foreach (var door in _doors)
-            {
-                if (!door.IsStairs || !door.IsOpen || (door.RoomA != here.Id && door.RoomB != here.Id)) continue;
-                var other = FindRoom(door.OtherRoom(here.Id));
-                if (other.Floor != here.Floor + dir) continue;
-                int stairs = Cm(StairsX(door));
-                if (Math.Abs(ch.XCm - stairs) > ReachCm) continue;
-                ch.XCm = stairs;
-                ch.ClimbFromRoomId = here.Id;
-                ch.ClimbToRoomId = other.Id;
-                ch.ClimbTicks = Math.Max(1, Rules.stairsTicks);
-                ch.ClimbTicksLeft = ch.ClimbTicks;
-                reason = "";
-                return true;
-            }
-            return Reject("reject_no_stairs", out reason);
+            ch.JumpFromRoomId = ch.RoomId;
+            ch.JumpToRoomId = to.Id;
+            ch.JumpTicks = Math.Max(1, Rules.jumpTicks);
+            ch.JumpTicksLeft = ch.JumpTicks;
+            reason = "";
+            return true;
+        }
+
+        /// <summary>Space held (1) or released (0), verticalMove "jetpack": the jetpack pushes up while held.</summary>
+        private bool ApplyThrust(int on, out string reason)
+        {
+            if (!UsesJetpack) return Reject("reject_unknown", out reason);
+            Character.Thrusting = on != 0;
+            if (Character.Thrusting) Character.DropThrough = false;
+            reason = "";
+            return true;
         }
 
         /// <summary>
-        /// E: reset the panel during a blackout when standing at it; otherwise plug what is carried into the
-        /// nearest free socket in reach; otherwise pick up the nearest appliance in reach.
+        /// S+Space or Shift+Space: drop through the floor under the character (the next one it falls onto) into the room
+        /// below. Refused when there is no room below.
+        /// </summary>
+        private bool ApplyDrop(out string reason)
+        {
+            if (!UsesJetpack) return Reject("reject_unknown", out reason);
+            if (RoomAcross(-1) == null) return Reject("reject_no_floor_below", out reason);
+            Character.DropThrough = true;
+            Character.Thrusting = false;
+            reason = "";
+            return true;
+        }
+
+        /// <summary>
+        /// E: reset the panel during a blackout when standing at it; otherwise put down what is carried (unplugged,
+        /// beside the nearest free socket or on the floor, by <see cref="RulesConfig.placeMode"/>; plugged in at once
+        /// when <see cref="RulesConfig.placeUnplugged"/> is off); otherwise pick up the nearest appliance in reach.
         /// </summary>
         private bool ApplyInteract(out string reason)
         {
             var ch = Character;
-            if (ch.IsClimbing) return Reject("reject_unknown", out reason);
+            if (!ch.CanUseHands) return Reject("reject_unknown", out reason);
 
             bool dark = false;
             foreach (var c in _circuits)
                 if (!c.IsOn) dark = true;
-            if (dark && ch.RoomId == PanelRoomId && Math.Abs(ch.XCm - Cm(PanelX)) <= ReachCm)
+            if (dark && CanReachPanel)
                 return ResetHouse(out reason);
 
             if (ch.CarryingId.Length > 0)
             {
-                SocketState best = null;
-                int bestDist = int.MaxValue;
-                foreach (var s in _sockets)
+                if (!Rules.placeUnplugged)
                 {
-                    if (s.RoomId != ch.RoomId || s.OccupantId.Length > 0 || s.Reserved || s.CordSocketId.Length > 0) continue;
-                    int d = Math.Abs(ch.XCm - Cm(SocketX(s)));
-                    if (d <= ReachCm && d < bestDist)
-                    {
-                        best = s;
-                        bestDist = d;
-                    }
+                    var free = NearestFreeSocket(ch.RoomId, ch.XCm, ch.ZCm, ReachCm, 0);
+                    if (free == null) return Reject("reject_no_free_socket", out reason);
+                    return ApplyPlug(ch.CarryingId, free.Id, out reason);
                 }
-                if (best == null) return Reject("reject_no_free_socket", out reason);
-                return ApplyPlug(ch.CarryingId, best.Id, out reason);
+                return PutDown(ch.XCm, ch.ZCm, ReachCm, 0, SimEventType.PutDown, out reason);
             }
 
-            ApplianceState pick = null;
-            int pickDist = int.MaxValue;
-            foreach (var app in _appliancesById)
-            {
-                if (app.SocketId.Length == 0) continue;
-                var s = FindSocket(app.SocketId);
-                if (s.RoomId != ch.RoomId) continue;
-                int d = Math.Abs(ch.XCm - Cm(SocketX(s)));
-                if (d <= ReachCm && d < pickDist)
-                {
-                    pick = app;
-                    pickDist = d;
-                }
-            }
+            var pick = NearestAppliance(ch.RoomId, ch.XCm, ch.ZCm, ReachCm);
             if (pick == null) return Reject("reject_unknown", out reason);
             string from = pick.SocketId;
             Vacate(pick);
@@ -1266,41 +1376,371 @@ namespace Trouble.Sim
             return true;
         }
 
-        /// <summary>Day mode: one tick of climbing, or of walking in the held direction through open doors.</summary>
+        /// <summary>
+        /// Hold E: throw what is carried ahead (the way the character faces). "socket" mode lands it beside the
+        /// nearest free socket ahead within <see cref="RulesConfig.throwMetres"/>; "floor" mode that far ahead, stopped
+        /// by the room's walls, at the character's depth. It lands unplugged.
+        /// </summary>
+        private bool ApplyThrow(out string reason)
+        {
+            var ch = Character;
+            if (!ch.CanUseHands || ch.CarryingId.Length == 0) return Reject("reject_nothing_carried", out reason);
+            int range = Cm(Rules.throwMetres);
+            if (FloorMode)
+            {
+                var room = FindRoom(ch.RoomId);
+                int x = Math.Max(Cm(room.X) + 30, Math.Min(Cm(room.X + room.Width) - 30, ch.XCm + ch.Facing * range));
+                return PutDown(x, ch.ZCm, 0, 0, SimEventType.Thrown, out reason);
+            }
+            // A throw flies over the floor: only how far along the room counts, not the depth.
+            return PutDown(ch.XCm, null, range, ch.Facing, SimEventType.Thrown, out reason);
+        }
+
+        /// <summary>
+        /// F: the nearest unplugged appliance in reach (beside a socket or on the floor) is plugged in; with none, the
+        /// nearest plugged one is unplugged. In "floor" mode an appliance on the floor goes into the nearest free socket in reach of it, and
+        /// one that is unplugged drops to the floor by its socket.
+        /// </summary>
+        private bool ApplyTogglePlug(out string reason)
+        {
+            var ch = Character;
+            if (!ch.CanUseHands) return Reject("reject_unknown", out reason);
+            var app = NearestAppliance(ch.RoomId, ch.XCm, ch.ZCm, ReachCm, unpluggedOnly: true) ?? NearestAppliance(ch.RoomId, ch.XCm, ch.ZCm, ReachCm);
+            if (app == null) return Reject("reject_nothing_to_plug", out reason);
+            if (app.Fixed) return Reject("reject_not_yours", out reason);
+
+            if (app.FloorRoomId.Length > 0)
+            {
+                var socket = NearestFreeSocket(app.FloorRoomId, app.FloorXCm, app.FloorZCm, ReachCm, 0);
+                if (socket == null) return Reject("reject_no_free_socket", out reason);
+                app.FloorRoomId = "";
+                socket.OccupantId = app.Id;
+                app.SocketId = socket.Id;
+                app.Unplugged = false;
+                Emit(new SimEvent { Type = SimEventType.PluggedIn, Appliance = app.Id, Socket = socket.Id });
+                reason = "";
+                return true;
+            }
+
+            var at = FindSocket(app.SocketId);
+            if (app.Unplugged)
+            {
+                app.Unplugged = false;
+                Emit(new SimEvent { Type = SimEventType.PluggedIn, Appliance = app.Id, Socket = at.Id });
+            }
+            else if (FloorMode)
+            {
+                int x = Cm(SocketX(at));
+                Vacate(app);
+                app.FloorRoomId = at.RoomId;
+                app.FloorXCm = x;
+                app.FloorZCm = BackZCm;
+                Emit(new SimEvent { Type = SimEventType.Unplugged, Appliance = app.Id, Socket = at.Id });
+            }
+            else
+            {
+                app.Unplugged = true;
+                Emit(new SimEvent { Type = SimEventType.Unplugged, Appliance = app.Id, Socket = at.Id });
+            }
+            reason = "";
+            return true;
+        }
+
+        /// <summary>Day mode: appliances are put down on the floor (rules placeMode "floor"), not beside a socket.</summary>
+        public bool FloorMode => string.Equals(Rules.placeMode, "floor", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Puts what the character carries down, unplugged: "floor" mode at (<paramref name="xCm"/>,
+        /// <paramref name="zCm"/>) in the character's room; "socket" mode beside the nearest free socket within
+        /// <paramref name="rangeCm"/> of that point (null depth = along the room only; only ahead when
+        /// <paramref name="ahead"/> is 1 or -1).
+        /// </summary>
+        private bool PutDown(int xCm, int? zCm, int rangeCm, int ahead, SimEventType kind, out string reason)
+        {
+            var ch = Character;
+            var app = FindAppliance(ch.CarryingId);
+            if (FloorMode)
+            {
+                app.FloorRoomId = ch.RoomId;
+                app.FloorXCm = xCm;
+                app.FloorZCm = zCm ?? ch.ZCm;
+                app.Unplugged = false;
+                ch.CarryingId = "";
+                Emit(new SimEvent { Type = kind, Appliance = app.Id, Room = ch.RoomId });
+                reason = "";
+                return true;
+            }
+            var socket = NearestFreeSocket(ch.RoomId, xCm, zCm, rangeCm, ahead);
+            if (socket == null) return Reject("reject_no_free_socket", out reason);
+            socket.OccupantId = app.Id;
+            app.SocketId = socket.Id;
+            app.Unplugged = true;
+            ch.CarryingId = "";
+            Emit(new SimEvent { Type = kind, Appliance = app.Id, Socket = socket.Id, Room = ch.RoomId });
+            reason = "";
+            return true;
+        }
+
+        /// <summary>
+        /// The free socket of <paramref name="roomId"/> nearest (<paramref name="xCm"/>, <paramref name="zCm"/>), no
+        /// further than <paramref name="rangeCm"/> across the floor (a socket is reached from <see cref="BackZCm"/>;
+        /// null depth = measure along the room only); with <paramref name="ahead"/> 1 or -1 only sockets on that side
+        /// count. Null if none.
+        /// </summary>
+        public SocketState NearestFreeSocket(string roomId, int xCm, int? zCm, int rangeCm, int ahead)
+        {
+            SocketState best = null;
+            int bestDist = int.MaxValue;
+            foreach (var s in _sockets)
+            {
+                if (s.RoomId != roomId || s.OccupantId.Length > 0 || s.Reserved || s.CordSocketId.Length > 0) continue;
+                int dx = Cm(SocketX(s)) - xCm;
+                if (ahead != 0 && dx != 0 && Math.Sign(dx) != ahead) continue;
+                long d2 = Dist2(xCm, zCm ?? BackZCm, xCm + dx, BackZCm);
+                if (d2 > (long)rangeCm * rangeCm) continue;
+                int d = (int)Math.Sqrt(d2);
+                if (d < bestDist)
+                {
+                    best = s;
+                    bestDist = d;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// The appliance in a socket or on the floor of <paramref name="roomId"/> nearest (<paramref name="xCm"/>,
+        /// <paramref name="zCm"/>) within reach across the floor, or null (one in a socket is reached from
+        /// <see cref="BackZCm"/>). <paramref name="unpluggedOnly"/> = only ones unplugged or on the floor.
+        /// </summary>
+        public ApplianceState NearestAppliance(string roomId, int xCm, int zCm, int rangeCm, bool unpluggedOnly = false)
+        {
+            ApplianceState pick = null;
+            int pickDist = int.MaxValue;
+            foreach (var app in _appliancesById)
+            {
+                int x, z;
+                if (unpluggedOnly && !app.Unplugged && app.FloorRoomId.Length == 0) continue;
+                if (app.SocketId.Length > 0)
+                {
+                    var s = FindSocket(app.SocketId);
+                    if (s.RoomId != roomId) continue;
+                    x = Cm(SocketX(s));
+                    z = BackZCm;
+                }
+                else if (app.FloorRoomId.Length > 0)
+                {
+                    if (app.FloorRoomId != roomId) continue;
+                    x = app.FloorXCm;
+                    z = app.FloorZCm;
+                }
+                else continue;
+                long d2 = Dist2(xCm, zCm, x, z);
+                if (d2 > (long)rangeCm * rangeCm) continue;
+                int d = (int)Math.Sqrt(d2);
+                if (d < pickDist)
+                {
+                    pick = app;
+                    pickDist = d;
+                }
+            }
+            return pick;
+        }
+
+        /// <summary>Depth in metres of an appliance in a socket (the back of the walkable floor) or on the floor; NaN while it is carried.</summary>
+        public float ApplianceZ(ApplianceState app)
+        {
+            if (app.SocketId.Length > 0) return BackZCm / 100f;
+            if (app.FloorRoomId.Length > 0) return app.FloorZ;
+            return float.NaN;
+        }
+
+        /// <summary>x in metres of an appliance in a socket or on the floor; NaN while it is carried.</summary>
+        public float ApplianceX(ApplianceState app)
+        {
+            if (app.SocketId.Length > 0) return SocketX(FindSocket(app.SocketId));
+            if (app.FloorRoomId.Length > 0) return app.FloorX;
+            return float.NaN;
+        }
+
+        /// <summary>
+        /// Day mode: one tick of the keyboard character. Mid-jump it only flies on (<see cref="RulesConfig.jumpTicks"/>
+        /// ticks, landing in the room above or below at the same x and depth). With the jetpack, first up and down
+        /// (<see cref="FlyTick"/>). Then A/D walk (or fly) along the room, through a door only within <see cref="RulesConfig.doorDepthMetres"/> of the open front:
+        /// walking into a door's wall further in slides the character out to the doorway instead of stopping it. W/S
+        /// walk in and out between the open front and <see cref="RulesConfig.walkDepthMetres"/>.
+        /// </summary>
         private void KeyboardTick()
         {
             var ch = Character;
-            if (ch.IsClimbing)
+            ch.PrevXCm = ch.XCm;
+            ch.PrevZCm = ch.ZCm;
+            if (ch.IsJumping)
             {
-                ch.ClimbTicksLeft--;
-                if (ch.ClimbTicksLeft == 0)
-                {
-                    EnterRoom(ch.ClimbToRoomId);
-                    var to = FindRoom(ch.ClimbToRoomId);
-                    ch.XCm = Math.Max(Cm(to.X), Math.Min(Cm(to.X + to.Width), ch.XCm));
-                }
+                ch.JumpTicksLeft--;
+                if (ch.JumpTicksLeft == 0) EnterRoom(ch.JumpToRoomId);
                 return;
+            }
+            if (ch.OnStairs)
+            {
+                StairsTick();
+                return;
+            }
+            if (UsesJetpack) FlyTick();
+
+            int depthStep = Math.Max(1, Cm(Rules.depthWalkSpeed / Rules.ticksPerSecond));
+            if (ch.DepthDir != 0)
+            {
+                int z = ch.ZCm + ch.DepthDir * depthStep;
+                ch.ZCm = Math.Max(0, Math.Min(Cm(Rules.walkDepthMetres), z));
             }
             if (ch.WalkDir == 0) return;
 
             const int wallGapCm = 30;
+            int doorCm = Cm(Rules.doorDepthMetres);
             int x = ch.XCm + ch.WalkDir * Math.Max(1, Cm(Rules.walkSpeed / Rules.ticksPerSecond));
+            if (UsesStairs && TryStepOntoStairs(x)) return;
             var room = FindRoom(ch.RoomId);
             for (int guard = 0; guard < _rooms.Count; guard++)
             {
                 int left = Cm(room.X);
                 int right = Cm(room.X + room.Width);
                 if (x >= left && x <= right) break;
-                var next = NeighbourThroughDoor(room, x > right ? 1 : -1);
+                // Only the doorway, at the open front, leads into the next room; deeper in it is a wall.
+                var door = NeighbourThroughDoor(room, x > right ? 1 : -1);
+                var next = ch.ZCm <= doorCm ? door : null;
                 if (next == null)
                 {
-                    x = x > right ? right - wallGapCm : left + wallGapCm;
+                    // Stop at the wall gap, but never push back from a spot already past it (that jittered every tick).
+                    x = x > right ? Math.Max(ch.XCm, right - wallGapCm) : Math.Min(ch.XCm, left + wallGapCm);
+                    // Pushing on a wall with a door in it: step out toward the doorway (unless W/S is steering).
+                    if (door != null && ch.DepthDir == 0) ch.ZCm = Math.Max(doorCm, ch.ZCm - depthStep);
                     break;
                 }
                 room = next;
                 EnterRoom(room.Id);
             }
             ch.XCm = x;
+        }
+
+        /// <summary>
+        /// Day mode, stairs: walking along from <see cref="CharacterState.XCm"/> to <paramref name="nextX"/> in the front
+        /// strip of the room (<see cref="RulesConfig.stairsDepthMetres"/>) across the bottom step going up, or across the
+        /// top step going down, puts the character on that flight. True if it did (the step is then taken on the stairs).
+        /// </summary>
+        private bool TryStepOntoStairs(int nextX)
+        {
+            var ch = Character;
+            if (ch.ZCm > Cm(Rules.stairsDepthMetres) || ch.IsAirborne) return false;
+            foreach (var door in _doors)
+            {
+                if (!door.IsFlight || !door.IsOpen) continue;
+                int up = Math.Sign(door.TopXCm - door.BottomXCm);
+                bool onto;
+                if (ch.RoomId == door.LowerRoomId)
+                    onto = ch.WalkDir == up && (ch.XCm - door.BottomXCm) * up <= 0 && (nextX - door.BottomXCm) * up > 0;
+                else if (ch.RoomId == door.UpperRoomId)
+                    onto = ch.WalkDir == -up && (ch.XCm - door.TopXCm) * up >= 0 && (nextX - door.TopXCm) * up < 0;
+                else continue;
+                if (!onto) continue;
+                ch.StairsDoorId = door.Id;
+                ch.VyCm = 0;
+                PlaceOnStairs(door, nextX);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Day mode, stairs: one tick on a flight. A/D walk up or down it at <see cref="RulesConfig.stairsSpeed"/>; past
+        /// either end the character steps off onto that floor. W/S do nothing here.
+        /// </summary>
+        private void StairsTick()
+        {
+            var ch = Character;
+            var door = FindDoor(ch.StairsDoorId);
+            if (ch.WalkDir == 0) return;
+            int x = ch.XCm + ch.WalkDir * Math.Max(1, Cm(Rules.stairsSpeed / Rules.ticksPerSecond));
+            PlaceOnStairs(door, x);
+        }
+
+        /// <summary>
+        /// Puts the character at x (cm) on a flight: its room is the lower one on the bottom half and the upper one on
+        /// the top half, and <see cref="CharacterState.AirCm"/> is its height over that room's floor. At or past either
+        /// end it steps off, onto the floor there.
+        /// </summary>
+        private void PlaceOnStairs(DoorState door, int x)
+        {
+            var ch = Character;
+            int up = Math.Sign(door.TopXCm - door.BottomXCm);
+            int length = Math.Abs(door.TopXCm - door.BottomXCm);
+            int along = (x - door.BottomXCm) * up;
+            int floorCm = Cm(Rules.floorHeightMetres);
+            string room;
+            if (along <= 0 || along >= length)
+            {
+                bool top = along >= length;
+                ch.XCm = top ? door.TopXCm : door.BottomXCm;
+                room = top ? door.UpperRoomId : door.LowerRoomId;
+                ch.AirCm = 0;
+                ch.StairsDoorId = "";
+            }
+            else
+            {
+                ch.XCm = x;
+                int height = (int)((long)floorCm * along / length);
+                room = along * 2 < length ? door.LowerRoomId : door.UpperRoomId;
+                ch.AirCm = room == door.LowerRoomId ? height : height - floorCm;
+            }
+            if (room != ch.RoomId) EnterRoom(room);
+        }
+
+        /// <summary>
+        /// Day mode: one tick of the jetpack. Gravity pulls down, a held Space pushes up (<see cref="JetpackThrustCm"/>);
+        /// speed is capped both ways. Rising past the ceiling enters the room above when there is one there, else the
+        /// head stops <see cref="RulesConfig.headroomMetres"/> under it. Falling lands on the first floor below, or
+        /// passes through it into the room under it once after a drop (S+Space / Shift+Space).
+        /// </summary>
+        private void FlyTick()
+        {
+            var ch = Character;
+            if (!ch.IsAirborne && !ch.Thrusting && !ch.DropThrough) return;
+            int vy = ch.VyCm - AccelCm(Rules.gravity);
+            if (ch.Thrusting) vy += JetpackThrustCm();
+            ch.VyCm = Math.Max(-SpeedCm(Rules.maxFallSpeed), Math.Min(SpeedCm(Rules.jetpackMaxRise), vy));
+            ch.AirCm += ch.VyCm;
+
+            int floorCm = Cm(Rules.floorHeightMetres);
+            if (ch.VyCm > 0)
+            {
+                var above = RoomAcross(1);
+                if (above != null && ch.AirCm >= floorCm)
+                {
+                    EnterRoom(above.Id);
+                    ch.AirCm -= floorCm;
+                }
+                else if (above == null && ch.AirCm > floorCm - Cm(Rules.headroomMetres))
+                {
+                    ch.AirCm = Math.Max(0, floorCm - Cm(Rules.headroomMetres));
+                    ch.VyCm = 0;
+                }
+            }
+            else if (ch.AirCm <= 0)
+            {
+                var below = ch.DropThrough ? RoomAcross(-1) : null;
+                if (below != null)
+                {
+                    EnterRoom(below.Id);
+                    ch.AirCm += floorCm;
+                    ch.DropThrough = false;
+                }
+                else
+                {
+                    ch.AirCm = 0;
+                    ch.VyCm = 0;
+                    ch.DropThrough = false;
+                }
+            }
         }
 
         /// <summary>The room on the same floor right next to this one on that side, joined by an open door. Null = a wall.</summary>
@@ -1526,9 +1966,14 @@ namespace Trouble.Sim
 
             foreach (var app in _appliances)
             {
-                bool seen = app.SocketId.Length == 0 || IsRoomVisible(FindSocket(app.SocketId).RoomId);
+                bool seen = app.SocketId.Length > 0 ? IsRoomVisible(FindSocket(app.SocketId).RoomId)
+                    : app.FloorRoomId.Length == 0 || IsRoomVisible(app.FloorRoomId);
                 if (!seen) continue;
                 app.SeenSocketId = app.SocketId;
+                app.SeenUnplugged = app.Unplugged;
+                app.SeenFloorRoomId = app.FloorRoomId;
+                app.SeenFloorX = app.FloorX;
+                app.SeenFloorZ = app.FloorZ;
                 app.SeenSwitchedOn = app.SwitchedOn;
                 app.SeenPowered = app.Powered;
                 app.SeenTick = Now;

@@ -221,5 +221,49 @@ namespace Trouble.Tests
             // Assert: the floor shows as a band (the back edge is drawn above the front edge).
             Assert.Greater(back.y, front.y);
         }
+
+        [Test]
+        public void WorldToViewportTilted_Turned_FocusPointStaysScreenCentre()
+        {
+            // Arrange
+            var focus = new Vector2(3f, 4f);
+
+            // Act
+            var vp = CameraMath.WorldToViewportTilted(focus, 0f, 6f, 30f, 20f, Aspect, new Vector3(focus.x, focus.y, 0f), 30f);
+
+            // Assert
+            Assert.AreEqual(0.5f, vp.x, 1e-4f);
+            Assert.AreEqual(0.5f, vp.y, 1e-4f);
+        }
+
+        [Test]
+        public void ViewportToPlaneTilted_Turned_InvertsWorldToViewportTilted()
+        {
+            // Arrange
+            var focus = new Vector2(1f, 3f);
+            var point = new Vector2(4f, 1.5f);
+
+            // Act
+            var vp = CameraMath.WorldToViewportTilted(focus, 0f, 9f, 30f, 25f, Aspect, new Vector3(point.x, point.y, 0f), -30f);
+            var back = CameraMath.ViewportToPlaneTilted(focus, 0f, 9f, 30f, 25f, Aspect, vp, -30f);
+
+            // Assert
+            Assert.AreEqual(point.x, back.x, 1e-3f);
+            Assert.AreEqual(point.y, back.y, 1e-3f);
+        }
+
+        [Test]
+        public void WorldToViewportTilted_TurnedRight_BackWallSlidesLeftOfTheFront()
+        {
+            // Arrange: the same x at the open front and at the back wall, the camera turned to look right.
+            var focus = new Vector2(0f, 1.5f);
+
+            // Act
+            var front = CameraMath.WorldToViewportTilted(focus, 0f, 8f, 30f, 10f, Aspect, new Vector3(0f, 1.5f, 0f), 25f);
+            var back = CameraMath.WorldToViewportTilted(focus, 0f, 8f, 30f, 10f, Aspect, new Vector3(0f, 1.5f, 4f), 25f);
+
+            // Assert: looking right from the left, the room's depth opens toward the left of the screen.
+            Assert.Less(back.x, front.x);
+        }
     }
 }

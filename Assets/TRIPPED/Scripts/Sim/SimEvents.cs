@@ -31,6 +31,14 @@ namespace Trouble.Sim
         HeartLost,
         /// <summary>Day mode: the character took an appliance out of its socket to carry it (Appliance, Socket).</summary>
         PickedUp,
+        /// <summary>Day mode: the character put what it carried down beside a socket or on the floor, unplugged (Appliance, Socket or Room).</summary>
+        PutDown,
+        /// <summary>Day mode: the character threw what it carried (Appliance, Socket or Room where it landed).</summary>
+        Thrown,
+        /// <summary>Day mode: an appliance was plugged in with F (Appliance, Socket).</summary>
+        PluggedIn,
+        /// <summary>Day mode: an appliance was unplugged with F (Appliance, Socket).</summary>
+        Unplugged,
     }
 
     /// <summary>One appliance that adds to a load sum, for messages like "Kettle 6 + Toaster 4 = 10 > 8".</summary>

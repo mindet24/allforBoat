@@ -46,6 +46,18 @@ namespace Trouble.Tests
         }
 
         [Test]
+        public void FamilyMemberStrip_IsACharacterWithoutProblems()
+        {
+            // Act
+            var plan = ArtImportRules.Plan("Assets/TRIPPED/Resources/Art/Characters/family_mom.png", 703, 703, Catalog);
+
+            // Assert
+            Assert.AreEqual(ArtKind.Character, plan.Kind);
+            Assert.AreEqual(1, plan.Frames);
+            Assert.IsEmpty(plan.Problems);
+        }
+
+        [Test]
         public void CharacterStripThatIsNotSquareFrames_IsReported()
         {
             // Act

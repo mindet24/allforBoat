@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 064604235fc07d744add233f1bf9081b, type: 3}
+  m_Name: RigConfig
+  m_EditorClassIdentifier: Trouble.Game::Trouble.Game.RigConfig
+  useRig: 1
+  rigFolder: Art/Characters/Rig
+  breatheAmount: 0.015
+  breatheSpeed: 2.4
+  idleArmSway: 3
+  walkStepRate: 4
+  walkLegSwing: 14
+  walkLegLift: 0.06
+  walkArmSwing: 16
+  walkBob: 0.035
+  walkLean: 4
+  stairsStepRate: 6
+  stairsLegSwing: 22
+  stairsLegLift: 0.12
+  stairsArmSwing: 26
+  stairsBob: 0.06
+  stairsLean: 10
+  flyArmRaise: 70
+  flyLegTuck: 0.05
+  flyLegSpread: 8
+  carryArmRaise: 160
+  carryArmSway: 6
+  liftTime: 0.35
+  liftCrouch: 0.14
+  putDownTime: 0.3
+  putDownCrouch: 0.12
+  throwTime: 0.45
+  throwWindUp: 0.4
+  throwWindUpRaise: 200
+  throwReleaseRaise: 70
+  throwLeanBack: 8
+  throwLeanForward: 14
+  plugTime: 0.35
+  plugCrouch: 0.18
+  plugReach: 45

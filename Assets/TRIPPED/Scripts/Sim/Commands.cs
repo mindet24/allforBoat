@@ -15,10 +15,20 @@ namespace Trouble.Sim
         CancelAction,
         /// <summary>Day mode, keyboard: hold a walking direction (Index -1 left, 0 stop, 1 right).</summary>
         Walk,
-        /// <summary>Day mode, keyboard: take the stairs next to the character (Index 1 up, -1 down).</summary>
-        Climb,
-        /// <summary>Day mode, keyboard (E): reset the panel, plug in what is carried, or pick up what is nearest.</summary>
+        /// <summary>Day mode, keyboard: hold a depth direction (Index 1 = W, into the room, -1 = S, toward the open front, 0 = stop).</summary>
+        WalkDepth,
+        /// <summary>Day mode, keyboard (E): reset the panel, put down (or plug in) what is carried, or pick up what is nearest.</summary>
         Interact,
+        /// <summary>Day mode, keyboard (F): plug in or unplug the appliance nearest the character.</summary>
+        TogglePlug,
+        /// <summary>Day mode, keyboard (hold E): throw what is carried ahead, up to <see cref="RulesConfig.throwMetres"/>.</summary>
+        Throw,
+        /// <summary>Day mode, keyboard, verticalMove "jump": jump to the room straight above (Index 1, Space) or below (-1, Shift+Space).</summary>
+        Jump,
+        /// <summary>Day mode, keyboard, verticalMove "jetpack": Space held (Index 1) or released (0); the jetpack pushes up while held.</summary>
+        Thrust,
+        /// <summary>Day mode, keyboard, verticalMove "jetpack" (S+Space / Shift+Space): drop through the floor into the room below.</summary>
+        Drop,
     }
 
     /// <summary>
@@ -59,8 +69,13 @@ namespace Trouble.Sim
         public static Command MoveTo(string room, bool append = false) => new Command(CommandType.MoveTo, room, append: append);
         public static Command CancelAction(int index) => new Command(CommandType.CancelAction, index: index);
         public static Command Walk(int direction) => new Command(CommandType.Walk, index: direction);
-        public static Command Climb(int direction) => new Command(CommandType.Climb, index: direction);
+        public static Command WalkDepth(int direction) => new Command(CommandType.WalkDepth, index: direction);
         public static Command Interact() => new Command(CommandType.Interact);
+        public static Command TogglePlug() => new Command(CommandType.TogglePlug);
+        public static Command Throw() => new Command(CommandType.Throw);
+        public static Command Jump(int direction) => new Command(CommandType.Jump, index: direction);
+        public static Command Thrust(bool on) => new Command(CommandType.Thrust, index: on ? 1 : 0);
+        public static Command Drop() => new Command(CommandType.Drop);
 
         public override string ToString() => $"{Type}({A}{(B.Length > 0 ? ", " + B : "")}{(Type == CommandType.SetSwitch ? (On ? ", on" : ", off") : "")})";
     }

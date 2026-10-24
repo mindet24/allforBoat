@@ -15,6 +15,8 @@ namespace Trouble.Sim
         public string shortLabel = "";
         /// <summary>Height of the sprite in the house, in metres. Read by the view.</summary>
         public float worldHeight = 0.6f;
+        /// <summary>Day mode: how heavy it is to carry (0 = light); each point takes thrust from the jetpack.</summary>
+        public int weight;
     }
 
     /// <summary>The whole catalog.json file.</summary>

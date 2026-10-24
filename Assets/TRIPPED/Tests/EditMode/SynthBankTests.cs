@@ -11,7 +11,7 @@ namespace Trouble.Tests
     {
         private static readonly string[] Required =
         {
-            "step", "stairs_step", "pickup", "plug_in", "reject",
+            "step", "jump", "jetpack", "pickup", "plug_in", "reject",
             "request_new_relaxed", "request_new_normal", "request_new_urgent", "request_done", "request_missed",
             "urgent_tick", "heart_lost", "combo_up", "overload_hum", "spark", "blackout", "power_up", "breaker_flip",
             "kettle_loop", "toaster_loop", "microwave_loop", "fridge_loop", "tv_loop", "heater_loop", "washer_loop",

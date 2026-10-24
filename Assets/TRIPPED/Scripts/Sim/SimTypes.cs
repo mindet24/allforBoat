@@ -33,6 +33,16 @@ namespace Trouble.Sim
         public string RoomB { get; internal set; }
         public bool IsStairs { get; internal set; }
         public bool IsOpen { get; internal set; }
+        /// <summary>Day mode, stairs between two floors: the room at the foot of the flight. Empty for doors.</summary>
+        public string LowerRoomId { get; internal set; } = "";
+        /// <summary>Day mode, stairs between two floors: the room at the top of the flight. Empty for doors.</summary>
+        public string UpperRoomId { get; internal set; } = "";
+        /// <summary>Day mode, stairs: x (cm) of the bottom step, on the lower floor.</summary>
+        public int BottomXCm { get; internal set; }
+        /// <summary>Day mode, stairs: x (cm) of the top step, on the upper floor.</summary>
+        public int TopXCm { get; internal set; }
+        /// <summary>True for stairs that can be walked in day mode (two rooms on different floors, a flight placed).</summary>
+        public bool IsFlight => LowerRoomId.Length > 0 && TopXCm != BottomXCm;
 
         public string OtherRoom(string roomId) => roomId == RoomA ? RoomB : RoomA;
     }
@@ -99,6 +109,18 @@ namespace Trouble.Sim
         public string SocketId { get; internal set; }
         public bool SwitchedOn { get; internal set; }
         public bool Powered { get; internal set; }
+        /// <summary>Day mode: standing at its socket but not plugged in, so it draws nothing until F.</summary>
+        public bool Unplugged { get; internal set; }
+        /// <summary>Day mode, placeMode "floor": room it lies in on the floor, away from any socket. Empty = not on the floor.</summary>
+        public string FloorRoomId { get; internal set; } = "";
+        /// <summary>Day mode: x (centimetres) where it lies on the floor of <see cref="FloorRoomId"/>.</summary>
+        public int FloorXCm { get; internal set; }
+        /// <summary>x in metres where it lies on the floor.</summary>
+        public float FloorX => FloorXCm / 100f;
+        /// <summary>Day mode: depth (centimetres from the open front) where it lies on the floor of <see cref="FloorRoomId"/>.</summary>
+        public int FloorZCm { get; internal set; }
+        /// <summary>Depth in metres where it lies on the floor.</summary>
+        public float FloorZ => FloorZCm / 100f;
 
         // What the player last saw (V4). Views show these instead of the live values while the
         // appliance's room is not visible.
@@ -107,6 +129,11 @@ namespace Trouble.Sim
         public string SeenSocketId { get; internal set; }
         public bool SeenSwitchedOn { get; internal set; }
         public bool SeenPowered { get; internal set; }
+        public bool SeenUnplugged { get; internal set; }
+        /// <summary>Floor room it was in when last seen (placeMode "floor"). Empty = not on the floor.</summary>
+        public string SeenFloorRoomId { get; internal set; } = "";
+        public float SeenFloorX { get; internal set; }
+        public float SeenFloorZ { get; internal set; }
         /// <summary>Tick it was last seen. -1 = never.</summary>
         public int SeenTick { get; internal set; } = -1;
     }
@@ -183,15 +210,44 @@ namespace Trouble.Sim
         public float X => XCm / 100f;
         /// <summary>Day mode: held walking direction, -1, 0 or 1.</summary>
         public int WalkDir { get; internal set; }
+        /// <summary>Day mode: depth into the room, centimetres from the open front (0) to rules.walkDepthMetres.</summary>
+        public int ZCm { get; internal set; }
+        /// <summary>Day mode: depth in metres, for the view.</summary>
+        public float Z => ZCm / 100f;
+        /// <summary>
+        /// Day mode: x and depth (centimetres) at the start of the last tick, so the view can glide from there to
+        /// <see cref="XCm"/> / <see cref="ZCm"/> between ticks instead of stepping.
+        /// </summary>
+        public int PrevXCm { get; internal set; }
+        public int PrevZCm { get; internal set; }
+        /// <summary>Day mode: held depth direction: 1 = W (into the room), -1 = S (toward the open front), 0 = none.</summary>
+        public int DepthDir { get; internal set; }
         /// <summary>Day mode: last direction walked, -1 or 1.</summary>
         public int Facing { get; internal set; } = 1;
-        public bool IsClimbing => ClimbTicksLeft > 0;
-        public string ClimbFromRoomId { get; internal set; } = "";
-        public string ClimbToRoomId { get; internal set; } = "";
-        public int ClimbTicks { get; internal set; }
-        public int ClimbTicksLeft { get; internal set; }
-        /// <summary>0 at the bottom of the climb, 1 at the top (or the other way when going down).</summary>
-        public float ClimbProgress => ClimbTicks <= 0 ? 1f : 1f - (float)ClimbTicksLeft / ClimbTicks;
+        /// <summary>Day mode: height of the feet above the floor of <see cref="RoomId"/>, centimetres (0 = standing on it).</summary>
+        public int AirCm { get; internal set; }
+        /// <summary>Day mode: height above the room's floor in metres, for the view.</summary>
+        public float Air => AirCm / 100f;
+        /// <summary>Day mode: vertical speed, centimetres per tick (up = positive).</summary>
+        public int VyCm { get; internal set; }
+        /// <summary>Day mode: Space is held, the jetpack pushes up.</summary>
+        public bool Thrusting { get; internal set; }
+        /// <summary>Day mode: dropping (S+Space / Shift+Space): the next floor it falls onto is passed through once.</summary>
+        public bool DropThrough { get; internal set; }
+        /// <summary>Day mode, verticalMove "jump": in the air, jumping to the floor above or below (Space / Shift+Space).</summary>
+        public bool IsJumping => JumpTicksLeft > 0;
+        public string JumpFromRoomId { get; internal set; } = "";
+        public string JumpToRoomId { get; internal set; } = "";
+        public int JumpTicks { get; internal set; }
+        public int JumpTicksLeft { get; internal set; }
+        /// <summary>Day mode: off the floor (jumping, flying, falling or dropping). E, F and throwing wait until it lands.</summary>
+        public bool IsAirborne => !OnStairs && (IsJumping || AirCm != 0 || VyCm != 0 || DropThrough);
+        /// <summary>Day mode, verticalMove "stairs": the stairs the character is walking on. Empty = not on stairs.</summary>
+        public string StairsDoorId { get; internal set; } = "";
+        /// <summary>True while walking up or down a flight of stairs (its height is <see cref="AirCm"/> over its room's floor).</summary>
+        public bool OnStairs => StairsDoorId.Length > 0;
+        /// <summary>Hands free to pick up, put down, throw or plug: not in the air and not on the stairs.</summary>
+        public bool CanUseHands => !IsAirborne && !OnStairs;
         /// <summary>First entry is the action in progress.</summary>
         public IReadOnlyList<CharacterAction> Queue => QueueList;
 
