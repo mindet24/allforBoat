@@ -13,13 +13,13 @@
   "panelRoom": "laundry",
   "panelPos": 0.12,
   "rooms": [
-    { "id": "laundry",  "name": "Basement",    "floor": 0, "x": 4,  "width": 9, "theme": "laundry",  "capRandom": true, "capMin": 5, "capMax": 10 },
-    { "id": "living",   "name": "Living room", "floor": 1, "x": 0,  "width": 9, "theme": "living",   "capRandom": true, "capMin": 5, "capMax": 10 },
-    { "id": "kitchen",  "name": "Kitchen",     "floor": 1, "x": 9,  "width": 8, "theme": "kitchen",  "capRandom": true, "capMin": 6, "capMax": 10 },
-    { "id": "bedroom",  "name": "Bedroom",     "floor": 2, "x": 0,  "width": 6, "theme": "bedroom",  "capRandom": true, "capMin": 3, "capMax": 10 },
-    { "id": "bathroom", "name": "Bathroom",    "floor": 2, "x": 6,  "width": 5, "theme": "bathroom", "capRandom": true, "capMin": 4, "capMax": 10 },
-    { "id": "kidroom",  "name": "Kid's room",  "floor": 2, "x": 11, "width": 6, "theme": "bedroom",  "capRandom": true, "capMin": 3, "capMax": 10 },
-    { "id": "study",    "name": "Study",       "floor": 3, "x": 4,  "width": 9, "theme": "study",    "capRandom": true, "capMin": 3, "capMax": 10 }
+    { "id": "laundry",  "name": "Basement",    "floor": 0, "x": 4,  "width": 9, "theme": "laundry",  "capRandom": true, "capMin": 9, "capMax": 12 },
+    { "id": "living",   "name": "Living room", "floor": 1, "x": 0,  "width": 9, "theme": "living",   "capRandom": true, "capMin": 7, "capMax": 12 },
+    { "id": "kitchen",  "name": "Kitchen",     "floor": 1, "x": 9,  "width": 8, "theme": "kitchen",  "capRandom": true, "capMin": 10, "capMax": 12 },
+    { "id": "bedroom",  "name": "Bedroom",     "floor": 2, "x": 0,  "width": 6, "theme": "bedroom",  "capRandom": true, "capMin": 3, "capMax": 12 },
+    { "id": "bathroom", "name": "Bathroom",    "floor": 2, "x": 6,  "width": 5, "theme": "bathroom", "capRandom": true, "capMin": 7, "capMax": 12 },
+    { "id": "kidroom",  "name": "Kid's room",  "floor": 2, "x": 11, "width": 6, "theme": "bedroom",  "capRandom": true, "capMin": 3, "capMax": 12 },
+    { "id": "study",    "name": "Study",       "floor": 3, "x": 4,  "width": 9, "theme": "study",    "capRandom": true, "capMin": 3, "capMax": 12 }
   ],
   "doors": [
     { "id": "D_living_kitchen",   "a": "living",   "b": "kitchen",  "kind": "door",   "open": true },
@@ -33,6 +33,7 @@
   "sockets": [
     { "id": "B1", "room": "laundry",  "circuit": "" },
     { "id": "B2", "room": "laundry",  "circuit": "" },
+    { "id": "B3", "room": "laundry",  "circuit": "" },
     { "id": "L1", "room": "living",   "circuit": "" },
     { "id": "L2", "room": "living",   "circuit": "" },
     { "id": "L3", "room": "living",   "circuit": "" },
@@ -57,7 +58,7 @@
     { "id": "toaster",   "type": "toaster",   "socket": "K1", "load": 3, "useSec": 12 },
     { "id": "fridge",    "type": "fridge",    "socket": "K2", "load": 1, "useSec": 30 },
     { "id": "kettle",    "type": "kettle",    "socket": "K3", "load": 6, "useSec": 8 },
-    { "id": "microwave", "type": "microwave", "socket": "K4", "load": 4, "useSec": 10 },
+    { "id": "microwave", "type": "microwave", "socket": "B2", "load": 4, "useSec": 10 },
     { "id": "tv",        "type": "tv",        "socket": "L1", "load": 1, "useSec": 45 },
     { "id": "heater",    "type": "heater",    "socket": "L2", "load": 6, "useSec": 30 },
     { "id": "washer",    "type": "washer",    "socket": "B1", "load": 5, "useSec": 40 },
@@ -67,7 +68,7 @@
   "day": {
     "enabled": true,
     "seed": 0,
-    "houseCapacity": 35,
+    "houseCapacity": 48,
     "hearts": 3,
     "uniformUseSec": 0,
     "firstRequestSec": 3,

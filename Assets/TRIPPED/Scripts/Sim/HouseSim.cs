@@ -348,12 +348,12 @@ namespace Trouble.Sim
             {
                 if (!app.Powered) continue;
                 var req = FindRequest(app.Id);
-                if (req == null || req.Done) continue;
+                if (req == null || !req.IsActive || !ServesRequest(app, req)) continue;
                 req.ProgressTicks++;
                 if (req.ProgressTicks >= req.DurationTicks)
                 {
                     req.Done = true;
-                    app.SwitchedOn = false;
+                    if (!IsDayMode) app.SwitchedOn = false;
                     if (IsDayMode)
                     {
                         Score += req.Points;
@@ -768,20 +768,17 @@ namespace Trouble.Sim
                 Emit(new SimEvent { Type = SimEventType.RequestSpawned, Appliance = _requests[i].ApplianceId, Room = _requests[i].RoomId });
         }
 
-        /// <summary>Day mode: an appliance runs while it is in the room of an active request for it.</summary>
+        /// <summary>Day mode: every appliance in a socket draws its load from that room; one being carried draws nothing.</summary>
         private void DayAutoSwitch()
         {
             foreach (var app in _appliances)
-            {
-                if (app.SocketId.Length == 0)
-                {
-                    app.SwitchedOn = false;
-                    continue;
-                }
-                string room = FindSocket(app.SocketId).RoomId;
-                var req = FindRequest(app.Id);
-                app.SwitchedOn = req != null && req.IsActive && req.RoomId == room;
-            }
+                app.SwitchedOn = app.SocketId.Length > 0;
+        }
+
+        /// <summary>Day mode: a request only progresses while its appliance is powered in the requesting room.</summary>
+        private bool ServesRequest(ApplianceState app, RequestState req)
+        {
+            return !IsDayMode || FindSocket(app.SocketId).RoomId == req.RoomId;
         }
 
         private bool IsPowered(ApplianceState app)

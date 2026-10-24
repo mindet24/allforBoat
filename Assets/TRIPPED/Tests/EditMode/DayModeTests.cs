@@ -86,12 +86,14 @@ namespace Trouble.Tests
         public void RollRoomCapacities_RandomRooms_SumToHouseCapacityWithinMinAndMax()
         {
             // Arrange
-            var rooms = Demo().rooms;
+            var demo = Demo();
+            var rooms = demo.rooms;
+            int house = demo.day.houseCapacity;
 
             for (int seed = 1; seed <= 200; seed++)
             {
                 // Act
-                var caps = HouseRoller.RollRoomCapacities(rooms, 35, new SimRandom(seed));
+                var caps = HouseRoller.RollRoomCapacities(rooms, house, new SimRandom(seed));
 
                 // Assert
                 int sum = 0;
@@ -101,7 +103,7 @@ namespace Trouble.Tests
                     Assert.LessOrEqual(caps[r.id], r.capMax, $"seed {seed} room {r.id}");
                     sum += caps[r.id];
                 }
-                Assert.AreEqual(35, sum, $"seed {seed}");
+                Assert.AreEqual(house, sum, $"seed {seed}");
             }
         }
 
@@ -109,11 +111,11 @@ namespace Trouble.Tests
         public void RollRoomCapacities_SameSeed_GivesSameCapacities()
         {
             // Arrange
-            var rooms = Demo().rooms;
+            var demo = Demo();
 
             // Act
-            var first = HouseRoller.RollRoomCapacities(rooms, 35, new SimRandom(77));
-            var second = HouseRoller.RollRoomCapacities(rooms, 35, new SimRandom(77));
+            var first = HouseRoller.RollRoomCapacities(demo.rooms, demo.day.houseCapacity, new SimRandom(77));
+            var second = HouseRoller.RollRoomCapacities(demo.rooms, demo.day.houseCapacity, new SimRandom(77));
 
             // Assert
             CollectionAssert.AreEquivalent(first, second);
@@ -232,7 +234,39 @@ namespace Trouble.Tests
             Assert.IsTrue(sim.Requests[0].Done);
             Assert.AreEqual(3, sim.Score);
             Assert.AreEqual("A1", sim.FindAppliance("kettle").SocketId);
-            Assert.IsFalse(sim.FindAppliance("kettle").SwitchedOn, "Done appliances switch off.");
+            Assert.AreEqual(6, sim.FindCircuit("a").Load, "A plugged appliance keeps drawing after its request is done.");
+        }
+
+        [Test]
+        public void WantedApplianceInAnotherRoom_DoesNotProgressTheRequest()
+        {
+            // Arrange: Mum wants the kettle in room a; it sits powered in room b.
+            var sim = Sim(TwoRooms(10, new[] { "kettle" }));
+            sim.Start();
+
+            // Act
+            Run(sim, 50);
+
+            // Assert
+            Assert.AreEqual(0, sim.Requests[0].ProgressTicks);
+            Assert.IsTrue(sim.FindAppliance("kettle").Powered);
+        }
+
+        [Test]
+        public void PickingUpAnAppliance_RemovesItsLoadFromTheRoom()
+        {
+            // Arrange
+            var sim = Sim(TwoRooms(10, new[] { "kettle" }), Rules(instant: false));
+            sim.Start();
+            WalkTo(sim, KettleX);
+            int before = sim.FindCircuit("b").Load;
+
+            // Act
+            Submit(sim, Command.Interact());
+
+            // Assert
+            Assert.AreEqual(9, before);
+            Assert.AreEqual(3, sim.FindCircuit("b").Load);
         }
 
         [Test]
@@ -293,7 +327,7 @@ namespace Trouble.Tests
         }
 
         [Test]
-        public void ApplianceInItsRoomWithoutRequest_DrawsNoPower()
+        public void PluggedApplianceWithoutRequest_DrawsItsLoad()
         {
             // Arrange
             var sim = Sim(TwoRooms(10, new[] { "kettle" }));
@@ -302,9 +336,23 @@ namespace Trouble.Tests
             sim.Start();
             Run(sim, 5);
 
+            // Assert: kettle 6 + toaster 3, wanted or not.
+            Assert.AreEqual(9, sim.FindCircuit("b").Load);
+            Assert.IsTrue(sim.FindAppliance("toaster").Powered);
+        }
+
+        [Test]
+        public void DayRoomStartingAboveItsLowestCapacity_IsReported()
+        {
+            // Arrange: room a (capacity 5) starts with the kettle (6).
+            var level = TwoRooms(5, new[] { "toaster" });
+            level.appliances[0].socket = "A1";
+
+            // Act
+            var errors = LevelValidator.Validate(level, TestData.Catalog(), Rules());
+
             // Assert
-            Assert.AreEqual(0, sim.FindCircuit("b").Load);
-            Assert.IsFalse(sim.FindAppliance("toaster").Powered);
+            Assert.That(errors, Has.Some.Contains("Room a starts with load 6"));
         }
 
         // ---- walking and stairs -------------------------------------------------------

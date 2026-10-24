@@ -232,6 +232,20 @@ namespace Trouble.Sim
                     if (s.room == r.id && !used.Contains(s.id)) free = true;
                 if (!free) errors.Add($"Room {r.id} has no free socket at the start, so nothing can be carried in.");
             }
+            // Every appliance draws power where it stands, so the start must fit the smallest capacity each room can roll.
+            foreach (var r in level.rooms)
+            {
+                int load = 0;
+                foreach (var a in level.appliances)
+                {
+                    var s = level.sockets.Find(x => x.id == a.socket);
+                    var def = catalog.Find(a.type);
+                    if (s == null || s.room != r.id || def == null) continue;
+                    load += a.loadRandom ? a.loadMax : (a.load > 0 ? a.load : def.load);
+                }
+                int lowest = r.capRandom ? r.capMin : r.capacity;
+                if (load > lowest) errors.Add($"Room {r.id} starts with load {load} but can roll capacity {lowest}, so the day would black out at once.");
+            }
             try
             {
                 HouseRoller.RollRoomCapacities(level.rooms, level.day.houseCapacity, new SimRandom(1));
