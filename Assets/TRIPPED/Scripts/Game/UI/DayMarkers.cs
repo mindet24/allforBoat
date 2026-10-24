@@ -7,9 +7,11 @@ using UnityEngine.UI;
 namespace Trouble.Game
 {
     /// <summary>
-    /// A marker over the room of every active day request: the person's initial in the urgency colour, with the
-    /// appliance wanted and the time left to start it. A marker whose room is off screen becomes an arrow on the edge
-    /// of the house area; clicking a marker pans the camera to that room.
+    /// A marker in the room of every active day request: the person's initial in the urgency colour, with the
+    /// appliance wanted and the time left to start it. Markers sit in one fixed row per room at the label's height,
+    /// side by side from the right wall (<see cref="MarkerLayout"/>), clear of key prompts, the character's head and
+    /// room labels. A marker whose room is off screen becomes an arrow on the edge of the house area; clicking a
+    /// marker pans the camera to that room.
     /// </summary>
     public sealed class DayMarkers
     {
@@ -25,8 +27,9 @@ namespace Trouble.Game
         }
 
         private readonly List<Item> _items = new List<Item>();
-        private readonly Dictionary<string, int> _count = new Dictionary<string, int>();
-        private readonly Dictionary<string, int> _index = new Dictionary<string, int>();
+        private readonly List<RequestState> _roomRequests = new List<RequestState>();
+        private readonly List<Rect> _keepClearWorld = new List<Rect>();
+        private readonly List<Rect> _keepClear = new List<Rect>();
         private RectTransform _root;
         private LevelController _controller;
         private TrippedViewConfig _config;
@@ -47,57 +50,66 @@ namespace Trouble.Game
             // Nothing to point at once the day is over.
             if (cam == null || _root == null || sim.Phase == LevelPhase.Won || sim.Phase == LevelPhase.Lost) { Hide(0); return; }
             int tps = sim.Rules.ticksPerSecond;
+            var rect = _root.rect;
+            float w = rect.width, h = rect.height;
 
-            _count.Clear();
-            _index.Clear();
-            foreach (var r in sim.Requests)
+            // What the markers must never cover, in canvas pixels (y up): key prompts, the character's head and
+            // what it carries, and the room labels.
+            _keepClearWorld.Clear();
+            _controller.House?.CollectKeepClear(_keepClearWorld);
+            _keepClear.Clear();
+            foreach (var wr in _keepClearWorld)
             {
-                if (r.Serial <= 0 || !r.IsActive) continue;
-                _count.TryGetValue(r.RoomId, out int n);
-                _count[r.RoomId] = n + 1;
+                var a = cam.WorldToViewport(new Vector2(wr.xMin, wr.yMin));
+                var b = cam.WorldToViewport(new Vector2(wr.xMax, wr.yMax));
+                _keepClear.Add(Rect.MinMaxRect(a.x * w, a.y * h, b.x * w, b.y * h));
             }
 
-            var rect = _root.rect;
             var area = _config.dayHouseArea;
             var inner = new Rect(area.x + 0.02f, area.y + 0.04f, area.width - 0.04f, area.height - 0.08f);
-            foreach (var r in sim.Requests)
+            foreach (var room in sim.Rooms)
             {
-                if (r.Serial <= 0 || !r.IsActive) continue;
-                var room = sim.FindRoom(r.RoomId);
-                if (room == null) continue;
-                _index.TryGetValue(r.RoomId, out int slot);
-                _index[r.RoomId] = slot + 1;
-                int count = _count[r.RoomId];
+                _roomRequests.Clear();
+                foreach (var r in sim.Requests)
+                    if (r.Serial > 0 && r.IsActive && r.RoomId == room.Id) _roomRequests.Add(r);
+                if (_roomRequests.Count == 0) continue;
 
-                var item = GetItem(ShownCount++);
-                item.RoomId = r.RoomId;
-                item.Root.gameObject.SetActive(true);
+                // One fixed row per room at the label's height, filled from the right wall leftwards.
+                float rowWorldY = HouseLayout.FloorY(room.Floor, _config.roomHeight) + _config.roomHeight - _config.markerRowBelowCeiling;
+                var left = cam.WorldToViewport(new Vector2(room.X + 0.2f, rowWorldY));
+                var right = cam.WorldToViewport(new Vector2(room.X + room.Width - 0.25f, rowWorldY));
+                var slots = MarkerLayout.Row(left.x * w, right.x * w, right.y * h, _config.markerSize, _config.markerGap,
+                    _roomRequests.Count, _keepClear);
 
-                // Several requests in one room sit side by side.
-                float worldX = room.CenterX + (slot - 0.5f * (count - 1)) * 0.95f;
-                float worldY = HouseLayout.FloorY(room.Floor, _config.roomHeight) + 1.55f;
-                var vp = cam.WorldToViewport(new Vector2(worldX, worldY));
-                bool off = AlertRules.EdgePoint(vp, inner, out var edge, out float angle);
-                var at = off ? edge : vp;
-                item.Root.anchoredPosition = new Vector2(at.x * rect.width, -(1f - at.y) * rect.height);
-                item.Arrow.gameObject.SetActive(off);
-                if (off)
+                for (int i = 0; i < _roomRequests.Count; i++)
                 {
-                    item.Arrow.localRotation = Quaternion.Euler(0f, 0f, angle);
-                    item.Arrow.anchoredPosition = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * 40f;
-                }
+                    var r = _roomRequests[i];
+                    var item = GetItem(ShownCount++);
+                    item.RoomId = r.RoomId;
+                    item.Root.gameObject.SetActive(true);
 
-                var color = _config.UrgencyColor(DayRules.ParseUrgency(r.Urgency));
-                item.Circle.color = color;
-                item.ArrowImage.color = color;
-                string initial = AlertRules.Initial(r.Owner);
-                if (item.Initial.text != initial) item.Initial.text = initial;
-                string caption = r.ProgressTicks > 0
-                    ? NameOf(sim, r.ApplianceId)
-                    : NameOf(sim, r.ApplianceId) + " " + HudFormat.TimeLeft(r.DueTicks, sim.Now, tps);
-                if (item.Caption.text != caption) item.Caption.text = caption;
-                // Captions of markers in the same room are listed one under the other so they never overlap.
-                item.Caption.rectTransform.anchoredPosition = new Vector2(0f, -2f - slot * 24f);
+                    var centre = slots[i].center;
+                    var vp = new Vector2(centre.x / Mathf.Max(1f, w), centre.y / Mathf.Max(1f, h));
+                    bool off = AlertRules.EdgePoint(vp, inner, out var edge, out float angle);
+                    var at = off ? edge : vp;
+                    item.Root.anchoredPosition = new Vector2(at.x * w, -(1f - at.y) * h);
+                    item.Arrow.gameObject.SetActive(off);
+                    if (off)
+                    {
+                        item.Arrow.localRotation = Quaternion.Euler(0f, 0f, angle);
+                        item.Arrow.anchoredPosition = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * 40f;
+                    }
+
+                    var color = _config.UrgencyColor(DayRules.ParseUrgency(r.Urgency));
+                    item.Circle.color = color;
+                    item.ArrowImage.color = color;
+                    string initial = AlertRules.Initial(r.Owner);
+                    if (item.Initial.text != initial) item.Initial.text = initial;
+                    string caption = r.ProgressTicks > 0
+                        ? NameOf(sim, r.ApplianceId)
+                        : NameOf(sim, r.ApplianceId) + " " + HudFormat.TimeLeft(r.DueTicks, sim.Now, tps);
+                    if (item.Caption.text != caption) item.Caption.text = caption;
+                }
             }
             Hide(ShownCount);
         }
@@ -117,17 +129,25 @@ namespace Trouble.Game
         private Item MakeItem(int index)
         {
             var item = new Item();
-            item.Root = UIFactory.Anchored(_root, "Marker " + index, new Vector2(0f, 1f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(46f, 46f));
-            item.Circle = UIFactory.Fill(item.Root, _config.alertColor, false, true);
+            // A pill: the person's initial in an urgency-coloured circle on the left, the caption beside it.
+            var size = _config.markerSize;
+            item.Root = UIFactory.Anchored(_root, "Marker " + index, new Vector2(0f, 1f), new Vector2(0.5f, 0.5f), Vector2.zero, size);
+            var back = UIFactory.Fill(item.Root, new Color(0.12f, 0.12f, 0.14f, 0.82f), false, true);
+            back.sprite = PlaceholderArt.UiRounded;
+            back.type = Image.Type.Sliced;
+            var circleRect = UIFactory.Anchored(item.Root, "Circle", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), Vector2.zero, new Vector2(size.y, size.y));
+            item.Circle = UIFactory.Fill(circleRect, _config.alertColor, false, true);
             item.Circle.sprite = PlaceholderArt.Circle;
             var button = item.Root.gameObject.AddComponent<Button>();
-            button.targetGraphic = item.Circle;
+            button.targetGraphic = back;
             button.navigation = new Navigation { mode = Navigation.Mode.None };
             button.onClick.AddListener(() => _controller.PanToRoom(item.RoomId));
-            item.Initial = UIFactory.LabelOn(UIFactory.Stretch(UIFactory.Rect(item.Root, "Initial", 0, 0, 46, 46)), "", 26, Color.white, TextAlignmentOptions.Center, true);
-            var cap = UIFactory.Anchored(item.Root, "Caption", new Vector2(0.5f, 0f), new Vector2(0.5f, 1f), new Vector2(0f, -2f), new Vector2(240f, 28f));
-            item.Caption = UIFactory.LabelOn(cap, "", 18, _config.textPrimary, TextAlignmentOptions.Top, true);
-            item.Caption.overflowMode = TextOverflowModes.Overflow;
+            item.Initial = UIFactory.LabelOn(UIFactory.Stretch(UIFactory.Rect(circleRect, "Initial", 0, 0, size.y, size.y)), "", size.y * 0.6f, Color.white, TextAlignmentOptions.Center, true);
+            var cap = UIFactory.Anchored(item.Root, "Caption", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(size.y + 4f, 0f), new Vector2(size.x - size.y - 8f, size.y));
+            item.Caption = UIFactory.LabelOn(cap, "", 17, _config.textPrimary, TextAlignmentOptions.MidlineLeft, true);
+            item.Caption.enableAutoSizing = true;
+            item.Caption.fontSizeMin = 11;
+            item.Caption.fontSizeMax = 17;
             item.Arrow = UIFactory.Anchored(item.Root, "Arrow", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(34f, 34f));
             item.ArrowImage = UIFactory.Fill(item.Arrow, _config.alertColor, false, false);
             item.ArrowImage.sprite = PlaceholderArt.Arrow;

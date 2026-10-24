@@ -56,9 +56,13 @@ namespace Trouble.Game
             {
                 var kitGo = new GameObject("HouseKit");
                 kitGo.transform.SetParent(transform, false);
-                kitGo.AddComponent<HouseKitView>().Build(_sim, config);
+                var kitView = kitGo.AddComponent<HouseKitView>();
+                kitView.Build(_sim, config);
+                // Frame what was really built: roof peak, chimney and foundation included.
                 var b = Bounds;
-                Bounds = Rect.MinMaxRect(b.xMin, b.yMin - HouseKitView.FoundationDepth, b.xMax, b.yMax + HouseKitView.RoofHeight);
+                var e = kitView.Extent;
+                if (e.width > 0f)
+                    Bounds = Rect.MinMaxRect(Mathf.Min(b.xMin, e.xMin), Mathf.Min(b.yMin, e.yMin), Mathf.Max(b.xMax, e.xMax), Mathf.Max(b.yMax, e.yMax));
             }
 
             foreach (var room in _sim.Rooms)
@@ -131,6 +135,17 @@ namespace Trouble.Game
             if (_highlightedSocket != null && _sockets.TryGetValue(_highlightedSocket, out var old) && old != null) old.SetHighlight(false);
             _highlightedSocket = socketId;
             if (socketId != null && _sockets.TryGetValue(socketId, out var now) && now != null) now.SetHighlight(true);
+        }
+
+        /// <summary>
+        /// Adds the world x, y rects HUD markers must keep clear of: every key prompt on screen, the character's head
+        /// and what it carries, and every room label.
+        /// </summary>
+        public void CollectKeepClear(List<Rect> into)
+        {
+            if (_prompts != null) _prompts.CollectShownRects(into);
+            if (_character != null) into.Add(_character.HeadWorldRect);
+            for (int i = 0; i < _rooms.Count; i++) into.Add(_rooms[i].LabelWorldRect);
         }
 
         /// <summary>The appliance view with this id, or null.</summary>

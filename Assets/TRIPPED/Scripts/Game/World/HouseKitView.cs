@@ -23,8 +23,11 @@ namespace Trouble.Game
         /// <summary>True when the config asks for the kit and the kit is assigned.</summary>
         public static bool Available(TrippedViewConfig config) => config != null && config.useHouseKit && config.houseKit != null;
 
-        /// <summary>Extra space the roof (above) and the foundation (below) add to the house rect.</summary>
-        public const float RoofHeight = 1.8f, FoundationDepth = 1.0f;
+        /// <summary>
+        /// Front-view rect (x, y) of everything the kit built, roof peak and chimney included, so the camera can frame
+        /// the whole house. Zero size until <see cref="Build"/> ran.
+        /// </summary>
+        public Rect Extent { get; private set; }
 
         /// <summary>Builds the whole shell for these rooms and doors.</summary>
         public void Build(HouseSim sim, TrippedViewConfig config)
@@ -39,11 +42,10 @@ namespace Trouble.Game
             foreach (var room in sim.Rooms)
             {
                 float y = HouseLayout.FloorY(room.Floor, h);
-                var holder = Holder("Kit " + room.Id, new Vector3(room.X, y, 0f), room.Width / module);
-                bool kitchen = room.Theme == "kitchen" && config.kitchenRoom != null;
-                if (kitchen) AddKitchen(holder);
+                if (config.TryRoomModel(room.Id, out var entry)) AddRoomModel(room, entry, y);
                 else
                 {
+                    var holder = Holder("Kit " + room.Id, new Vector3(room.X, y, 0f), room.Width / module);
                     Piece(holder, "Room_Floor");
                     Piece(holder, "Room_BackWall");
                 }
@@ -73,6 +75,24 @@ namespace Trouble.Game
                 var holder = Holder("Wall x" + wall.X.ToString("0.##"), new Vector3(wall.X, HouseLayout.FloorY(wall.Floor, h), 0f), 1f);
                 Piece(holder, string.IsNullOrEmpty(wall.DoorId) ? "Room_SideWall_Solid" : "Room_SideWall_Door");
             }
+            Extent = FrontRect(transform);
+        }
+
+        /// <summary>The x, y rect covered by every renderer under <paramref name="root"/>, in the house's local space.</summary>
+        private Rect FrontRect(Transform root)
+        {
+            bool any = false;
+            Bounds b = default;
+            foreach (var r in root.GetComponentsInChildren<Renderer>())
+            {
+                if (!any) b = r.bounds;
+                else b.Encapsulate(r.bounds);
+                any = true;
+            }
+            if (!any) return new Rect(0, 0, 0, 0);
+            var min = transform.InverseTransformPoint(b.min);
+            var max = transform.InverseTransformPoint(b.max);
+            return Rect.MinMaxRect(Mathf.Min(min.x, max.x), Mathf.Min(min.y, max.y), Mathf.Max(min.x, max.x), Mathf.Max(min.y, max.y));
         }
 
         /// <summary>A copy of the kit's Socket_Plate (or null without a kit), yawed to face the camera.</summary>
@@ -96,13 +116,30 @@ namespace Trouble.Game
             return false;
         }
 
-        private void AddKitchen(Transform holder)
+        /// <summary>
+        /// A furnished room (its own floor, back wall and furniture) in place of the kit's floor and back wall. Models
+        /// built at the room's real width are used at scale 1; an older module-width model is stretched in x to fit,
+        /// and then also loses its <see cref="RoomModelEntry.hideWhenRescaled"/> parts.
+        /// </summary>
+        private void AddRoomModel(RoomState room, RoomModelEntry entry, float y)
         {
-            var skip = new HashSet<string>(_config.kitchenSkipParts ?? new string[0]);
-            foreach (Transform part in _config.kitchenRoom.transform)
+            var holder = Holder("Room " + room.Id, new Vector3(room.X, y, 0f), 1f);
+            var pivot = new GameObject(entry.model.name).transform;
+            pivot.SetParent(holder, false);
+            pivot.localRotation = Quaternion.Euler(0f, _config.kitYaw, 0f);
+            var copy = Instantiate(entry.model, pivot, false);
+            copy.name = entry.model.name;
+
+            float modelWidth = FrontRect(copy.transform).width;
+            float scaleX = RoomModelRules.ScaleX(modelWidth, room.Width, _config.roomModelWidthTolerance);
+            bool rescaled = !Mathf.Approximately(scaleX, 1f);
+            holder.localScale = new Vector3(scaleX, 1f, 1f);
+
+            foreach (Transform part in copy.transform)
             {
-                if (skip.Contains(part.name)) continue;
-                Copy(holder, part);
+                if (!RoomModelRules.Hides(part.name, entry.hideParts, entry.hideWhenRescaled, rescaled)) continue;
+                part.gameObject.SetActive(false);
+                Debug.Log($"[TRIPPED] Room {room.Id}: hid {part.name} of {entry.model.name}" + (rescaled ? $" (model {modelWidth:0.##} m stretched to {room.Width:0.##} m)." : "."));
             }
         }
 

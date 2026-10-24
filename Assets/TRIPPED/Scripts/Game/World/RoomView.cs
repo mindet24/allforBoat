@@ -30,6 +30,20 @@ namespace Trouble.Game
         /// <summary>The sim room this view shows.</summary>
         public RoomState Room => _room;
 
+        /// <summary>World x, y rect of the room's name text as last laid out (updated whenever the text changes).</summary>
+        public Rect LabelWorldRect { get; private set; }
+
+        /// <summary>Lays the name text out now and records where it ends, so HUD markers can keep clear of it.</summary>
+        private void MeasureLabel()
+        {
+            if (_nameText == null) return;
+            _nameText.ForceMeshUpdate();
+            var b = _nameText.textBounds;
+            var min = _nameText.transform.TransformPoint(b.min);
+            var max = _nameText.transform.TransformPoint(b.max);
+            LabelWorldRect = Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+        }
+
         /// <summary>Builds the room's pieces under this object, which sits at world origin.</summary>
         public void Build(RoomState room, bool isPanelRoom, TrippedViewConfig config, ArtLibrary art,
             IReadOnlyList<RoomState> allRooms = null, bool dayMode = false, bool greyboxShell = true, float panelX = float.NaN)
@@ -181,6 +195,7 @@ namespace Trouble.Game
                 {
                     _shownText = text;
                     _nameText.text = text;
+                    MeasureLabel();
                 }
                 float fill = HudFormat.Fill(circuit.Load, circuit.Capacity);
                 var band = HudFormat.Band(circuit.Load, circuit.Capacity, _config.loadAmberAbove, _config.loadRedAbove);

@@ -39,20 +39,22 @@ namespace Trouble.Game
         public RectTransform Root => _tray;
 
         /// <summary>Builds the tray strip.</summary>
-        public void Build(RectTransform canvas, LevelController controller, TrippedViewConfig config, HudText text)
+        /// <param name="height">Height of the strip in reference pixels; 0 = the full tray (200). Day mode uses a thin strip for the key hint.</param>
+        public void Build(RectTransform canvas, LevelController controller, TrippedViewConfig config, HudText text, float height = 0f)
         {
+            float trayH = height > 0f ? height : 200f;
             _controller = controller;
             _config = config;
             _text = text;
-            _tray = UIFactory.Anchored(canvas, "Tray", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, new Vector2(0f, 200f));
+            _tray = UIFactory.Anchored(canvas, "Tray", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, new Vector2(0f, trayH));
             _tray.anchorMin = new Vector2(0f, 0f);
             _tray.anchorMax = new Vector2(1f, 0f);
-            _tray.sizeDelta = new Vector2(0f, 200f);
+            _tray.sizeDelta = new Vector2(0f, trayH);
             var bg = config.hudBackground;
             bg.a = 0.94f;
             UIFactory.Fill(_tray, bg, false);
 
-            _hint = UIFactory.Label(_tray, "Hint", Left, 6, 1800, 34, "", 20, config.textSecondary);
+            _hint = UIFactory.Label(_tray, "Hint", Left, height > 0f ? Mathf.Max(0f, (trayH - 34f) * 0.5f) : 6f, 1800, 34, "", 20, config.textSecondary);
             var cordButton = UIFactory.Button(_tray, "Cords", 0, Top, ChipW, ChipH, "", 24, config.hudPanel, config.textSecondary,
                 () => _controller.HandleClick(new ClickInput { Kind = ClickKind.TrayCord }));
             _cordChip = (RectTransform)cordButton.transform;

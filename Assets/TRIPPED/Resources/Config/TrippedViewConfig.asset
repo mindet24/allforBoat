@@ -95,9 +95,14 @@ MonoBehaviour:
   dayHouseArea:
     serializedVersion: 2
     x: 0.01
-    y: 0.18518518
+    y: 0.05925926
     width: 0.7916667
-    height: 0.7314815
+    height: 0.8537037
+  dayHomeMargin: 0.06
+  dayTrayHeight: 56
+  markerRowBelowCeiling: 0.7
+  markerSize: {x: 170, y: 36}
+  markerGap: 6
   urgencyUrgent: {r: 0.8980392, g: 0.22352941, b: 0.20784314, a: 1}
   urgencyNormal: {r: 1, g: 0.7019608, b: 0, a: 1}
   urgencyRelaxed: {r: 0.5411765, g: 0.5411765, b: 0.5803922, a: 1}
@@ -109,7 +114,7 @@ MonoBehaviour:
   stairsHalfRun: 1
   stairsLanding: 0.15
   characterFollowSpeed: 6
-  carryIconHeight: 0.75
+  carryIconHeight: 0.55
   dayOverlayZ: -0.45
   promptBack: {r: 0.11764706, g: 0.11764706, b: 0.14117648, a: 0.9019608}
   promptText: {r: 1, g: 0.8784314, b: 0.4, a: 1}
@@ -120,19 +125,38 @@ MonoBehaviour:
   panelMountHeight: 1
   useHouseKit: 1
   houseKit: {fileID: 919132149155446097, guid: ddaf319699e61504ea1bc167a75da7f1, type: 3}
-  kitchenRoom: {fileID: 919132149155446097, guid: f72d05524e5eece47b87ac1b50202bf2, type: 3}
   kitModuleWidth: 6
   kitYaw: 180
-  kitchenSkipParts:
-  - Fridge
-  - Kitchen_Counter
-  - Kitchen_CounterItems
-  - Kitchen_Chair_01
-  - Kitchen_Chair_02
-  - Kitchen_DiningTable
-  - Kitchen_Bin
-  - Kitchen_Pantry
-  - Kitchen_PendantLamp
+  roomModels:
+  - roomId: living
+    model: {fileID: 919132149155446097, guid: c4a9c4980c810084b82d09d427d55394, type: 3}
+    hideParts: []
+    hideWhenRescaled: []
+  - roomId: bedroom
+    model: {fileID: 919132149155446097, guid: 0f3daffe4cfaea44cb02492a4db2c6fe, type: 3}
+    hideParts: []
+    hideWhenRescaled: []
+  - roomId: bathroom
+    model: {fileID: 919132149155446097, guid: 4e5d29d94e3765e44b4f1f992562ebec, type: 3}
+    hideParts: []
+    hideWhenRescaled: []
+  - roomId: kidroom
+    model: {fileID: 919132149155446097, guid: cde6dc6ccd5149c4fb240994cf8700aa, type: 3}
+    hideParts: []
+    hideWhenRescaled: []
+  - roomId: study
+    model: {fileID: 919132149155446097, guid: b0f34fa3e5be51d4181a35c2d59978b2, type: 3}
+    hideParts: []
+    hideWhenRescaled: []
+  - roomId: laundry
+    model: {fileID: 919132149155446097, guid: 2319ff6629370a04cab7fadfb5aee6f7, type: 3}
+    hideParts: []
+    hideWhenRescaled: []
+  - roomId: kitchen
+    model: {fileID: 919132149155446097, guid: f72d05524e5eece47b87ac1b50202bf2, type: 3}
+    hideParts: []
+    hideWhenRescaled: []
+  roomModelWidthTolerance: 0.1
   socketPlateScale: 1.5
   deadlineWarnSeconds: 5
   routineWarnSeconds: 3

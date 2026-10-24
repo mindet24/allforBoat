@@ -91,6 +91,9 @@ namespace Trouble.Game
             _area = area;
         }
 
+        /// <summary>Space around the whole house at the farthest zoom (0.1 = 10%). Negative = the config's homeMargin.</summary>
+        public float HomeMargin { get; set; } = -1f;
+
         /// <summary>Takes the camera settings from the config.</summary>
         public void Setup(TrippedViewConfig config)
         {
@@ -122,7 +125,7 @@ namespace Trouble.Game
         public void Home(bool snap)
         {
             float aspect = Aspect();
-            _maxDistance = CameraMath.FitViewHeight(_bounds.size, aspect, _area, _config.homeMargin);
+            _maxDistance = CameraMath.FitViewHeight(_bounds.size, aspect, _area, HomeMargin >= 0f ? HomeMargin : _config.homeMargin);
             _minDistance = Mathf.Min(_maxDistance,
                 CameraMath.ViewHeightForWidth(_config.nearRoomWidth, _config.nearRoomScreenFraction, aspect));
             _targetDistance = _maxDistance;

@@ -16,6 +16,28 @@ namespace Trouble.Game
         }
     }
 
+    /// <summary>A furnished room model for one sim room, and the parts of it to leave out.</summary>
+    [System.Serializable]
+    public struct RoomModelEntry
+    {
+        /// <summary>Sim room id (level JSON).</summary>
+        public string roomId;
+        /// <summary>Art/Models/Room_&lt;Id&gt;.fbx. None = the kit's plain floor and back wall.</summary>
+        public GameObject model;
+        [Tooltip("Child objects always left out (for example the 3D fridge: the PNG fridge replaces it).")]
+        public string[] hideParts;
+        [Tooltip("Child objects left out only when the model is not built at the room's real width (an old 6 m placeholder).")]
+        public string[] hideWhenRescaled;
+
+        public RoomModelEntry(string roomId, string[] hideParts = null, string[] hideWhenRescaled = null)
+        {
+            this.roomId = roomId;
+            model = null;
+            this.hideParts = hideParts ?? new string[0];
+            this.hideWhenRescaled = hideWhenRescaled ?? new string[0];
+        }
+    }
+
     /// <summary>
     /// Every value the view layer uses that is not a game rule: colours, house geometry, camera, UI timing,
     /// art paths (GDD v1.1 §4.2). Game rules live in rules.json; this is look and feel only.
@@ -142,7 +164,16 @@ namespace Trouble.Game
 
         [Header("Day mode (level_demo)")]
         [Tooltip("House area of the screen in day mode: no left panel, requests on the right (viewport units).")]
-        public Rect dayHouseArea = new Rect(0.01f, 200f / 1080f, 1520f / 1920f, 790f / 1080f);
+        public Rect dayHouseArea = new Rect(0.01f, 64f / 1080f, 1520f / 1920f, 922f / 1080f);
+        [Tooltip("Day mode: extra space around the whole house at the farthest zoom (0.06 = the house fills about 94% of dayHouseArea's limiting side).")]
+        public float dayHomeMargin = 0.06f;
+        [Tooltip("Day mode: height of the bottom strip that holds the key hint, reference pixels.")]
+        public float dayTrayHeight = 56f;
+        [Tooltip("Day mode request markers: one row per room at this distance below the ceiling (the room label's height), metres.")]
+        public float markerRowBelowCeiling = 0.7f;
+        [Tooltip("Size of one request marker (circle + caption), reference pixels.")]
+        public Vector2 markerSize = new Vector2(170f, 36f);
+        public float markerGap = 6f;
         public Color urgencyUrgent = Hex("#E53935");
         public Color urgencyNormal = Hex("#FFB300");
         public Color urgencyRelaxed = Hex("#8A8A94");
@@ -161,7 +192,7 @@ namespace Trouble.Game
         [Tooltip("How fast the drawn character catches up with the sim's position, metres per second.")]
         public float characterFollowSpeed = 6f;
         [Tooltip("Height of the carried appliance's sprite above the head, metres.")]
-        public float carryIconHeight = 0.75f;
+        public float carryIconHeight = 0.55f;
         [Tooltip("z of day-mode labels, load bars and key prompts: in front of the house so stairs and walls never cover them.")]
         public float dayOverlayZ = -0.45f;
         public Color promptBack = Hex("#1E1E24E6");
@@ -181,18 +212,19 @@ namespace Trouble.Game
         public bool useHouseKit = true;
         [Tooltip("Assets/TRIPPED/Art/Models/HouseKit.fbx: room pieces 6 m wide, 4 m deep, 3 m tall.")]
         public GameObject houseKit;
-        [Tooltip("Assets/TRIPPED/Art/Models/Room_Kitchen.fbx: a dressed kitchen, used for rooms with theme \"kitchen\".")]
-        public GameObject kitchenRoom;
         [Tooltip("Width of one kit room module, metres. Pieces are scaled in x by room width / this.")]
         public float kitModuleWidth = 6f;
         [Tooltip("Yaw applied to every kit piece so it faces the camera. The FBX comes in turned 180° (x and depth negated).")]
         public float kitYaw = 180f;
-        [Tooltip("Kitchen parts left out: the 3D fridge (the PNG fridge replaces it) and furniture standing in front of the sockets and the character.")]
-        public string[] kitchenSkipParts =
+        [Tooltip("Furnished room models (Art/Models/Room_<Id>.fbx) by sim room id. A room with a model uses its own floor and back wall instead of the kit's.")]
+        public RoomModelEntry[] roomModels =
         {
-            "Fridge", "Kitchen_Counter", "Kitchen_CounterItems", "Kitchen_Chair_01", "Kitchen_Chair_02",
-            "Kitchen_DiningTable", "Kitchen_Bin", "Kitchen_Pantry", "Kitchen_PendantLamp",
+            new RoomModelEntry("living"), new RoomModelEntry("bedroom"), new RoomModelEntry("bathroom"),
+            new RoomModelEntry("kidroom"), new RoomModelEntry("study"), new RoomModelEntry("laundry"),
+            new RoomModelEntry("kitchen"),
         };
+        [Tooltip("A room model is used at scale 1 when its width is within this many metres of the room's; otherwise it is stretched in x to fit.")]
+        public float roomModelWidthTolerance = 0.1f;
         [Tooltip("Scale of the kit's Socket_Plate (0.26 m) on each socket.")]
         public float socketPlateScale = 1.5f;
 
@@ -258,6 +290,20 @@ namespace Trouble.Game
             if (string.IsNullOrEmpty(circuitId)) return unknownSocket;
             int index = char.ToUpperInvariant(circuitId[0]) - 'A';
             return index >= 0 && index < circuitColors.Length ? circuitColors[index] : unknownSocket;
+        }
+
+        /// <summary>The furnished model entry for a room id; false if there is none (or no model is assigned).</summary>
+        public bool TryRoomModel(string roomId, out RoomModelEntry entry)
+        {
+            if (roomModels != null)
+                foreach (var e in roomModels)
+                    if (e.roomId == roomId && e.model != null)
+                    {
+                        entry = e;
+                        return true;
+                    }
+            entry = default;
+            return false;
         }
 
         /// <summary>Colour of a day request by urgency: urgent red, normal amber, relaxed grey.</summary>

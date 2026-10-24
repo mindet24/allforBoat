@@ -155,6 +155,8 @@ namespace Trouble.Game
                 _camera.UseArea(Sim.IsDayMode ? _config.dayHouseArea : _config.houseArea);
                 // Day mode: A/D/W/S and the arrows move the character, not the camera.
                 _camera.KeyPan = !Sim.IsDayMode;
+                // Day mode: the house fills nearly all of the screen the HUD leaves free.
+                _camera.HomeMargin = Sim.IsDayMode ? _config.dayHomeMargin : -1f;
                 _camera.Frame(House.Bounds, () => HouseLayout.CharacterPoint(Sim, TickFraction, _config.roomHeight, _config.stairsHalfRun, _config.stairsLanding));
             }
             LevelLoaded?.Invoke(n);

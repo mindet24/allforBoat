@@ -76,7 +76,7 @@ namespace Trouble.Game
                 // hint in the tray. No queue strip, breaker cards, left request panel, timeline or alerts.
                 _dayBar.Build(root, controller, config, text);
                 _dayStack.Build(root, config, text);
-                _tray.Build(root, controller, config, text);
+                _tray.Build(root, controller, config, text, config.dayTrayHeight);
                 // No queue strip: day mode is played live with the keyboard, nothing is queued.
                 _dayMarkers.Build(root, controller, config);
                 _toasts.Build(root, config, 300f);

@@ -28,6 +28,20 @@ namespace Trouble.Game
         /// <summary>What E would act on, as last shown (for checks).</summary>
         public DayTarget Shown { get; private set; } = DayTarget.None;
 
+        /// <summary>Adds the world x, y rect of every prompt on screen now (HUD markers keep clear of them).</summary>
+        public void CollectShownRects(List<Rect> into)
+        {
+            Add(_interact, _config.promptSize, into);
+            for (int i = 0; i < MaxStairsPrompts; i++) Add(_stairs[i], _config.stairsPromptSize, into);
+        }
+
+        private static void Add(Bubble bubble, Vector2 size, List<Rect> into)
+        {
+            if (bubble == null || !bubble.Root.activeSelf) return;
+            var p = bubble.Root.transform.position;
+            into.Add(new Rect(p.x - size.x * 0.5f, p.y - size.y * 0.5f, size.x, size.y));
+        }
+
         /// <summary>Number of stairs prompts on screen now (for checks).</summary>
         public int StairsShown { get; private set; }
 

@@ -27,6 +27,21 @@ namespace Trouble.Game
         private readonly System.Collections.Generic.List<Command> _shownCommands = new System.Collections.Generic.List<Command>();
         private readonly StringBuilder _sb = new StringBuilder();
 
+        /// <summary>
+        /// World x, y rect from the character's shoulders to the top of what it carries: the part HUD markers must
+        /// never cover.
+        /// </summary>
+        public Rect HeadWorldRect
+        {
+            get
+            {
+                var p = transform.position;
+                float top = _config.playerWorldHeight + 0.1f + (_carrySprite != null && _carrySprite.gameObject.activeSelf ? _config.carryIconHeight : 0f);
+                float bottom = _config.playerWorldHeight * 0.6f;
+                return new Rect(p.x - 0.45f, p.y + bottom, 0.9f, top - bottom);
+            }
+        }
+
         /// <summary>Builds the sprite and the queue label.</summary>
         public void Build(TrippedViewConfig config, ArtLibrary art)
         {
