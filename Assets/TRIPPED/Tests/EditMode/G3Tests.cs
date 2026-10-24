@@ -370,7 +370,9 @@ namespace Trouble.Tests
     /// <summary>Screen flow rules (GDD v1.0 §6.1).</summary>
     public class FlowRulesTests
     {
-        [TestCase(ScreenId.None, ScreenId.LevelSelect)]
+        [TestCase(ScreenId.None, ScreenId.Pause)]
+        [TestCase(ScreenId.Pause, ScreenId.None)]
+        [TestCase(ScreenId.HowTo, ScreenId.Title)]
         [TestCase(ScreenId.LevelSelect, ScreenId.Title)]
         [TestCase(ScreenId.End, ScreenId.LevelSelect)]
         [TestCase(ScreenId.Title, ScreenId.Title)]

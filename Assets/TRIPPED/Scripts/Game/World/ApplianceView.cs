@@ -103,7 +103,11 @@ namespace Trouble.Game
             _target.RoomId = room.Id;
             float socketX = HouseLayout.SocketX(room.X, room.Width, socket.Pos);
             float x = socketX + _config.socketSize * 0.5f + _width * 0.5f + 0.06f;
-            transform.localPosition = new Vector3(x, HouseLayout.FloorY(room.Floor, _config.roomHeight), _config.roomDepth - _config.applianceInset);
+            // Day mode: in front of the furnished room models so counters never hide an appliance sprite.
+            // Taller appliances sit a hair further back, so a kettle beside the fridge always draws in front of it
+            // (same sorting order otherwise ties and flips with the camera).
+            float z = sim.IsDayMode ? _config.dayFrontZ + _height * 0.02f : _config.roomDepth - _config.applianceInset;
+            transform.localPosition = new Vector3(x, HouseLayout.FloorY(room.Floor, _config.roomHeight), z);
 
             bool ghost = !room.Visible;
             SetGhostOrder(ghost);

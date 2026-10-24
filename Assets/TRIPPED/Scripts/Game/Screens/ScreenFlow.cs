@@ -3,45 +3,56 @@ using System.Collections.Generic;
 using Trouble.Sim;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.UI;
 
 namespace Trouble.Game
 {
-    /// <summary>Which full-screen menu is open. None = the player is in a level.</summary>
+    /// <summary>Which menu is open. None = the player is in a level with nothing over it.</summary>
     public enum ScreenId
     {
         None,
         Title,
         LevelSelect,
         End,
+        HowTo,
+        /// <summary>The pause overlay; the level stays loaded behind it.</summary>
+        Pause,
     }
 
-    /// <summary>The pure rules of the screen flow (GDD v1.0 §6.1).</summary>
+    /// <summary>The pure rules of the screen flow.</summary>
     public static class FlowRules
     {
-        /// <summary>Where Esc leads from a screen: a level and the End go to Level Select, Level Select to Title, Title nowhere.</summary>
+        /// <summary>
+        /// Where Esc leads from a screen: in a level it pauses, from the pause it resumes, How to Play and Level Select go
+        /// back to the Title, the End to Level Select, the Title nowhere.
+        /// </summary>
         public static ScreenId EscapeTarget(ScreenId current)
         {
             switch (current)
             {
-                case ScreenId.None: return ScreenId.LevelSelect;
+                case ScreenId.None: return ScreenId.Pause;
+                case ScreenId.Pause: return ScreenId.None;
                 case ScreenId.End: return ScreenId.LevelSelect;
                 case ScreenId.LevelSelect: return ScreenId.Title;
+                case ScreenId.HowTo: return ScreenId.Title;
                 default: return ScreenId.Title;
             }
         }
+
+        /// <summary>True if the screen covers the whole view and the level is unloaded while it shows.</summary>
+        public static bool IsFullScreen(ScreenId screen) => screen != ScreenId.None && screen != ScreenId.Pause;
 
         /// <summary>True if winning <paramref name="level"/> ends the game (there is no level after it).</summary>
         public static bool IsLastLevel(int level, Func<int, bool> exists) => !exists(level + 1);
     }
 
     /// <summary>
-    /// Title → Level Select → level → Result → next level or End (GDD v1.0 §6.1), plus the unlock progress.
-    /// Lives next to the <see cref="LevelController"/> and listens to its events; the controller does not know it.
+    /// Title → (How to Play) → the day → end-of-day panel → Retry or Main Menu; Esc pauses a level (Resume / Restart /
+    /// Main Menu). The classic levels 1-4 stay reachable from the Title's "Classic levels" button with their unlock
+    /// progress and End screen. Lives next to the <see cref="LevelController"/> and listens to its events.
     /// </summary>
     /// <remarks>
     /// Any code that loads a level directly (<c>controller.LoadLevel(n)</c>, the 1-9 keys) closes the menus,
-    /// so quick tests that skip the Title still work.
+    /// so quick tests that skip the Title still work. Pausing with Space also opens the pause overlay.
     /// </remarks>
     public sealed class ScreenFlow : MonoBehaviour
     {
@@ -55,7 +66,7 @@ namespace Trouble.Game
         /// <summary>The menu that is open now.</summary>
         public ScreenId Current { get; private set; }
 
-        /// <summary>The unlock progress (PlayerPrefs).</summary>
+        /// <summary>The unlock progress and best scores (PlayerPrefs).</summary>
         public Progress Progress => _progress;
 
         /// <summary>The menu screens, for checks.</summary>
@@ -70,18 +81,22 @@ namespace Trouble.Game
 
             var canvasGo = new GameObject("Menus", typeof(RectTransform));
             canvasGo.transform.SetParent(transform, false);
-            var canvas = canvasGo.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 30;
-            var scaler = canvasGo.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = config.referenceResolution;
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = config.matchWidthOrHeight;
-            canvasGo.AddComponent<GraphicRaycaster>();
+            var canvas = UiKit.Canvas(canvasGo, config, 30);
 
-            _menus = new MenuScreens(config, new HudText(controller.Loader.Strings));
-            _menus.Build((RectTransform)canvasGo.transform, StartDemo, Quit, ShowTitle, ShowLevelSelect, ShowLevelSelect, StartLevel, ShowLevelSelect);
+            _menus = new MenuScreens(config, TrippedUiConfig.LoadOrDefault(), new HudText(controller.Loader.Strings));
+            _menus.Build(canvas, new MenuActions
+            {
+                Play = StartDemo,
+                HowTo = ShowHowTo,
+                Quit = Quit,
+                Classic = ShowLevelSelect,
+                BackToTitle = ShowTitle,
+                EndLevels = ShowLevelSelect,
+                PickLevel = StartLevel,
+                Resume = Resume,
+                Restart = RestartFromPause,
+                MainMenu = ShowTitle,
+            });
 
             controller.LevelLoaded += OnLevelLoaded;
             controller.TickEvents += OnTickEvents;
@@ -91,7 +106,10 @@ namespace Trouble.Game
         /// <summary>Opens the Title screen (the level, if any, is removed).</summary>
         public void ShowTitle() => Show(ScreenId.Title);
 
-        /// <summary>Opens the Level Select with the current unlock progress.</summary>
+        /// <summary>Opens How to Play.</summary>
+        public void ShowHowTo() => Show(ScreenId.HowTo);
+
+        /// <summary>Opens the classic Level Select with the current unlock progress.</summary>
         public void ShowLevelSelect() => Show(ScreenId.LevelSelect);
 
         /// <summary>Opens the End screen with the total of the best times.</summary>
@@ -111,6 +129,36 @@ namespace Trouble.Game
             _controller.LoadLevel(n);
         }
 
+        /// <summary>Pauses the running level and opens the pause overlay (also the HUD's pause button).</summary>
+        public void Pause()
+        {
+            var sim = _controller.Sim;
+            if (sim == null || sim.Phase == LevelPhase.Won || sim.Phase == LevelPhase.Lost) return;
+            if (sim.Phase == LevelPhase.Running) _controller.StartOrTogglePause();
+            SetPause(true);
+        }
+
+        /// <summary>Closes the pause overlay and lets the level run again.</summary>
+        public void Resume()
+        {
+            var sim = _controller.Sim;
+            if (sim != null && sim.Phase == LevelPhase.Paused) _controller.StartOrTogglePause();
+            SetPause(false);
+        }
+
+        private void RestartFromPause()
+        {
+            SetPause(false);
+            _controller.Restart();
+        }
+
+        private void SetPause(bool on)
+        {
+            Current = on ? ScreenId.Pause : ScreenId.None;
+            _shownFrame = Time.frameCount;
+            _menus.Pause.SetActive(on);
+        }
+
         private void Show(ScreenId screen)
         {
             if (_controller.Sim != null) _controller.Unload();
@@ -119,10 +167,12 @@ namespace Trouble.Game
             _shownFrame = Time.frameCount;
             if (screen == ScreenId.LevelSelect) _menus.ShowCards(BuildCards());
             if (screen == ScreenId.End) _menus.SetEndTime(HudFormat.Clock(_progress.TotalBestTicks(LevelCount()), TicksPerSecond()));
+            if (screen == ScreenId.Title) _menus.SetBestScore(_progress.BestScore(LevelLoader.DemoLevel));
             _menus.Title.SetActive(screen == ScreenId.Title);
+            _menus.HowTo.SetActive(screen == ScreenId.HowTo);
             _menus.Select.SetActive(screen == ScreenId.LevelSelect);
             _menus.End.SetActive(screen == ScreenId.End);
-            _menus.ResultLevels.SetActive(false);
+            _menus.Pause.SetActive(false);
         }
 
         private List<LevelCard> BuildCards()
@@ -159,40 +209,67 @@ namespace Trouble.Game
             Current = ScreenId.None;
             _endAt = -1f;
             _menus.Title.SetActive(false);
+            _menus.HowTo.SetActive(false);
             _menus.Select.SetActive(false);
             _menus.End.SetActive(false);
-            _menus.ResultLevels.SetActive(false);
+            _menus.Pause.SetActive(false);
         }
 
         private void OnTickEvents(IReadOnlyList<SimEvent> events)
         {
             for (int i = 0; i < events.Count; i++)
             {
-                if (events[i].Type != SimEventType.LevelWon) continue;
+                var type = events[i].Type;
+                if (type != SimEventType.LevelWon && type != SimEventType.LevelLost) continue;
                 int level = _controller.LevelIndex;
-                if (level == LevelLoader.DemoLevel) continue; // the day has no unlock chain or best time
+                if (level == LevelLoader.DemoLevel)
+                {
+                    // The day keeps its best score instead of an unlock chain.
+                    if (_controller.Sim != null) _progress.RecordScore(level, _controller.Sim.Score);
+                    continue;
+                }
+                if (type != SimEventType.LevelWon) continue;
                 _progress.RecordWin(level, events[i].Tick);
                 if (FlowRules.IsLastLevel(level, _controller.HasLevel)) _endAt = Time.unscaledTime + _config.endScreenDelay;
             }
         }
 
-        private void OnEscapeInLevel() => Show(FlowRules.EscapeTarget(ScreenId.None));
+        /// <summary>Esc in a level: pause, resume, or (on the result panel) leave for the menu.</summary>
+        private void OnEscapeInLevel()
+        {
+            if (_shownFrame == Time.frameCount) return;
+            var sim = _controller.Sim;
+            bool ended = sim != null && (sim.Phase == LevelPhase.Won || sim.Phase == LevelPhase.Lost);
+            if (ended)
+            {
+                if (sim.IsDayMode) ShowTitle();
+                else ShowLevelSelect();
+                return;
+            }
+            if (FlowRules.EscapeTarget(Current) == ScreenId.Pause) Pause();
+            else Resume();
+        }
 
         private void Update()
         {
-            // Not set up yet (or already torn down): nothing to drive.
-            if (_controller == null || _menus == null || _menus.ResultLevels == null) return;
+            if (_controller == null || _menus == null || _menus.Pause == null) return;
             if (_endAt >= 0f && Current == ScreenId.None && Time.unscaledTime >= _endAt) ShowEnd();
 
             var kb = Keyboard.current;
-            if (kb != null && kb.escapeKey.wasPressedThisFrame && Current != ScreenId.None && _shownFrame != Time.frameCount)
+            if (kb != null && kb.escapeKey.wasPressedThisFrame && FlowRules.IsFullScreen(Current) && _shownFrame != Time.frameCount)
             {
                 var target = FlowRules.EscapeTarget(Current);
                 if (target != Current) Show(target);
             }
 
-            bool resultShown = Current == ScreenId.None && _controller.Hud != null && _controller.Hud.Result != null && _controller.Hud.Result.IsShown;
-            if (_menus.ResultLevels.activeSelf != resultShown) _menus.ResultLevels.SetActive(resultShown);
+            // Space pauses and resumes the sim directly: keep the overlay in step with it.
+            var sim = _controller.Sim;
+            if (sim != null)
+            {
+                if (Current == ScreenId.None && sim.Phase == LevelPhase.Paused) SetPause(true);
+                else if (Current == ScreenId.Pause && sim.Phase == LevelPhase.Running) SetPause(false);
+            }
+            else if (Current == ScreenId.Pause) SetPause(false);
         }
 
         private static void Quit()

@@ -1,0 +1,194 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 85e70be428045e94abbc667dc441d5a2, type: 3}
+  m_Name: JuiceConfig
+  m_EditorClassIdentifier: Trouble.Game::Trouble.Game.JuiceConfig
+  musicGroupVolume: 0.8
+  sfxGroupVolume: 1
+  uiGroupVolume: 0.8
+  voiceGroupVolume: 0.7
+  maxVariants: 8
+  soundVolumes:
+  - name: step
+    volume: 0.2
+  - name: stairs_step
+    volume: 0.25
+  - name: pickup
+    volume: 0.5
+  - name: plug_in
+    volume: 0.6
+  - name: reject
+    volume: 0.45
+  - name: request_new_relaxed
+    volume: 0.4
+  - name: request_new_normal
+    volume: 0.45
+  - name: request_new_urgent
+    volume: 0.55
+  - name: request_done
+    volume: 0.55
+  - name: request_missed
+    volume: 0.5
+  - name: urgent_tick
+    volume: 0.4
+  - name: heart_lost
+    volume: 0.75
+  - name: combo_up
+    volume: 0.4
+  - name: overload_hum
+    volume: 0.6
+  - name: spark
+    volume: 0.3
+  - name: blackout
+    volume: 0.9
+  - name: power_up
+    volume: 0.55
+  - name: breaker_flip
+    volume: 0.6
+  - name: toaster_pop
+    volume: 0.5
+  - name: kettle_loop
+    volume: 0.18
+  - name: toaster_loop
+    volume: 0.12
+  - name: microwave_loop
+    volume: 0.15
+  - name: fridge_loop
+    volume: 0.1
+  - name: tv_loop
+    volume: 0.12
+  - name: heater_loop
+    volume: 0.12
+  - name: washer_loop
+    volume: 0.16
+  - name: dryer_loop
+    volume: 0.16
+  - name: blender_loop
+    volume: 0.16
+  - name: ui_hover
+    volume: 0.2
+  - name: ui_click
+    volume: 0.4
+  - name: ui_back
+    volume: 0.35
+  - name: ui_pause
+    volume: 0.4
+  - name: countdown_beep
+    volume: 0.4
+  - name: day_start
+    volume: 0.55
+  - name: win_jingle
+    volume: 0.6
+  - name: lose_jingle
+    volume: 0.6
+  - name: star_pop
+    volume: 0.5
+  - name: score_tick
+    volume: 0.25
+  - name: music_menu
+    volume: 0.3
+  - name: music_day
+    volume: 0.28
+  - name: music_day_final
+    volume: 0.3
+  - name: voice_happy
+    volume: 0.35
+  - name: voice_angry
+    volume: 0.35
+  - name: voice_hey
+    volume: 0.3
+  heyChance: 0.3
+  countdownSeconds: 5
+  sparkSoundInterval: 0.22
+  stepInterval: 0.26
+  climbStepInterval: 0.18
+  stepPitchSpread: 0.08
+  comboWindow: 4
+  comboPitchStep: 0.12
+  comboPitchMax: 1.6
+  urgentTickSeconds: 5
+  urgentFastTickSeconds: 2
+  urgentFastTickPitch: 1.3
+  humPitchMin: 0.8
+  humPitchMax: 2
+  humVolumeMin: 0.15
+  humVolumeMax: 0.7
+  musicFade: 0.8
+  finalSeconds: 30
+  finalMusicPitch: 1.18
+  blackoutMusicDuck: 0.35
+  overloadShakeMin: 0.02
+  overloadShakeMax: 0.12
+  blackoutShake: 0.6
+  heartShake: 0.3
+  rejectShake: 0.05
+  plugShake: 0.04
+  shakeDecay: 3.5
+  shakeFrequency: 28
+  shakeMax: 0.8
+  overloadColor: {r: 1, g: 0.12, b: 0.08, a: 1}
+  overloadAlphaMin: 0.28
+  overloadAlphaMax: 0.6
+  overloadPulseMinHz: 2
+  overloadPulseMaxHz: 9
+  overloadSparksPerSecond: 10
+  blackoutLightFactor: 0.25
+  blackoutRoomAlpha: 0.35
+  blackoutRoomColor: {r: 0.02, g: 0.02, b: 0.06, a: 1}
+  flashColor: {r: 1, g: 1, b: 1, a: 0.85}
+  flashSeconds: 0.18
+  slowMoScale: 0.25
+  slowMoSeconds: 0.3
+  panelSparkBurst: 40
+  relightStagger: 0.12
+  relightFlicker: 0.35
+  relightDarkAlpha: 0.75
+  flickerHz: 22
+  squashAmount: 0.28
+  squashSeconds: 0.28
+  carryBobHeight: 0.08
+  carryBobHz: 3.2
+  leanDegrees: 8
+  leanSpeed: 12
+  stairsHopHeight: 0.12
+  stairsHopHz: 5
+  wobbleDegrees: 4
+  wobbleHz: 7
+  workPulse: 0.04
+  scorePopupColor: {r: 1, g: 0.85, b: 0.15, a: 1}
+  heartPopupColor: {r: 1, g: 0.25, b: 0.3, a: 1}
+  missPopupColor: {r: 0.75, g: 0.75, b: 0.8, a: 1}
+  heartPopupText: -1 {0}
+  missPopupText: MISSED
+  popupFontSize: 7
+  popupSeconds: 1.1
+  popupRise: 1.2
+  popupOvershoot: 1.8
+  popupPopSeconds: 0.25
+  coinBurst: 14
+  coinColor: {r: 1, g: 0.8, b: 0.1, a: 1}
+  sparkColor: {r: 1, g: 0.9, b: 0.4, a: 1}
+  sparkSize: 0.08
+  sparkSpeed: 3.5
+  sparkLife: 0.35
+  coinSize: 0.2
+  coinSpeed: 5
+  coinLife: 0.9
+  gravity: 12
+  maxParticles: 400
+  fxZ: -0.6
+  fxSortingOrder: 40
+  overlaySortingOrder: 90
+  vignetteColor: {r: 0.9, g: 0.05, b: 0.05, a: 1}
+  vignetteAlphaMax: 0.35
+  vignettePulseHz: 1.5
+  vignetteOverloadAlpha: 0.25

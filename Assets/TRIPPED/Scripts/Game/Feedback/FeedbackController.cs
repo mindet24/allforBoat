@@ -18,7 +18,7 @@ namespace Trouble.Game
         /// <summary>PlayerPrefs key of the mute switch (1 = muted).</summary>
         public const string MutedKey = "trouble.muted";
 
-        private const int PlayLogCapacity = 300;
+        private const int PlayLogCapacity = 2000;
 
         private struct Scheduled
         {
@@ -28,7 +28,14 @@ namespace Trouble.Game
 
         private LevelController _controller;
         private TrippedViewConfig _config;
+        private JuiceConfig _juice;
+        private SoundBank _bank;
         private AudioSource _oneShot;
+        private AudioSource[] _pitched;
+        private int _nextPitched;
+        private float _listenerCheckAt;
+        private const int PitchedVoices = 8;
+        private const float ListenerCheckSeconds = 1f;
         private readonly Dictionary<string, AudioClip> _clips = new Dictionary<string, AudioClip>();
         private readonly Dictionary<string, AudioSource> _buzz = new Dictionary<string, AudioSource>();
         private readonly List<Scheduled> _scheduled = new List<Scheduled>();
@@ -55,6 +62,15 @@ namespace Trouble.Game
         /// <summary>Sound is off (M).</summary>
         public bool Muted { get; private set; }
 
+        /// <summary>The day-mode and UI sound set (files from Resources/Audio, or generated).</summary>
+        public SoundBank Bank => _bank;
+
+        /// <summary>The game-feel numbers.</summary>
+        public JuiceConfig Juice => _juice;
+
+        /// <summary>The visual and day-mode sound juice (G5).</summary>
+        public JuiceController JuiceView { get; private set; }
+
         /// <summary>Number of buzz loops running now.</summary>
         public int ActiveBuzzCount => _buzz.Count;
 
@@ -63,22 +79,48 @@ namespace Trouble.Game
         {
             _controller = controller;
             _config = config;
+            _juice = JuiceConfig.LoadOrDefault();
             Muted = SafeGetMuted();
-
-            if (FindAnyObjectByType<AudioListener>() == null && Camera.main != null)
-                Camera.main.gameObject.AddComponent<AudioListener>();
+            EnsureListener();
 
             _oneShot = gameObject.AddComponent<AudioSource>();
             _oneShot.playOnAwake = false;
             _oneShot.spatialBlend = 0f;
+            _pitched = new AudioSource[PitchedVoices];
+            for (int i = 0; i < _pitched.Length; i++)
+            {
+                _pitched[i] = gameObject.AddComponent<AudioSource>();
+                _pitched[i].playOnAwake = false;
+                _pitched[i].spatialBlend = 0f;
+            }
 
             foreach (var name in ProceduralAudio.Names)
                 _clips[name] = ProceduralAudio.Load(name, config.audioFolder);
+            _bank = new SoundBank(config.audioFolder, _juice.maxVariants);
 
             controller.LevelLoaded += OnLevelLoaded;
             controller.LevelUnloaded += StopAll;
             controller.TickEvents += OnTickEvents;
             controller.CommandAccepted += OnCommandAccepted;
+
+            JuiceView = gameObject.AddComponent<JuiceController>();
+            JuiceView.Setup(controller, config, _juice, this);
+        }
+
+        /// <summary>
+        /// Makes sure an enabled AudioListener exists on an active object (adds one to the main camera if none).
+        /// Without it Unity plays nothing at all. Checked again every second, in case a camera is replaced.
+        /// </summary>
+        private static void EnsureListener()
+        {
+            var listeners = FindObjectsByType<AudioListener>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < listeners.Length; i++)
+                if (listeners[i].isActiveAndEnabled) return;
+            var cam = Camera.main;
+            if (cam == null) return;
+            var listener = cam.GetComponent<AudioListener>();
+            if (listener == null) listener = cam.gameObject.AddComponent<AudioListener>();
+            listener.enabled = true;
         }
 
         /// <summary>The clip of a sound (generated or from a file), or null if the name is unknown.</summary>
@@ -89,6 +131,8 @@ namespace Trouble.Game
         {
             Muted = muted;
             if (muted) _oneShot.Stop();
+            if (muted && _pitched != null)
+                foreach (var p in _pitched) p.Stop();
             foreach (var kv in _buzz) kv.Value.mute = muted;
             try
             {
@@ -101,13 +145,63 @@ namespace Trouble.Game
         }
 
         /// <summary>Plays a one-shot sound at its configured volume. Does nothing when muted.</summary>
-        public void Play(string sound)
+        /// <remarks>
+        /// Works for the level sounds (<see cref="ProceduralAudio.Names"/>) and the day/UI set
+        /// (<see cref="SynthBank.Names"/>, e.g. "ui_click"), so screens can call it too.
+        /// </remarks>
+        public void Play(string sound) => Play(sound, 1f, 1f);
+
+        /// <summary>Plays a one-shot sound at a pitch (1 = normal) and an extra volume factor.</summary>
+        public void Play(string sound, float pitch, float volumeScale)
         {
-            if (!_clips.TryGetValue(sound, out var clip) || clip == null) return;
+            AudioClip clip;
+            if (_bank != null && _bank.Has(sound)) clip = _bank.Pick(sound);
+            else if (!_clips.TryGetValue(sound, out clip)) clip = null;
+            if (clip == null) return;
             Record(sound);
             if (Muted) return;
-            _oneShot.PlayOneShot(clip, _config.VolumeOf(sound) * _config.masterVolume);
+            float volume = VolumeFor(sound) * volumeScale;
+            if (Mathf.Approximately(pitch, 1f))
+            {
+                _oneShot.PlayOneShot(clip, volume);
+                return;
+            }
+            var src = _pitched[_nextPitched];
+            _nextPitched = (_nextPitched + 1) % _pitched.Length;
+            src.pitch = pitch;
+            src.PlayOneShot(clip, volume);
         }
+
+        /// <summary>Full playing volume of a sound: its own volume x its mixer group x master.</summary>
+        public float VolumeFor(string sound)
+        {
+            if (_juice != null && SynthBank.Knows(sound))
+            {
+                float v = _juice.TryVolume(sound, out var own) ? own : 0.5f;
+                return v * _juice.GroupVolume(SynthBank.GroupOf(sound)) * _config.masterVolume;
+            }
+            return _config.VolumeOf(sound) * _config.masterVolume;
+        }
+
+        /// <summary>
+        /// A looping source for a bank sound, parented under this object, not yet playing. The caller owns it and
+        /// sets its volume each frame (see <see cref="VolumeFor"/>) and its mute from <see cref="Muted"/>.
+        /// </summary>
+        public AudioSource MakeLoop(string sound)
+        {
+            var go = new GameObject("Loop " + sound);
+            go.transform.SetParent(transform, false);
+            var src = go.AddComponent<AudioSource>();
+            src.clip = _bank != null ? _bank.Pick(sound) : null;
+            src.loop = true;
+            src.playOnAwake = false;
+            src.spatialBlend = 0f;
+            src.mute = Muted;
+            return src;
+        }
+
+        /// <summary>Adds a sound name to <see cref="PlayLog"/> without playing it (loops started by the juice layer).</summary>
+        public void LogPlay(string sound) => Record(sound);
 
         /// <summary>Stops the buzz loops and every pending or playing sound (restart, level change).</summary>
         public void StopAll()
@@ -128,6 +222,7 @@ namespace Trouble.Game
 
         private void OnCommandAccepted(Command command)
         {
+            if (_controller.Sim != null && _controller.Sim.IsDayMode) return; // day sounds: JuiceController
             // In planning a switch happens at once; while running it clicks when the character does it (ActionDone).
             if (_controller.Sim != null && _controller.Sim.Phase == LevelPhase.Planning && FeedbackRules.IsSwitchOn(command))
                 Play(ProceduralAudio.Click);
@@ -137,6 +232,16 @@ namespace Trouble.Game
         {
             var sim = _controller.Sim;
             if (sim == null) return;
+            if (sim.IsDayMode)
+            {
+                // Day mode has its own sound table and hum (JuiceController); keep the log and the tips here.
+                for (int i = 0; i < events.Count; i++)
+                {
+                    _events.Add(events[i]);
+                    Tip(Tips.OnEvent(_controller.LevelIndex, events[i]));
+                }
+                return;
+            }
             for (int i = 0; i < events.Count; i++)
             {
                 var e = events[i];
@@ -247,6 +352,12 @@ namespace Trouble.Game
             }
 
             UpdateBuzzVolumes();
+
+            if (Time.unscaledTime >= _listenerCheckAt)
+            {
+                _listenerCheckAt = Time.unscaledTime + ListenerCheckSeconds;
+                EnsureListener();
+            }
         }
 
         /// <summary>Buzz grows with the overload counter; it is silent while the level is not running.</summary>

@@ -67,6 +67,9 @@ namespace Trouble.Game
             if (live) DayInteraction.StairsInReach(sim, _stairsInReach);
             StairsShown = 0;
             var room = sim.FindRoom(sim.Character.RoomId);
+            // The E prompt wins its spot; a stairs prompt that would touch it moves to the other side of the character.
+            Rect? eRect = null;
+            if (at.HasValue) eRect = new Rect(at.Value.x - _config.promptSize.x * 0.5f, at.Value.y - _config.promptSize.y * 0.5f, _config.promptSize.x, _config.promptSize.y);
             for (int i = 0; i < MaxStairsPrompts; i++)
             {
                 if (i >= _stairsInReach.Count || room == null)
@@ -83,7 +86,8 @@ namespace Trouble.Game
                 // S lower, above the sockets.
                 float x = p.X + _config.stairsHalfRun * 0.5f + 0.3f;
                 float y = floorY + (up ? _config.playerWorldHeight + 0.15f : 0.95f);
-                Place(_stairs[i], new Vector3(x, y, _config.dayOverlayZ));
+                var c = PromptLayout.StairsCentre(new Vector2(x, y), _config.stairsPromptSize, eRect, sim.Character.X, _config.promptGap);
+                Place(_stairs[i], new Vector3(c.x, c.y, _config.dayOverlayZ));
                 StairsShown++;
             }
         }

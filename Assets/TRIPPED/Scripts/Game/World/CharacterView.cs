@@ -104,7 +104,18 @@ namespace Trouble.Game
             {
                 if (Mathf.Abs(p.x - _lastX) > 0.0005f) _facingLeft = p.x < _lastX;
             }
-            transform.localPosition = new Vector3(p.x, p.y, _config.roomDepth - _config.characterInset);
+            // Day mode: in front of the furnished room models (their open front is z = 0), so counters and sofas never
+            // hide the character. Sorting order still decides what draws over what among the sprites.
+            float z = day ? _config.dayFrontZ : _config.roomDepth - _config.characterInset;
+            transform.localPosition = new Vector3(p.x, p.y, z);
+            if (_carrySprite != null)
+            {
+                // Keep the carried sprite on the overlay plane whatever depth the character is at (position only:
+                // the juice layer owns its rotation and scale).
+                var lp = _carrySprite.transform.localPosition;
+                float wantZ = _config.dayOverlayZ - z + 0.05f;
+                if (!Mathf.Approximately(lp.z, wantZ)) _carrySprite.transform.localPosition = new Vector3(lp.x, lp.y, wantZ);
+            }
             _lastX = p.x;
 
             bool walking = day ? ch.WalkDir != 0 || ch.IsClimbing : ch.IsWalking;

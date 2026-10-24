@@ -65,6 +65,21 @@ namespace Trouble.Game
             return total;
         }
 
+        /// <summary>PlayerPrefs key format of a day level's best score.</summary>
+        public const string BestScoreKeyFormat = "trouble.bestscore.{0}";
+
+        /// <summary>Best score ever reached in a day level, 0 if never played.</summary>
+        public int BestScore(int level) => Mathf.Max(0, _store.GetInt(string.Format(BestScoreKeyFormat, level), 0));
+
+        /// <summary>Keeps <paramref name="score"/> if it beats the best so far. Returns true when it is a new best.</summary>
+        public bool RecordScore(int level, int score)
+        {
+            if (score <= BestScore(level)) return false;
+            _store.SetInt(string.Format(BestScoreKeyFormat, level), score);
+            _store.Save();
+            return true;
+        }
+
         /// <summary>Sets the highest unlocked level (debug and tests). Values below 1 become 1.</summary>
         public void SetUnlocked(int level)
         {

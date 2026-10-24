@@ -184,6 +184,30 @@ namespace Trouble.Game
         public Color blackoutOverlay = new Color(0f, 0f, 0f, 0.62f);
         public float cardExitSeconds = 0.7f;
 
+        [Header("Day follow camera (G6)")]
+        [Tooltip("Follow zoom: at least this many floors are on screen.")]
+        public float followMinFloors = 1.9f;
+        [Tooltip("Follow zoom: metres of each neighbouring room shown beside the character's room.")]
+        public float followNeighbourPeek = 1.2f;
+        [Tooltip("0 = the view follows the character exactly, 1 = it keeps the character's room centred.")]
+        [Range(0f, 1f)] public float followRoomLock = 0.45f;
+        [Tooltip("Where the middle of the character's room sits on screen (viewport units, origin bottom-left). Below the middle leaves room for the order tickets.")]
+        public Vector2 followScreenAnchor = new Vector2(0.5f, 0.45f);
+        [Tooltip("Seconds the camera takes to catch up sideways while the character walks.")]
+        public float followSmoothTime = 0.28f;
+        [Tooltip("Seconds the camera takes to ease to a new floor.")]
+        public float followFloorSmoothTime = 0.45f;
+        [Tooltip("Seconds to zoom between the follow view and the whole-house overview.")]
+        public float overviewSmoothTime = 0.25f;
+        [Tooltip("Metres the follow view may go past the house's outer walls.")]
+        public float followBoundsPad = 0.6f;
+        [Tooltip("Hold to see the whole house.")]
+        public UnityEngine.InputSystem.Key overviewKey = UnityEngine.InputSystem.Key.Tab;
+        public UnityEngine.InputSystem.Key overviewAltKey = UnityEngine.InputSystem.Key.Q;
+        [Tooltip("Overview: part of the screen the whole house fits in, under the tickets and above the bottom HUD (viewport units).")]
+        public Rect overviewArea = new Rect(0.03f, 0.13f, 0.94f, 0.66f);
+        public float overviewMargin = 0.04f;
+
         [Header("Day mode keyboard (walk, stairs, E)")]
         [Tooltip("Half the horizontal run of a flight of stairs, metres. The flight is centred on sim.StairsX.")]
         public float stairsHalfRun = 1.0f;
@@ -200,6 +224,10 @@ namespace Trouble.Game
         [Tooltip("Size of a key prompt bubble (\"E\", \"W ↑\"), metres.")]
         public Vector2 promptSize = new Vector2(0.5f, 0.42f);
         public Vector2 stairsPromptSize = new Vector2(0.8f, 0.42f);
+        [Tooltip("Smallest space between the E prompt and a stairs prompt, metres.")]
+        public float promptGap = 0.12f;
+        [Tooltip("Day mode: z of the character and appliance sprites, just in front of the furnished room models' open front (z = 0) and behind the prompts (dayOverlayZ).")]
+        public float dayFrontZ = -0.2f;
         [Tooltip("Resources path of the breaker panel sprite (bottom-centre pivot, 1 unit tall).")]
         public string panelArtPath = "Art/Props/panel";
         [Tooltip("Height the panel sprite is drawn at, metres.")]
