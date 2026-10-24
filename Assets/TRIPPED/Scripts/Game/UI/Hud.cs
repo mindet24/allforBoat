@@ -35,6 +35,7 @@ namespace Trouble.Game
         private readonly DayStatus _status = new DayStatus();
         private readonly RoomMeters _meters = new RoomMeters();
         private readonly RequestPins _pins = new RequestPins();
+        private readonly PowerPanel _power = new PowerPanel();
         private bool _day;
         private readonly List<Rect> _hudRects = new List<Rect>();
 
@@ -56,6 +57,9 @@ namespace Trouble.Game
         /// <summary>Day mode: the per-room power meters, for checks.</summary>
         public RoomMeters Meters => _meters;
 
+        /// <summary>Day mode: the Total Power panel, for checks.</summary>
+        public PowerPanel Power => _power;
+
         /// <summary>Day mode: request pins and edge arrows, for checks.</summary>
         public RequestPins Pins => _pins;
 
@@ -70,6 +74,7 @@ namespace Trouble.Game
             _config = config;
             _ui = TrippedUiConfig.LoadOrDefault();
             UiArt.Configure(_ui);
+            UiIcons.Configure(_ui);
             var root = UiKit.Canvas(gameObject, config, 10);
             var flow = controller.GetComponent<ScreenFlow>();
 
@@ -81,6 +86,7 @@ namespace Trouble.Game
                 _pins.Build(cx);
                 _tickets.Build(cx);
                 _status.Build(cx, _sim, () => { if (flow != null) flow.Pause(); });
+                _power.Build(cx, _sim);
                 _toasts.Build(root, config, _ui.dayToastTop);
                 _result.Build(root, controller, config, text, () => { if (flow != null) flow.ShowTitle(); });
                 if (controller.HouseCam != null) controller.HouseCam.FollowDay(_sim);
@@ -128,10 +134,12 @@ namespace Trouble.Game
             {
                 _hudRects.Clear();
                 _status.CollectHudRects(_hudRects);
+                _power.CollectRect(_hudRects);
                 _meters.Sync(_sim, time, _hudRects);
                 _pins.Sync(_sim, time);
                 _tickets.Sync(_sim, time, Time.unscaledDeltaTime);
                 _status.Sync(_sim, time);
+                _power.Sync(_sim, time);
                 _toasts.Sync(time);
                 _result.Sync(time);
                 return;

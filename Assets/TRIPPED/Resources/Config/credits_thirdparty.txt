@@ -1,0 +1,5 @@
+# Third-party credits shown on the Credits screen, one per line.
+# Lines starting with # are ignored. Add sound and font credits here.
+Lilita One font by Juan Montoreano, SIL Open Font License 1.1
+Patrick Hand font by Patrick Wagesreiter, SIL Open Font License 1.1
+TextMesh Pro and Liberation Sans (SIL Open Font License 1.1)

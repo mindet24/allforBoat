@@ -53,6 +53,17 @@ namespace Trouble.Game
         /// </summary>
         public Sprite[] CharacterFrames(string state)
         {
+            // Called every frame by the character view: look the state up first so no path string is built (G7).
+            if (state != null && _stripsByState.TryGetValue(state, out var known)) return known;
+            var result = LoadStrip(state);
+            if (state != null) _stripsByState[state] = result;
+            return result;
+        }
+
+        private readonly Dictionary<string, Sprite[]> _stripsByState = new Dictionary<string, Sprite[]>();
+
+        private Sprite[] LoadStrip(string state)
+        {
             string path = _config.characterArtFolder + "/player_" + state;
             if (_strips.TryGetValue(path, out var frames)) return frames;
             frames = null;

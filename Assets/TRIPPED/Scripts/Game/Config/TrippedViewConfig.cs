@@ -145,6 +145,12 @@ namespace Trouble.Game
         public float playerWorldHeight = 1.4f;
         public float animationFps = 8f;
 
+        [Header("Frame pacing (G7 perf)")]
+        [Tooltip("Frames per second the game aims for when vSync is off (0 or less = platform default, uncapped on desktop).")]
+        public int targetFrameRate = 60;
+        [Tooltip("0 = vSync off (targetFrameRate caps the rate), 1 = every vertical blank. Applied at boot.")]
+        [Range(0, 2)] public int vSyncCount = 1;
+
         [Header("Camera (GDD v1.1 §2.6)")]
         [Tooltip("Orthographic side view (art direction, 23 Oct). Off = perspective with fieldOfView.")]
         public bool orthographic = true;

@@ -220,8 +220,10 @@ namespace Trouble.Game
         private void SyncCables()
         {
             int frame = Time.frameCount;
-            foreach (var s in _sim.Sockets)
+            var sockets = _sim.Sockets;
+            for (int i = 0; i < sockets.Count; i++) // indexed: no boxed enumerator every frame
             {
+                var s = sockets[i];
                 if (!s.IsCord) continue;
                 if (!_cables.TryGetValue(s.Id, out var cable) || cable == null || cable.Cord != s)
                 {

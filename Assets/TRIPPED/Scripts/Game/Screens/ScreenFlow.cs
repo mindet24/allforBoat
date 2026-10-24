@@ -16,6 +16,8 @@ namespace Trouble.Game
         HowTo,
         /// <summary>The pause overlay; the level stays loaded behind it.</summary>
         Pause,
+        Settings,
+        Credits,
     }
 
     /// <summary>The pure rules of the screen flow.</summary>
@@ -34,12 +36,18 @@ namespace Trouble.Game
                 case ScreenId.End: return ScreenId.LevelSelect;
                 case ScreenId.LevelSelect: return ScreenId.Title;
                 case ScreenId.HowTo: return ScreenId.Title;
+                case ScreenId.Settings: return ScreenId.Title;
+                case ScreenId.Credits: return ScreenId.Title;
                 default: return ScreenId.Title;
             }
         }
 
         /// <summary>True if the screen covers the whole view and the level is unloaded while it shows.</summary>
         public static bool IsFullScreen(ScreenId screen) => screen != ScreenId.None && screen != ScreenId.Pause;
+
+        /// <summary>True if the screen shows the demo house behind it (Title, How to Play, Settings, Credits).</summary>
+        public static bool UsesHouseBackdrop(ScreenId screen) =>
+            screen == ScreenId.Title || screen == ScreenId.HowTo || screen == ScreenId.Settings || screen == ScreenId.Credits;
 
         /// <summary>True if winning <paramref name="level"/> ends the game (there is no level after it).</summary>
         public static bool IsLastLevel(int level, Func<int, bool> exists) => !exists(level + 1);
@@ -62,6 +70,12 @@ namespace Trouble.Game
         private Progress _progress;
         private int _shownFrame = -1;
         private float _endAt = -1f;
+        private TitleBackdrop _backdrop;
+        private TrippedUiConfig _ui;
+        private bool _loadingBackdrop;
+
+        /// <summary>The house behind the Title (for checks).</summary>
+        public TitleBackdrop Backdrop => _backdrop;
 
         /// <summary>The menu that is open now.</summary>
         public ScreenId Current { get; private set; }
@@ -83,11 +97,19 @@ namespace Trouble.Game
             canvasGo.transform.SetParent(transform, false);
             var canvas = UiKit.Canvas(canvasGo, config, 30);
 
-            _menus = new MenuScreens(config, TrippedUiConfig.LoadOrDefault(), new HudText(controller.Loader.Strings));
+            _ui = TrippedUiConfig.LoadOrDefault();
+            UserSettings.Current = new UserSettings(new PlayerPrefsProgressStore());
+            UserSettings.Current.ApplyAll();
+            _backdrop = gameObject.AddComponent<TitleBackdrop>();
+            _backdrop.Setup(controller, config, _ui);
+
+            _menus = new MenuScreens(config, _ui, new HudText(controller.Loader.Strings));
             _menus.Build(canvas, new MenuActions
             {
                 Play = StartDemo,
                 HowTo = ShowHowTo,
+                Settings = ShowSettings,
+                Credits = ShowCredits,
                 Quit = Quit,
                 Classic = ShowLevelSelect,
                 BackToTitle = ShowTitle,
@@ -108,6 +130,12 @@ namespace Trouble.Game
 
         /// <summary>Opens How to Play.</summary>
         public void ShowHowTo() => Show(ScreenId.HowTo);
+
+        /// <summary>Opens the Settings screen.</summary>
+        public void ShowSettings() => Show(ScreenId.Settings);
+
+        /// <summary>Opens the Credits screen.</summary>
+        public void ShowCredits() => Show(ScreenId.Credits);
 
         /// <summary>Opens the classic Level Select with the current unlock progress.</summary>
         public void ShowLevelSelect() => Show(ScreenId.LevelSelect);
@@ -161,15 +189,34 @@ namespace Trouble.Game
 
         private void Show(ScreenId screen)
         {
-            if (_controller.Sim != null) _controller.Unload();
+            if (FlowRules.UsesHouseBackdrop(screen) && _ui.titleHouseBackdrop && _controller.HasLevel(LevelLoader.DemoLevel))
+            {
+                // The demo house stays (or is loaded fresh) behind the menu.
+                if (!_backdrop.Active)
+                {
+                    _loadingBackdrop = true;
+                    bool ok = _controller.LoadLevel(LevelLoader.DemoLevel);
+                    _loadingBackdrop = false;
+                    if (ok) _backdrop.Enter();
+                }
+            }
+            else
+            {
+                _backdrop.Exit();
+                if (_controller.Sim != null) _controller.Unload();
+            }
+            _menus.SetTitleSky(!_backdrop.Active);
             _endAt = -1f;
             Current = screen;
             _shownFrame = Time.frameCount;
             if (screen == ScreenId.LevelSelect) _menus.ShowCards(BuildCards());
             if (screen == ScreenId.End) _menus.SetEndTime(HudFormat.Clock(_progress.TotalBestTicks(LevelCount()), TicksPerSecond()));
             if (screen == ScreenId.Title) _menus.SetBestScore(_progress.BestScore(LevelLoader.DemoLevel));
+            if (screen == ScreenId.Settings) _menus.RefreshSettings();
             _menus.Title.SetActive(screen == ScreenId.Title);
             _menus.HowTo.SetActive(screen == ScreenId.HowTo);
+            _menus.Settings.SetActive(screen == ScreenId.Settings);
+            _menus.Credits.SetActive(screen == ScreenId.Credits);
             _menus.Select.SetActive(screen == ScreenId.LevelSelect);
             _menus.End.SetActive(screen == ScreenId.End);
             _menus.Pause.SetActive(false);
@@ -206,10 +253,14 @@ namespace Trouble.Game
 
         private void OnLevelLoaded(int level)
         {
+            if (_loadingBackdrop) return; // the house behind the menu, not a level to play
+            _backdrop.Exit();
             Current = ScreenId.None;
             _endAt = -1f;
             _menus.Title.SetActive(false);
             _menus.HowTo.SetActive(false);
+            _menus.Settings.SetActive(false);
+            _menus.Credits.SetActive(false);
             _menus.Select.SetActive(false);
             _menus.End.SetActive(false);
             _menus.Pause.SetActive(false);

@@ -33,6 +33,19 @@ namespace Trouble.Game
         /// <summary>The PNG sprite of an appliance (Resources/Art/Appliances/{type}.png), or null.</summary>
         public Sprite IconOf(HouseSim sim, string applianceId) => Art?.Appliance(TypeOf(sim, applianceId));
 
+        /// <summary>A face portrait from Resources/{faceFolder}/{name}.png (lower case), or null until the art exists.</summary>
+        public static Sprite FaceOf(TrippedUiConfig ui, string owner)
+        {
+            if (string.IsNullOrEmpty(owner)) return null;
+            string key = owner.ToLowerInvariant();
+            if (Faces.TryGetValue(key, out var s)) return s;
+            s = Resources.Load<Sprite>(ui.faceFolder + "/" + key);
+            Faces[key] = s;
+            return s;
+        }
+
+        private static readonly Dictionary<string, Sprite> Faces = new Dictionary<string, Sprite>();
+
         /// <summary>Canvas size in reference pixels.</summary>
         public Vector2 CanvasSize => Canvas.rect.size;
 
@@ -68,6 +81,8 @@ namespace Trouble.Game
             public Image BarFill;
             public TextMeshProUGUI Time;
             public TextMeshProUGUI Stamp;
+            public Image Pill;
+            public Image PillIcon;
             public float BornAt;
             public float EndAt = -1f;
             public TicketPhase EndPhase;
@@ -192,6 +207,11 @@ namespace Trouble.Game
                 barColor = ui.running;
                 time = "ON";
                 t.IconBack.color = Color.Lerp(ui.creamDark, ui.running, 0.35f + 0.15f * Mathf.Sin(now * 6f));
+                if (t.Pill.color != ui.running)
+                {
+                    t.Pill.color = ui.running;
+                    t.PillIcon.sprite = UiIcons.Plug;
+                }
             }
             else
             {
@@ -199,7 +219,12 @@ namespace Trouble.Game
                 int band = TicketRules.TimerBand(fill, ui.timerGreenAbove, ui.timerAmberAbove);
                 barColor = band == 0 ? ui.good : band == 1 ? ui.accent : ui.bad;
                 int secs = Mathf.Max(0, Mathf.CeilToInt((r.DueTicks - sim.Now) / (float)tps));
-                time = secs + "s";
+                time = PowerPanelRules.Clock(secs);
+                if (t.Pill.color != ui.red)
+                {
+                    t.Pill.color = ui.red;
+                    t.PillIcon.sprite = UiIcons.Clock;
+                }
                 if (band != t.ShownBand)
                 {
                     t.ShownBand = band;
@@ -217,6 +242,8 @@ namespace Trouble.Game
 
         private Ticket Make(HouseSim sim, RequestState r, float now)
         {
+            // A request bubble like the art sheet: the person's portrait, "Need a Kettle!", the appliance and a red
+            // clock pill; a thin bar under the speech shows the time left (or the progress once it runs).
             var ui = _cx.Ui;
             var cfg = _cx.Config;
             var size = ui.ticketSize;
@@ -230,39 +257,66 @@ namespace Trouble.Game
             var bt = body.transform;
             float w = size.x, h = size.y;
 
-            t.Header = UIFactory.Panel(bt, "Header", 6, 6, w - 12, ui.ticketHeaderHeight, urgency, false, false);
-            t.Header.sprite = UiArt.Rounded;
-            t.Header.type = Image.Type.Sliced;
-            var owner = UiKit.Text(t.Header.transform, "Owner", 12, 0, w - 90, ui.ticketHeaderHeight, r.Owner, 24, Color.white, TextAlignmentOptions.MidlineLeft);
-            owner.overflowMode = TextOverflowModes.Ellipsis;
-            t.Time = UiKit.Text(t.Header.transform, "Time", w - 84, 0, 66, ui.ticketHeaderHeight, "", 22, Color.white, TextAlignmentOptions.MidlineRight);
+            // Portrait: an urgency-coloured ring around the person's face (or a coloured circle with the initial).
+            float ps = ui.portraitSize;
+            t.Header = UIFactory.Panel(bt, "Ring", 10, (h - ps) * 0.5f - 6f, ps, ps, urgency, false, false);
+            t.Header.sprite = PlaceholderArt.Circle;
+            var face = UIFactory.Panel(t.Header.transform, "Face", 6, 6, ps - 12, ps - 12, ui.PersonColor(r.Owner), false, false);
+            face.sprite = PlaceholderArt.Circle;
+            var faceArt = DayHudContext.FaceOf(ui, r.Owner);
+            if (faceArt != null)
+            {
+                var img = UiKit.Icon(face.transform, "Art", 0, 0, ps - 12, ps - 12, faceArt, Color.white);
+                img.preserveAspect = true;
+            }
+            else UiKit.Fill(face.transform, "Initial", AlertRules.Initial(r.Owner), ps * 0.5f, Color.white);
+            var nameTag = UiKit.Card(t.Header.transform, "Name", new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f), new Vector2(0f, 2f), new Vector2(ps + 6f, 26f), ui.navy, ui, false);
+            nameTag.sprite = UiArt.Pill;
+            var nameText = UiKit.Fill(nameTag.transform, "Text", r.Owner, 18, Color.white);
+            nameText.enableAutoSizing = true;
+            nameText.fontSizeMin = 10;
+            nameText.fontSizeMax = 18;
 
-            float iconBack = ui.ticketIconSize + 12f;
-            t.IconBack = UIFactory.Panel(bt, "IconBack", (w - iconBack) * 0.5f, ui.ticketHeaderHeight + 10f, iconBack, iconBack, ui.creamDark, false, false);
+            // Speech.
+            float sx = ps + 22f, sw = w - sx - ui.ticketIconSize - 18f;
+            string appName = DayHudContext.NameOf(sim, r.ApplianceId);
+            var need = UiKit.Text(bt, "Speech", sx, 10, sw, 56, _cx.Text.Format("g7_need", ("appliance", appName)), 28, ui.navy, TextAlignmentOptions.TopLeft);
+            need.textWrappingMode = TextWrappingModes.Normal;
+            need.enableAutoSizing = true;
+            need.fontSizeMin = 16;
+            need.fontSizeMax = 28;
+            string roomName = sim.FindRoom(r.RoomId)?.Name ?? r.RoomId;
+            var room = UiKit.Text(bt, "Room", sx, 64, sw, 24, _cx.Text.Format("g7_in_room", ("room", roomName)), 20, ui.charcoalSoft, TextAlignmentOptions.MidlineLeft, false);
+            room.overflowMode = TextOverflowModes.Ellipsis;
+
+            // Appliance icon on the right.
+            float iconBack = ui.ticketIconSize + 8f;
+            t.IconBack = UIFactory.Panel(bt, "IconBack", w - iconBack - 10f, 6, iconBack, iconBack, ui.creamDark, false, false);
             t.IconBack.sprite = PlaceholderArt.Circle;
             var icon = _cx.IconOf(sim, r.ApplianceId);
             if (icon != null)
-                UiKit.Icon(t.IconBack.transform, "Icon", 6, 6, ui.ticketIconSize, ui.ticketIconSize, icon, Color.white);
+                UiKit.Icon(t.IconBack.transform, "Icon", 4, 4, ui.ticketIconSize, ui.ticketIconSize, icon, Color.white);
             else
-                UiKit.Text(t.IconBack.transform, "IconText", 0, 0, iconBack, iconBack, DayHudContext.NameOf(sim, r.ApplianceId), 18, ui.charcoal);
+                UiKit.Text(t.IconBack.transform, "IconText", 0, 0, iconBack, iconBack, appName, 18, ui.charcoal);
 
-            float roomY = ui.ticketHeaderHeight + 10f + iconBack + 2f;
-            string roomName = sim.FindRoom(r.RoomId)?.Name ?? r.RoomId;
-            var room = UiKit.Text(bt, "Room", 8, roomY, w - 16, 24, roomName, 21, ui.charcoal);
-            room.enableAutoSizing = true;
-            room.fontSizeMin = 13;
-            room.fontSizeMax = 21;
-            room.overflowMode = TextOverflowModes.Ellipsis;
-
-            var barBack = UIFactory.Panel(bt, "Timer", 12, h - 22, w - 24, 13, ui.charcoalSoft, false, false);
+            // Time bar under the speech.
+            var barBack = UIFactory.Panel(bt, "Timer", sx, h - 30, w - sx - ui.clockPillSize.x - 22f, 12, ui.creamDark, false, false);
             barBack.sprite = UiArt.Pill;
             barBack.type = Image.Type.Sliced;
             t.BarFill = UIFactory.Fill(UIFactory.Stretch(UIFactory.Rect(barBack.transform, "Fill", 0, 0, 0, 0)), ui.good, false, false);
             t.BarFill.sprite = UiArt.Pill;
             t.BarFill.type = Image.Type.Sliced;
 
-            t.Stamp = UiKit.Text(bt, "Stamp", 0, ui.ticketHeaderHeight + 30f, w, 60, "", 40, ui.good);
-            t.Stamp.transform.localRotation = Quaternion.Euler(0f, 0f, 12f);
+            // Red clock pill, bottom-right, overlapping the edge like the sheet.
+            var pill = ui.clockPillSize;
+            t.Pill = UIFactory.Panel(bt, "Clock", w - pill.x - 8f, h - pill.y - 4f, pill.x, pill.y, ui.red, false, false);
+            t.Pill.sprite = UiArt.Pill;
+            t.Pill.type = Image.Type.Sliced;
+            t.PillIcon = UiKit.Icon(t.Pill.transform, "Icon", 4, 2, pill.y - 4f, pill.y - 4f, UiIcons.Clock, Color.white);
+            t.Time = UiKit.Text(t.Pill.transform, "Time", pill.y, 0, pill.x - pill.y - 6f, pill.y, "", 26, Color.white, TextAlignmentOptions.Center);
+
+            t.Stamp = UiKit.Text(bt, "Stamp", 0, 20, w, 80, "", 52, ui.good);
+            t.Stamp.transform.localRotation = Quaternion.Euler(0f, 0f, 8f);
             t.Stamp.gameObject.SetActive(false);
             t.Root.anchoredPosition = new Vector2(-1000f, 1000f);
             return t;
@@ -362,7 +416,13 @@ namespace Trouble.Game
             _badgeImage.type = Image.Type.Sliced;
             _badgeImage.color = ui.bad;
             _badgeImage.raycastTarget = false;
-            _badgeText = UiKit.Fill(_badge, "Text", "", 30f * scale, Color.white);
+            _badgeText = UiKit.Fill(_badge, "Text", "", 28f * scale, Color.white);
+            _badgeText.rectTransform.offsetMin = new Vector2(bs.y * 0.9f, 0f);
+            var warn = UIFactory.Anchored(_badge, "Warning", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(6f * scale, 0f), new Vector2(bs.y * 0.8f, bs.y * 0.8f));
+            var warnImg = warn.gameObject.AddComponent<Image>();
+            warnImg.sprite = UiIcons.Warning;
+            warnImg.raycastTarget = false;
+            _badge.localRotation = Quaternion.Euler(0f, 0f, 4f);
             _badge.gameObject.SetActive(false);
         }
 

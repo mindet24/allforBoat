@@ -178,7 +178,8 @@ namespace Trouble.Game
             if (_juice != null && SynthBank.Knows(sound))
             {
                 float v = _juice.TryVolume(sound, out var own) ? own : 0.5f;
-                return v * _juice.GroupVolume(SynthBank.GroupOf(sound)) * _config.masterVolume;
+                // G6: the player's Settings volume for the group (master goes through AudioListener.volume).
+                return v * _juice.GroupVolume(SynthBank.GroupOf(sound)) * _config.masterVolume * UserSettings.GroupFactor(SynthBank.GroupOf(sound));
             }
             return _config.VolumeOf(sound) * _config.masterVolume;
         }

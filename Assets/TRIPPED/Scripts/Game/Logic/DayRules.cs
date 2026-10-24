@@ -28,8 +28,10 @@ namespace Trouble.Game
         {
             if (sim == null || !sim.IsDayMode) return false;
             if (sim.Phase == LevelPhase.Won || sim.Phase == LevelPhase.Lost) return false;
-            foreach (var c in sim.Circuits)
-                if (!c.IsOn) return true;
+            // Indexed, not foreach: foreach over an IReadOnlyList boxes its enumerator, and this runs several times a frame.
+            var circuits = sim.Circuits;
+            for (int i = 0; i < circuits.Count; i++)
+                if (!circuits[i].IsOn) return true;
             return false;
         }
 
@@ -61,8 +63,9 @@ namespace Trouble.Game
         public static int ActiveCount(HouseSim sim)
         {
             int n = 0;
-            foreach (var r in sim.Requests)
-                if (r.IsActive) n++;
+            var requests = sim.Requests;
+            for (int i = 0; i < requests.Count; i++)
+                if (requests[i].IsActive) n++;
             return n;
         }
     }

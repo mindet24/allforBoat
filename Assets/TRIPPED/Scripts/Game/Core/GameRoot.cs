@@ -36,6 +36,10 @@ namespace Trouble.Game
         private void Awake()
         {
             var config = TrippedViewConfig.LoadOrDefault();
+            // G7: cap the frame rate (vSync, or targetFrameRate when vSync is off) so a light scene does not spin the
+            // GPU at hundreds of fps on weak hardware.
+            QualitySettings.vSyncCount = config.vSyncCount;
+            Application.targetFrameRate = config.targetFrameRate > 0 ? config.targetFrameRate : -1;
             EnsureEventSystem();
 
             var cam = Camera.main;

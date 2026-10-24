@@ -55,8 +55,10 @@ namespace Trouble.Game
         /// <summary>True when any room's breaker is off (the sim's blackout test for E at the panel).</summary>
         public static bool AnyBreakerOff(HouseSim sim)
         {
-            foreach (var c in sim.Circuits)
-                if (!c.IsOn) return true;
+            // Indexed loops in this class: they run every frame (key prompts), and foreach over an IReadOnlyList boxes.
+            var circuits = sim.Circuits;
+            for (int i = 0; i < circuits.Count; i++)
+                if (!circuits[i].IsOn) return true;
             return false;
         }
 
@@ -77,8 +79,10 @@ namespace Trouble.Game
             {
                 SocketState best = null;
                 int bestDist = int.MaxValue;
-                foreach (var s in sim.Sockets)
+                var sockets = sim.Sockets;
+                for (int i = 0; i < sockets.Count; i++)
                 {
+                    var s = sockets[i];
                     if (s.RoomId != ch.RoomId || !string.IsNullOrEmpty(s.OccupantId) || s.Reserved || !string.IsNullOrEmpty(s.CordSocketId)) continue;
                     int d = Math.Abs(ch.XCm - Cm(sim.SocketX(s)));
                     if (d <= reach && d < bestDist)
@@ -95,8 +99,10 @@ namespace Trouble.Game
             ApplianceState pick = null;
             SocketState pickSocket = null;
             int pickDist = int.MaxValue;
-            foreach (var app in sim.Appliances)
+            var appliances = sim.Appliances;
+            for (int i = 0; i < appliances.Count; i++)
             {
+                var app = appliances[i];
                 if (string.IsNullOrEmpty(app.SocketId)) continue;
                 var s = sim.FindSocket(app.SocketId);
                 if (s == null || s.RoomId != ch.RoomId) continue;
@@ -126,8 +132,10 @@ namespace Trouble.Game
             var here = sim.FindRoom(ch.RoomId);
             if (here == null) return;
             int reach = Cm(sim.Rules.reachMetres);
-            foreach (var door in sim.Doors)
+            var doors = sim.Doors;
+            for (int di = 0; di < doors.Count; di++)
             {
+                var door = doors[di];
                 if (!door.IsStairs || !door.IsOpen || (door.RoomA != here.Id && door.RoomB != here.Id)) continue;
                 var other = sim.FindRoom(door.OtherRoom(here.Id));
                 if (other == null) continue;
@@ -137,8 +145,8 @@ namespace Trouble.Game
                 if (Math.Abs(ch.XCm - Cm(x)) > reach) continue;
                 // The sim takes the first matching door per direction; show only that one.
                 bool taken = false;
-                foreach (var p in into)
-                    if (p.Direction == dir) taken = true;
+                for (int pi = 0; pi < into.Count; pi++)
+                    if (into[pi].Direction == dir) taken = true;
                 if (taken) continue;
                 into.Add(new StairsPrompt { DoorId = door.Id, Direction = dir, X = x, RoomId = here.Id });
             }

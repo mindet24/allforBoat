@@ -13,23 +13,56 @@ namespace Trouble.Game
         /// <summary>Resources path of the config asset.</summary>
         public const string ResourcePath = "Config/TrippedUiConfig";
 
-        [Header("Palette (warm cream + charcoal)")]
-        public Color cream = TrippedViewConfig.Hex("#FFF4DE");
-        public Color creamDark = TrippedViewConfig.Hex("#F1DDB8");
-        public Color charcoal = TrippedViewConfig.Hex("#2B2B33");
-        public Color charcoalSoft = TrippedViewConfig.Hex("#4A4A55");
-        public Color shadow = new Color(0.08f, 0.06f, 0.1f, 0.35f);
-        public Color accent = TrippedViewConfig.Hex("#FFB300");
-        public Color good = TrippedViewConfig.Hex("#43B047");
-        public Color bad = TrippedViewConfig.Hex("#E53935");
-        public Color coin = TrippedViewConfig.Hex("#FFC93C");
+        [Header("Palette (art sheet: yellow, sky, green, purple, red, navy, tan, charcoal)")]
+        public Color yellow = TrippedViewConfig.Hex("#F6C933");
+        public Color sky = TrippedViewConfig.Hex("#3FA2F6");
+        public Color green = TrippedViewConfig.Hex("#7DBE4E");
+        public Color purple = TrippedViewConfig.Hex("#8E5BD9");
+        public Color red = TrippedViewConfig.Hex("#E8423F");
+        public Color navy = TrippedViewConfig.Hex("#1F2A44");
+        public Color navyLight = TrippedViewConfig.Hex("#2E3D5E");
+        public Color tan = TrippedViewConfig.Hex("#D6B98C");
+        public Color ink = TrippedViewConfig.Hex("#2F3640");
+        [Tooltip("Light card colour (request bubbles, how-to cards, settings rows).")]
+        public Color cream = TrippedViewConfig.Hex("#FFF9EE");
+        public Color creamDark = TrippedViewConfig.Hex("#F0E2C8");
+        [Tooltip("Dark text and dark panels (navy).")]
+        public Color charcoal = TrippedViewConfig.Hex("#1F2A44");
+        public Color charcoalSoft = TrippedViewConfig.Hex("#56627F");
+        public Color shadow = new Color(0.06f, 0.08f, 0.16f, 0.32f);
+        public Color accent = TrippedViewConfig.Hex("#F6C933");
+        public Color good = TrippedViewConfig.Hex("#5DB447");
+        public Color bad = TrippedViewConfig.Hex("#E8423F");
+        public Color coin = TrippedViewConfig.Hex("#F6C933");
         public Color coinRim = TrippedViewConfig.Hex("#D9901A");
-        public Color backdropTop = TrippedViewConfig.Hex("#FFB547");
-        public Color backdropBottom = TrippedViewConfig.Hex("#F0703C");
-        public Color dim = new Color(0.08f, 0.07f, 0.1f, 0.72f);
-        public Color segmentEmpty = TrippedViewConfig.Hex("#5A5A66");
-        public Color meterBack = new Color(0.17f, 0.17f, 0.2f, 0.9f);
-        public Color running = TrippedViewConfig.Hex("#3DA5F4");
+        [Tooltip("Menu sky gradient (top, bottom).")]
+        public Color backdropTop = TrippedViewConfig.Hex("#3A8FE0");
+        public Color backdropBottom = TrippedViewConfig.Hex("#BFE6FB");
+        public Color grass = TrippedViewConfig.Hex("#6DB24A");
+        public Color dirt = TrippedViewConfig.Hex("#7A4A2A");
+        public Color dim = new Color(0.06f, 0.08f, 0.16f, 0.72f);
+        public Color segmentEmpty = TrippedViewConfig.Hex("#46557A");
+        public Color meterBack = new Color(0.12f, 0.16f, 0.27f, 0.94f);
+        public Color running = TrippedViewConfig.Hex("#3FA2F6");
+        [Tooltip("Navy HUD panels (slightly see-through).")]
+        public Color panel = new Color(0.12f, 0.16f, 0.27f, 0.95f);
+        public Color iconOutline = TrippedViewConfig.Hex("#1F2A44");
+
+        [Header("Family colours (placeholder portraits until Art/Faces/{name}.png exist)")]
+        public string[] personNames = { "Mom", "Dad", "Daughter", "Grandma" };
+        public Color[] personColors =
+        {
+            TrippedViewConfig.Hex("#E85D75"), TrippedViewConfig.Hex("#3FA2F6"), TrippedViewConfig.Hex("#8E5BD9"), TrippedViewConfig.Hex("#7DBE4E"),
+        };
+        public Color personFallback = TrippedViewConfig.Hex("#D6B98C");
+        [Tooltip("Resources folder of face portraits, named mom.png, dad.png, daughter.png, grandma.png.")]
+        public string faceFolder = "Art/Faces";
+
+        [Header("Fonts (OFL, Resources/Fonts)")]
+        public string displayFont = "Fonts/LilitaOne-Regular";
+        public string handFont = "Fonts/PatrickHand-Regular";
+        [Tooltip("Outline width of the display font on the logo and big titles (TMP units).")]
+        public float logoOutline = 0.28f;
         [Tooltip("Corner radius of panels and buttons, in sprite pixels (the sprite is 128 px).")]
         public int cornerRadius = 30;
         public Vector2 shadowOffset = new Vector2(0f, -7f);
@@ -38,16 +71,20 @@ namespace Trouble.Game
         public float buttonHoverScale = 1.06f;
         public float buttonPressScale = 0.94f;
         public float buttonAnimSpeed = 18f;
-        public Color buttonPrimary = TrippedViewConfig.Hex("#43B047");
-        public Color buttonSecondary = TrippedViewConfig.Hex("#FFF4DE");
-        public Color buttonFocusRing = TrippedViewConfig.Hex("#FFE066");
+        public Color buttonPrimary = TrippedViewConfig.Hex("#F6C933");
+        public Color buttonPrimaryText = TrippedViewConfig.Hex("#1F2A44");
+        public Color buttonSecondary = TrippedViewConfig.Hex("#25324F");
+        public Color buttonSecondaryText = Color.white;
+        public Color buttonFocusRing = TrippedViewConfig.Hex("#FFFFFF");
 
         [Header("Order tickets (top-left)")]
         public Vector2 ticketOrigin = new Vector2(20f, 18f);
-        public Vector2 ticketSize = new Vector2(196f, 212f);
+        public Vector2 ticketSize = new Vector2(352f, 132f);
         public float ticketGap = 12f;
-        public int ticketsPerRow = 6;
-        public float ticketIconSize = 86f;
+        public int ticketsPerRow = 4;
+        public float ticketIconSize = 84f;
+        public float portraitSize = 96f;
+        public Vector2 clockPillSize = new Vector2(128f, 40f);
         public float ticketHeaderHeight = 40f;
         public float ticketSlideSeconds = 0.35f;
         public float ticketSlideDistance = 260f;
@@ -126,6 +163,53 @@ namespace Trouble.Game
         public float dayToastTop = 492f;
         public Vector2 startCardSize = new Vector2(760f, 300f);
         public Vector2 pauseButtonSize = new Vector2(84f, 80f);
+
+        [Header("Power panel (top-right, under the hearts)")]
+        public float powerPanelWidth = 380f;
+        public float powerHeaderHeight = 96f;
+        public float powerRowHeight = 44f;
+        public float powerPanelTop = 116f;
+        [Tooltip("Room row bar colours cycle through these (the sheet's room colours); the bar turns amber/red as it fills.")]
+        public Color[] roomColors =
+        {
+            TrippedViewConfig.Hex("#3FA2F6"), TrippedViewConfig.Hex("#8E5BD9"), TrippedViewConfig.Hex("#7DBE4E"), TrippedViewConfig.Hex("#F6C933"),
+            TrippedViewConfig.Hex("#E85D75"), TrippedViewConfig.Hex("#5BC7C2"), TrippedViewConfig.Hex("#D6B98C"),
+        };
+        public Color rowHighlight = new Color(0.96f, 0.79f, 0.2f, 0.22f);
+
+        [Header("Title screen")]
+        public float logoSize = 184f;
+        public float logoTilt = 6f;
+        public Vector2 logoPosition = new Vector2(80f, 92f);
+        public Vector2 playButtonSize = new Vector2(470f, 116f);
+        public Vector2 titleButtonSize = new Vector2(420f, 82f);
+        public float titleButtonGap = 14f;
+        public float titleMenuTop = 452f;
+        public float titleMenuLeft = 110f;
+        public float titleButtonTilt = 2.5f;
+        [Tooltip("Title: the game's own house is shown in this part of the screen (viewport units). Off = a flat backdrop.")]
+        public bool titleHouseBackdrop = true;
+        public Rect titleHouseArea = new Rect(0.38f, 0.03f, 0.6f, 0.8f);
+        public float noteSize = 40f;
+
+        [Header("Settings")]
+        public int volumeStep = 10;
+        public Vector2 settingsPanelSize = new Vector2(1000f, 860f);
+        public float settingsRowHeight = 70f;
+
+        [Header("Credits")]
+        [Tooltip("Resources text file with one third-party credit per line (# starts a comment).")]
+        public string thirdPartyCreditsPath = "Config/credits_thirdparty";
+        public Vector2 creditsPanelSize = new Vector2(1100f, 860f);
+
+        /// <summary>Colour of a family member's placeholder portrait.</summary>
+        public Color PersonColor(string name)
+        {
+            if (personNames != null && personColors != null)
+                for (int i = 0; i < personNames.Length && i < personColors.Length; i++)
+                    if (string.Equals(personNames[i], name, System.StringComparison.OrdinalIgnoreCase)) return personColors[i];
+            return personFallback;
+        }
 
         /// <summary>Loads the config asset, or makes one with default values if there is none.</summary>
         public static TrippedUiConfig LoadOrDefault()

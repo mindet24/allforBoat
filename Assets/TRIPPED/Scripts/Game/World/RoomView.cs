@@ -26,6 +26,10 @@ namespace Trouble.Game
         private string _shownText = "";
         private string _shownCountdown = "";
         private int _shownFillKey = -1;
+        // What the label and countdown were built from, so their strings are only rebuilt when these change (G7: no
+        // per-frame string allocation). Int.MinValue = not built yet.
+        private int _shownLoad = int.MinValue, _shownCapacity = int.MinValue, _shownOn = int.MinValue;
+        private int _shownOverTicks = int.MinValue;
 
         /// <summary>The sim room this view shows.</summary>
         public RoomState Room => _room;
@@ -190,12 +194,19 @@ namespace Trouble.Game
             var circuit = sim.FindCircuit(_room.Id);
             if (circuit != null)
             {
-                string text = DayRules.RoomLoadText(_room.Name, circuit.Load, circuit.Capacity) + (circuit.IsOn ? "" : "  OFF");
-                if (text != _shownText)
+                int on = circuit.IsOn ? 1 : 0;
+                if (circuit.Load != _shownLoad || circuit.Capacity != _shownCapacity || on != _shownOn)
                 {
-                    _shownText = text;
-                    _nameText.text = text;
-                    MeasureLabel();
+                    _shownLoad = circuit.Load;
+                    _shownCapacity = circuit.Capacity;
+                    _shownOn = on;
+                    string text = DayRules.RoomLoadText(_room.Name, circuit.Load, circuit.Capacity) + (circuit.IsOn ? "" : "  OFF");
+                    if (text != _shownText)
+                    {
+                        _shownText = text;
+                        _nameText.text = text;
+                        MeasureLabel();
+                    }
                 }
                 float fill = HudFormat.Fill(circuit.Load, circuit.Capacity);
                 var band = HudFormat.Band(circuit.Load, circuit.Capacity, _config.loadAmberAbove, _config.loadRedAbove);
@@ -209,13 +220,18 @@ namespace Trouble.Game
                     _barFill.transform.localPosition = new Vector3(_barLeft + w * 0.5f, pos.y, pos.z);
                     _barFill.color = _config.LoadColor(band);
                 }
-                string countdown = "";
-                if (circuit.Overloading)
-                    countdown = HudFormat.SecondsToTrip(circuit.OverTicks, sim.Rules.overTripTicks, sim.Rules.ticksPerSecond).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " s";
-                if (countdown != _shownCountdown)
+                int overTicks = circuit.Overloading ? circuit.OverTicks : -1;
+                if (overTicks != _shownOverTicks)
                 {
-                    _shownCountdown = countdown;
-                    _countdownText.text = countdown;
+                    _shownOverTicks = overTicks;
+                    string countdown = "";
+                    if (circuit.Overloading)
+                        countdown = HudFormat.SecondsToTrip(circuit.OverTicks, sim.Rules.overTripTicks, sim.Rules.ticksPerSecond).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " s";
+                    if (countdown != _shownCountdown)
+                    {
+                        _shownCountdown = countdown;
+                        _countdownText.text = countdown;
+                    }
                 }
             }
 

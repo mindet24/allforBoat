@@ -68,6 +68,9 @@ namespace Trouble.Game
         /// <summary>Test and capture hook: true forces the overview as if the key were held.</summary>
         public bool ForceOverview { get; set; }
 
+        /// <summary>Part of the screen the overview fits the house into (viewport units); null = the config's overviewArea. The Title uses the right side.</summary>
+        public Rect? AreaOverride { get; set; }
+
         /// <summary>
         /// Day mode: follow the character's room of <paramref name="sim"/> (the follow point comes from <see cref="Frame"/>).
         /// Wheel zoom, drag and key panning are off while following.
@@ -340,12 +343,13 @@ namespace Trouble.Game
             pad.xMax += _config.followBoundsPad;
             pad.yMin -= _config.followBoundsPad;
             pad.yMax += _config.followBoundsPad;
-            float overviewHeight = CameraMath.FitViewHeight(_bounds.size, aspect, _config.overviewArea, _config.overviewMargin);
+            var overviewArea = AreaOverride ?? _config.overviewArea;
+            float overviewHeight = CameraMath.FitViewHeight(_bounds.size, aspect, overviewArea, _config.overviewMargin);
 
             if (Overview || _followPoint == null)
             {
                 _targetDistance = overviewHeight;
-                _targetPosition = CameraMath.CenterOnForHeight(_bounds.center, overviewHeight, aspect, _config.overviewArea);
+                _targetPosition = CameraMath.CenterOnForHeight(_bounds.center, overviewHeight, aspect, overviewArea);
             }
             else
             {

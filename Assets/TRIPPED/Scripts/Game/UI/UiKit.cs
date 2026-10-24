@@ -54,7 +54,7 @@ namespace Trouble.Game
         {
             var t = UIFactory.Label(parent, name, x, y, w, h, text, size, color, align, bold);
             t.overflowMode = TextOverflowModes.Overflow;
-            return t;
+            return bold ? t.AsDisplay() : t;
         }
 
         /// <summary>A label that fills its parent.</summary>
@@ -64,7 +64,7 @@ namespace Trouble.Game
             var rt = UIFactory.Stretch(UIFactory.Rect(parent, name, 0, 0, 0, 0));
             var t = UIFactory.LabelOn(rt, text, size, color, align, bold);
             t.overflowMode = TextOverflowModes.Overflow;
-            return t;
+            return bold ? t.AsDisplay() : t;
         }
 
         /// <summary>A plain image (no slicing) at a rect from the parent's top-left.</summary>
@@ -81,7 +81,7 @@ namespace Trouble.Game
         /// <paramref name="anchor"/> with its centre at <paramref name="position"/>.
         /// </summary>
         public static ChunkyButton Button(Transform parent, string name, Vector2 anchor, Vector2 position, Vector2 size, string label,
-            float fontSize, Color background, Color textColor, TrippedUiConfig ui, Action onClick)
+            float fontSize, Color background, Color textColor, TrippedUiConfig ui, Action onClick, Sprite icon = null, Color? iconColor = null)
         {
             var body = Card(parent, name, anchor, new Vector2(0.5f, 0.5f), position, size, background, ui, true, true);
             var root = (RectTransform)body.transform.parent;
@@ -105,6 +105,20 @@ namespace Trouble.Game
             colors.fadeDuration = 0.06f;
             button.colors = colors;
             var label1 = Fill(body.transform, "Label", label, fontSize, textColor);
+            if (icon != null)
+            {
+                // Icon on the left, the label beside it.
+                float s = size.y * 0.56f;
+                var iconRt = UIFactory.Anchored(body.transform, "Icon", new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(size.y * 0.62f, 0f), new Vector2(s, s));
+                var img = iconRt.gameObject.AddComponent<Image>();
+                img.sprite = icon;
+                img.color = iconColor ?? Color.white;
+                img.preserveAspect = true;
+                img.raycastTarget = false;
+                var lrt = label1.rectTransform;
+                lrt.offsetMin = new Vector2(size.y * 1.15f, 0f);
+                label1.alignment = TextAlignmentOptions.MidlineLeft;
+            }
             var chunky = body.gameObject.AddComponent<ChunkyButton>();
             chunky.Init(root, ring, label1, ui, onClick);
             button.onClick.AddListener(() =>

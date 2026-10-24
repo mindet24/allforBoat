@@ -55,6 +55,7 @@ namespace Trouble.Game
             float dt = Time.unscaledDeltaTime;
             _trauma = JuiceMath.DecayShake(_trauma, _juice.shakeDecay, dt);
             float amount = JuiceMath.ShakeAmount(_trauma, Steady, _juice.shakeMax);
+            if (!UserSettings.ShakeEnabled) amount = 0f; // G6: Settings > Camera shake off (accessibility)
             Steady = 0f;
             float t = Time.unscaledTime * _juice.shakeFrequency;
             _applied = amount <= 0f ? Vector3.zero : new Vector3(

@@ -57,10 +57,10 @@ namespace Trouble.Game
             _root = dim.gameObject;
 
             var size = ui.resultPanelSize;
-            var body = UiKit.Card(dim, "Panel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, size, ui.cream, ui);
+            var body = UiKit.Card(dim, "Panel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, size, ui.panel, ui);
             var t = body.transform;
             float w = size.x;
-            _title = UiKit.Text(t, "Title", 0, 26, w, 90, "", 72, ui.charcoal);
+            _title = UiKit.Text(t, "Title", 0, 22, w, 96, "", 78, Color.white);
 
             _stars = new Image[3];
             for (int i = 0; i < 3; i++)
@@ -68,26 +68,26 @@ namespace Trouble.Game
                 float s = i == 1 ? 140f : 112f;
                 float x = w * 0.5f + (i - 1) * 150f - s * 0.5f;
                 float y = (i == 1 ? 116f : 140f);
-                var img = UiKit.Icon(t, "Star " + i, x, y, s, s, UiArt.Star, ui.creamDark);
+                var img = UiKit.Icon(t, "Star " + i, x, y, s, s, UiIcons.StarEmpty, Color.white);
                 _stars[i] = img;
             }
 
             var row = UIFactory.Rect(t, "ScoreRow", 0, 270, w, 100);
             _scoreRow = row.gameObject;
-            UiKit.Icon(row, "Coin", w * 0.5f - 160f, 4, 92, 92, UiArt.Coin, Color.white);
-            _score = UiKit.Text(row, "Score", w * 0.5f - 60f, 0, 200, 100, "", 76, ui.charcoal);
+            UiKit.Icon(row, "Coin", w * 0.5f - 160f, 4, 92, 92, UiIcons.Coin, Color.white);
+            _score = UiKit.Text(row, "Score", w * 0.5f - 60f, 0, 200, 100, "", 80, Color.white);
 
-            _cause = UiKit.Text(t, "Cause", 40, 140, w - 80, 110, "", 30, ui.charcoal, TextAlignmentOptions.Center, false);
+            _cause = UiKit.Text(t, "Cause", 40, 140, w - 80, 110, "", 30, Color.white, TextAlignmentOptions.Center, false);
             _cause.textWrappingMode = TextWrappingModes.Normal;
-            _detail = UiKit.Text(t, "Detail", 40, 250, w - 80, 60, "", 22, ui.charcoalSoft, TextAlignmentOptions.Center, false);
+            _detail = UiKit.Text(t, "Detail", 40, 250, w - 80, 60, "", 22, ui.creamDark, TextAlignmentOptions.Center, false);
             _detail.textWrappingMode = TextWrappingModes.Normal;
-            _stats = UiKit.Text(t, "Stats", 0, 380, w, 50, "", 32, ui.charcoalSoft);
+            _stats = UiKit.Text(t, "Stats", 0, 380, w, 50, "", 32, ui.creamDark);
             _best = UiKit.Text(t, "Best", 0, 430, w, 40, "", 26, ui.accent);
 
             var bs = new Vector2(260f, 84f);
-            _retry = UiKit.Button(t, "Retry", new Vector2(0.5f, 0f), new Vector2(-150f, 80f), bs, text.Get("g6_retry"), 36, ui.buttonPrimary, Color.white, ui, controller.Restart);
-            _next = UiKit.Button(t, "Next", new Vector2(0.5f, 0f), new Vector2(0f, 80f), bs, text.Get("result_next"), 36, ui.accent, ui.charcoal, ui, controller.LoadNextLevel);
-            _menu = UiKit.Button(t, "Menu", new Vector2(0.5f, 0f), new Vector2(150f, 80f), bs, text.Get("g6_main_menu"), 32, ui.buttonSecondary, ui.charcoal, ui, () => onMenu?.Invoke());
+            _retry = UiKit.Button(t, "Retry", new Vector2(0.5f, 0f), new Vector2(-150f, 80f), bs, text.Get("g6_retry"), 36, ui.buttonPrimary, ui.buttonPrimaryText, ui, controller.Restart, UiIcons.Hourglass);
+            _next = UiKit.Button(t, "Next", new Vector2(0.5f, 0f), new Vector2(0f, 80f), bs, text.Get("result_next"), 36, ui.green, Color.white, ui, controller.LoadNextLevel, UiIcons.Play, Color.white);
+            _menu = UiKit.Button(t, "Menu", new Vector2(0.5f, 0f), new Vector2(150f, 80f), bs, text.Get("g6_main_menu"), 32, ui.navyLight, Color.white, ui, () => onMenu?.Invoke(), UiIcons.House);
             _nav = _root.AddComponent<MenuNav>();
             _root.SetActive(false);
         }
@@ -101,7 +101,7 @@ namespace Trouble.Game
         {
             _day = false;
             _title.text = title ?? (won ? _text.Get("result_won") : _text.Get("result_lost"));
-            _title.color = won ? _ui.good : _ui.bad;
+            _title.color = won ? _ui.yellow : _ui.red;
             _cause.text = cause ?? "";
             _detail.text = detail ?? "";
             _stats.text = stats ?? _text.Format("result_stats", ("time", time), ("trips", trips));
@@ -122,7 +122,7 @@ namespace Trouble.Game
             _day = true;
             _starCount = stars;
             _title.text = _text.Get(won ? "g6_win" : "g6_lose");
-            _title.color = won ? _ui.good : _ui.bad;
+            _title.color = won ? _ui.yellow : _ui.red;
             _cause.gameObject.SetActive(false);
             _detail.gameObject.SetActive(false);
             _scoreRow.SetActive(true);
@@ -130,7 +130,8 @@ namespace Trouble.Game
             foreach (var s in _stars)
             {
                 s.gameObject.SetActive(true);
-                s.color = _ui.creamDark;
+                s.sprite = UiIcons.StarEmpty;
+                s.color = Color.white;
                 s.rectTransform.localScale = Vector3.one;
             }
             _stats.text = _text.Get("g6_done") + "  " + done + "     " + _text.Get("g6_missed") + "  " + missed;
@@ -176,7 +177,8 @@ namespace Trouble.Game
             {
                 float t = now - _shownAt - (i + 1) * _ui.starPopDelay;
                 bool lit = i < _starCount && t >= 0f;
-                _stars[i].color = lit ? _ui.accent : _ui.creamDark;
+                var sprite = lit ? UiIcons.Star : UiIcons.StarEmpty;
+                if (_stars[i].sprite != sprite) _stars[i].sprite = sprite;
                 float s = 1f;
                 if (lit && t < 0.3f) s = 1f + 0.5f * Mathf.Sin(t / 0.3f * Mathf.PI);
                 _stars[i].rectTransform.localScale = new Vector3(s, s, 1f);

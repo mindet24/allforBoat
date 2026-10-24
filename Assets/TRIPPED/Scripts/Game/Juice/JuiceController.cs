@@ -47,6 +47,8 @@ namespace Trouble.Game
         private readonly List<string> _scratchSounds = new List<string>();
         private readonly HashSet<SimEventType> _playedThisTick = new HashSet<SimEventType>();
         private readonly List<string> _stale = new List<string>();
+        private readonly Dictionary<string, string> _loopNames = new Dictionary<string, string>();
+        private Transform _characterRoot;
         private readonly List<(Light light, float intensity)> _lights = new List<(Light, float)>();
 
         private AudioSource _musicA;
@@ -108,8 +110,9 @@ namespace Trouble.Game
             _screen = screenGo.AddComponent<ScreenFx>();
             _screen.Build(juice);
 
-            _musicA = feedback.MakeLoop(SynthBank.MusicDay);
-            _musicB = feedback.MakeLoop(SynthBank.MusicDay);
+            // The clip is set when a track starts (UpdateMusic); not picking one here keeps the synthesis off the boot frame.
+            _musicA = MusicSource(feedback);
+            _musicB = MusicSource(feedback);
 
             controller.LevelLoaded += OnLevelLoaded;
             controller.LevelUnloaded += OnLevelUnloaded;
@@ -150,6 +153,7 @@ namespace Trouble.Game
             _resetAt = -100f;
             _carrySprite = null;
             _carryCard = null;
+            _characterRoot = null;
             WorstOverload = 0f;
         }
 
@@ -181,6 +185,7 @@ namespace Trouble.Game
                 _rooms.Add(fx);
             }
             var character = _house.transform.Find("Character");
+            _characterRoot = character;
             if (character != null)
             {
                 _carrySprite = character.Find("CarriedSprite");
@@ -498,8 +503,9 @@ namespace Trouble.Game
         {
             float worst = 0f;
             int trip = sim.Rules.overTripTicks;
-            foreach (var r in _rooms)
+            for (int ri = 0; ri < _rooms.Count; ri++)
             {
+                var r = _rooms[ri];
                 var c = sim.FindCircuit(r.Room.Id);
                 bool over = running && c != null && c.IsOn && c.Overloading;
                 float frac = over ? Mathf.Max(0.05f, JuiceMath.OverloadFraction(c.OverTicks, trip)) : 0f;
@@ -516,8 +522,14 @@ namespace Trouble.Game
                     r.SparkAccumulator += _juice.overloadSparksPerSecond * (0.3f + frac) * Time.unscaledDeltaTime;
                     int n = JuiceMath.TakeWhole(ref r.SparkAccumulator);
                     if (n > 0 && _fx != null)
-                        foreach (var s in sim.Sockets)
+                    {
+                        var sockets = sim.Sockets;
+                        for (int si = 0; si < sockets.Count; si++)
+                        {
+                            var s = sockets[si];
                             if (s.RoomId == r.Room.Id && s.OccupantId.Length > 0) _fx.Sparks(SocketPoint(sim, s), n, 0.6f + frac);
+                        }
+                    }
                     if (now >= r.NextSparkSound)
                     {
                         _feedback.Play(SynthBank.Spark, Random.Range(0.85f, 1.25f), 0.5f + frac * 0.5f);
@@ -602,14 +614,16 @@ namespace Trouble.Game
         {
             _stale.Clear();
             foreach (var kv in _applianceLoops) _stale.Add(kv.Key);
-            foreach (var app in sim.Appliances)
+            var appliances = sim.Appliances;
+            for (int ai = 0; ai < appliances.Count; ai++) // indexed: no boxed enumerator every frame
             {
+                var app = appliances[ai];
                 var view = _house.FindApplianceView(app.Id);
                 bool working = running && IsWorking(sim, app);
                 if (working)
                 {
                     _stale.Remove(app.Id);
-                    string loop = SynthBank.LoopOf(app.Type);
+                    string loop = LoopName(app.Type);
                     if (!_applianceLoops.TryGetValue(app.Id, out var src) && _feedback.Bank != null && _feedback.Bank.Has(loop))
                     {
                         src = _feedback.MakeLoop(loop);
@@ -648,6 +662,17 @@ namespace Trouble.Game
             }
         }
 
+        /// <summary><see cref="SynthBank.LoopOf"/>, cached: it is asked every frame for every working appliance (G7).</summary>
+        private string LoopName(string type)
+        {
+            if (!_loopNames.TryGetValue(type, out var loop))
+            {
+                loop = SynthBank.LoopOf(type);
+                _loopNames[type] = loop;
+            }
+            return loop;
+        }
+
         /// <summary>Powered, in a socket of the room that wants it, and that request is still open.</summary>
         private static bool IsWorking(HouseSim sim, ApplianceState app)
         {
@@ -664,7 +689,7 @@ namespace Trouble.Game
 
         private void UpdateCharacter(HouseSim sim, float now, bool running)
         {
-            var character = _house.transform.Find("Character");
+            var character = _characterRoot;
             if (character == null) return;
             var ch = sim.Character;
             float target = running && !ch.IsClimbing ? -ch.WalkDir * _juice.leanDegrees : 0f;
@@ -711,7 +736,9 @@ namespace Trouble.Game
                 if (sim.Phase == LevelPhase.Paused || sim.Phase == LevelPhase.Planning) duck *= _juice.blackoutMusicDuck;
             }
 
-            if (wanted != _musicWanted)
+            // A generated track still being synthesised in the background starts when it is ready (a frame or so later)
+            // instead of stalling this frame; the old track keeps playing meanwhile.
+            if (wanted != _musicWanted && (wanted.Length == 0 || _feedback.Bank.IsReady(wanted)))
             {
                 _musicWanted = wanted;
                 // Crossfade: the old track moves to B and fades out; the new one starts on A.
@@ -737,6 +764,19 @@ namespace Trouble.Game
             _musicA.pitch = pitch;
             _musicB.volume = _musicB.isPlaying ? _musicB.volume * (1f - _musicFade) : 0f;
             if (_musicFade >= 1f && _musicB.isPlaying) _musicB.Stop();
+        }
+
+        /// <summary>A looping music source under the feedback object (as <see cref="FeedbackController.MakeLoop"/>, no clip yet).</summary>
+        private static AudioSource MusicSource(FeedbackController feedback)
+        {
+            var go = new GameObject("Loop music");
+            go.transform.SetParent(feedback.transform, false);
+            var src = go.AddComponent<AudioSource>();
+            src.loop = true;
+            src.playOnAwake = false;
+            src.spatialBlend = 0f;
+            src.mute = feedback.Muted;
+            return src;
         }
 
         private void StopLoops()

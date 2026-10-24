@@ -32,7 +32,6 @@ namespace Trouble.Game
         private RectTransform _carryRoot;
         private RectTransform _readoutBody;
         private MeterWidget _readout;
-        private string _readoutRoom = "";
         private GameObject _startCard;
         private GameObject _overview;
         private GameObject _banner;
@@ -59,7 +58,7 @@ namespace Trouble.Game
             var text = cx.Text;
             var root = cx.Canvas;
             float inset = ui.edgeInset;
-            var panel = new Color(ui.charcoal.r, ui.charcoal.g, ui.charcoal.b, 0.92f);
+            var panel = ui.panel;
 
             // Hearts, top-right.
             var hearts = UiKit.Card(root, "Hearts", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-inset, -inset), ui.heartsSize, panel, ui);
@@ -72,8 +71,9 @@ namespace Trouble.Game
                 var h = UIFactory.Anchored(hearts.transform, "Heart " + i, new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f),
                     new Vector2(hx0 + hs * 0.5f + i * (hs + 10f), 0f), new Vector2(hs, hs));
                 var img = h.gameObject.AddComponent<Image>();
-                img.sprite = PlaceholderArt.Heart;
-                img.color = cx.Config.heartColor;
+                img.sprite = UiIcons.Heart;
+                img.color = Color.white;
+                img.preserveAspect = true;
                 img.raycastTarget = false;
                 _hearts[i] = img;
             }
@@ -90,19 +90,15 @@ namespace Trouble.Game
             _scoreRoot.pivot = new Vector2(0.5f, 0.5f);
             _scoreRoot.anchoredPosition = new Vector2(inset + ui.scoreSize.x * 0.5f, inset + ui.scoreSize.y * 0.5f);
             float coin = ui.scoreSize.y + 12f;
-            var coinImg = UiKit.Icon(score.transform, "Coin", -14f, -6f, coin, coin, UiArt.Coin, Color.white);
+            var coinImg = UiKit.Icon(score.transform, "Coin", -14f, -6f, coin, coin, UiIcons.Coin, Color.white);
             coinImg.preserveAspect = true;
             _score = UiKit.Text(score.transform, "Value", coin - 6f, 0, ui.scoreSize.x - coin, ui.scoreSize.y, "0", 60, ui.cream);
 
-            // Current room readout above the score.
-            var readout = UiKit.Card(root, "RoomReadout", new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(inset, inset + ui.scoreSize.y + 14f),
-                ui.roomReadoutSize, panel, ui);
-            _readoutBody = (RectTransform)readout.transform;
-            UiKit.Text(readout.transform, "Caption", 18, 8, 300, 26, text.Get("g6_you_are_in"), 18, ui.accent, TextAlignmentOptions.MidlineLeft);
+            // (The current room's power now lives in the power panel, top-right.)
 
             // Day timer, bottom-right.
             _timeCard = UiKit.Card(root, "Timer", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-inset, inset), ui.timerSize, panel, ui);
-            UiKit.Icon(_timeCard.transform, "Hourglass", 16, 14, 56, ui.timerSize.y - 28f, UiArt.Hourglass, ui.accent);
+            UiKit.Icon(_timeCard.transform, "Hourglass", 16, 14, 56, ui.timerSize.y - 28f, UiIcons.Hourglass, Color.white);
             _time = UiKit.Text(_timeCard.transform, "Time", 76, 4, ui.timerSize.x - 92f, ui.timerSize.y - 30f, "", 56, ui.cream);
             var barBack = UIFactory.Panel(_timeCard.transform, "Bar", 84, ui.timerSize.y - 28f, ui.timerSize.x - 104f, 14, ui.charcoalSoft, false, false);
             barBack.sprite = UiArt.Pill;
@@ -149,8 +145,9 @@ namespace Trouble.Game
             // Blackout banner.
             _bannerImage = UiKit.Card(root, "Blackout", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -ui.blackoutY), ui.blackoutSize, ui.bad, ui);
             float bw = ui.blackoutSize.x, bh = ui.blackoutSize.y;
-            UiKit.Text(_bannerImage.transform, "Title", 30, 12, bw - 200f, 86, text.Get("g6_blackout"), 76, Color.white, TextAlignmentOptions.MidlineLeft);
-            UiKit.Text(_bannerImage.transform, "Sub", 34, 94, bw - 200f, 44, text.Get("g6_blackout_sub"), 34, Color.white, TextAlignmentOptions.MidlineLeft, false);
+            UiKit.Icon(_bannerImage.transform, "Warning", 26, (bh - 104f) * 0.5f, 104, 104, UiIcons.Warning, Color.white);
+            UiKit.Text(_bannerImage.transform, "Title", 146, 12, bw - 330f, 86, text.Get("g6_blackout"), 80, Color.white, TextAlignmentOptions.MidlineLeft);
+            UiKit.Text(_bannerImage.transform, "Sub", 150, 94, bw - 330f, 44, text.Get("g6_blackout_sub"), 34, Color.white, TextAlignmentOptions.MidlineLeft, false);
             var arrowBack = UIFactory.Anchored(_bannerImage.transform, "ArrowBack", new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-bh * 0.55f - 10f, 0f), new Vector2(bh - 24f, bh - 24f));
             var abImg = arrowBack.gameObject.AddComponent<Image>();
             abImg.sprite = PlaceholderArt.Circle;
@@ -202,7 +199,7 @@ namespace Trouble.Game
             {
                 if (_shownHearts > hearts) _heartLostAt = now;
                 _shownHearts = hearts;
-                for (int i = 0; i < _hearts.Length; i++) _hearts[i].color = i < hearts ? cfg.heartColor : cfg.heartEmpty;
+                for (int i = 0; i < _hearts.Length; i++) _hearts[i].color = i < hearts ? Color.white : new Color(0.35f, 0.4f, 0.52f, 0.7f);
             }
             float since = now - _heartLostAt;
             for (int i = 0; i < _hearts.Length; i++)
@@ -232,7 +229,7 @@ namespace Trouble.Game
             }
             UIFactory.SetBar(_timeFill, sim.DayLengthTicks > 0 ? (float)left / sim.DayLengthTicks : 0f);
             bool warn = second <= ui.timerWarnSeconds && !over && sim.Phase != LevelPhase.Planning;
-            var panel = new Color(ui.charcoal.r, ui.charcoal.g, ui.charcoal.b, 0.92f);
+            var panel = ui.panel;
             _timeCard.color = warn ? Color.Lerp(panel, ui.bad, 0.5f + 0.5f * Mathf.Sin(now * 5f)) : panel;
             _timeFill.color = warn ? ui.bad : ui.accent;
 
@@ -252,22 +249,7 @@ namespace Trouble.Game
             float carryScale = cp < 1f ? 1f + 0.2f * Mathf.Sin(cp * Mathf.PI) : 1f;
             _carryRoot.localScale = new Vector3(carryScale, carryScale, 1f);
 
-            // Current room readout.
-            string roomId = sim.Character.IsClimbing && !string.IsNullOrEmpty(sim.Character.ClimbToRoomId) ? sim.Character.ClimbToRoomId : sim.Character.RoomId;
-            var room = sim.FindRoom(roomId);
-            var circuit = room != null ? sim.FindCircuit(room.Id) : null;
-            if (room != null && circuit != null && room.Id != _readoutRoom)
-            {
-                _readoutRoom = room.Id;
-                if (_readout != null) UnityEngine.Object.Destroy(_readout.Root.gameObject);
-                _readout = new MeterWidget();
-                _readout.Build(_readoutBody, room.Name, circuit.Capacity, _cx, 1.3f, true, false);
-                float avail = ui.roomReadoutSize.x - 24f;
-                float fit = Mathf.Min(1f, avail / Mathf.Max(1f, _readout.Width));
-                _readout.Root.localScale = new Vector3(fit, fit, 1f);
-                _readout.Root.anchoredPosition = new Vector2(6f, -34f);
-            }
-            if (_readout != null && circuit != null) _readout.Sync(circuit, sim.Rules, now);
+
 
             bool planning = sim.Phase == LevelPhase.Planning;
             if (_startCard.activeSelf != planning) _startCard.SetActive(planning);
