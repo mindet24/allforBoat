@@ -7,7 +7,8 @@ namespace Trouble.Sim
     /// Day mode: makes requests while the day runs, from the level's people and urgencies. Deterministic for a
     /// given seed. It never makes a request the player cannot do:
     /// the appliance fits the room's capacity, it is not already wanted, it is not already in that room,
-    /// and every urgent request in a room fits that room together.
+    /// and every urgent request in a room fits that room together. With day.conflictChance it sometimes picks, on
+    /// purpose, an appliance that clashes with the room but can still be done (<see cref="ConflictRules"/>).
     /// </summary>
     internal sealed class RequestGenerator
     {
@@ -61,7 +62,7 @@ namespace Trouble.Sim
             {
                 var urgency = PickUrgency(usedUrgency);
                 if (urgency == null) return;
-                var app = PickAppliance(sim, person, room, urgency, into);
+                var app = PickAppliance(sim, person, room, urgency, into, out bool conflict);
                 if (app == null) continue;
                 usedUrgency = urgency.id;
                 into.Add(new RequestState
@@ -76,6 +77,7 @@ namespace Trouble.Sim
                     Urgency = urgency.id,
                     Points = urgency.points,
                     CostsHeart = urgency.costsHeart,
+                    Conflict = conflict,
                 });
             }
         }
@@ -97,8 +99,10 @@ namespace Trouble.Sim
             return null;
         }
 
-        private ApplianceState PickAppliance(HouseSim sim, PersonData person, string room, UrgencyData urgency, List<RequestState> requests)
+        private ApplianceState PickAppliance(HouseSim sim, PersonData person, string room, UrgencyData urgency, List<RequestState> requests,
+            out bool conflict)
         {
+            conflict = false;
             int capacity = sim.FindCircuit(room)?.Capacity ?? 0;
             int urgentLoad = 0;
             if (urgency.costsHeart)
@@ -117,7 +121,39 @@ namespace Trouble.Sim
                 if (app.SocketId.Length > 0 && sim.FindSocket(app.SocketId).RoomId == room) continue;
                 candidates.Add(app);
             }
-            return candidates.Count == 0 ? null : candidates[_rng.Range(0, candidates.Count - 1)];
+            if (candidates.Count == 0) return null;
+
+            // No roll at all with conflictChance 0, so days without it keep their exact request sequence.
+            if (_day.conflictChance > 0f && _rng.NextDouble() < _day.conflictChance)
+            {
+                var clashes = Clashes(sim, room, urgency, requests, candidates, capacity);
+                if (clashes.Count > 0)
+                {
+                    conflict = true;
+                    return clashes[_rng.Range(0, clashes.Count - 1)];
+                }
+            }
+            return candidates[_rng.Range(0, candidates.Count - 1)];
+        }
+
+        /// <summary>The candidates that clash with <paramref name="room"/> and can still be done in time.</summary>
+        private List<ApplianceState> Clashes(HouseSim sim, string room, UrgencyData urgency, List<RequestState> requests,
+            List<ApplianceState> candidates, int capacity)
+        {
+            int roomLoad = sim.FindCircuit(room)?.Load ?? 0;
+            int pendingLoad = 0, blockingTicks = 0;
+            foreach (var r in requests)
+            {
+                if (!r.IsActive || r.RoomId != room) continue;
+                if (r.ProgressTicks == 0) pendingLoad += sim.FindAppliance(r.ApplianceId).Load;
+                blockingTicks += Math.Max(0, r.DurationTicks - r.ProgressTicks);
+            }
+            int travel = _rules.SecondsToTicks(_day.conflictTravelSec);
+            int due = _rules.SecondsToTicks(urgency.dueSec);
+            var clashes = new List<ApplianceState>();
+            foreach (var app in candidates)
+                if (ConflictRules.IsSolvableConflict(capacity, roomLoad, pendingLoad, app.Load, blockingTicks, travel, due)) clashes.Add(app);
+            return clashes;
         }
 
         private int UseTicks(HouseSim sim, string applianceId)

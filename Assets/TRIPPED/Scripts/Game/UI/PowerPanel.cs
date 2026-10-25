@@ -116,6 +116,10 @@ namespace Trouble.Game
             bool following = cam != null && cam.DayFollowing && !cam.Overview;
             var ch = sim.Character;
             string current = ch.RoomId;
+            // Carrying something: the current room's row shows what it would draw with it plugged in ("7+6/11"),
+            // red when it would not fit, so a clash is seen before it trips.
+            var carried = string.IsNullOrEmpty(ch.CarryingId) ? null : sim.FindAppliance(ch.CarryingId);
+            int carry = carried != null ? carried.Load : 0;
             var show = PowerPanelRules.RowsToShow(_power, following, current);
 
             float y = ui.powerHeaderHeight + 4f;
@@ -131,13 +135,16 @@ namespace Trouble.Game
                 row.Root.anchoredPosition = new Vector2(0f, -y);
                 y += ui.powerRowHeight;
                 row.Highlight.enabled = row.Id == current;
-                string count = p.On ? p.Load + "/" + p.Capacity : _cx.Text.Get("g6_off");
+                int adding = row.Id == current ? carry : 0;
+                string count = !p.On ? _cx.Text.Get("g6_off")
+                    : adding > 0 ? p.Load + "+" + adding + "/" + p.Capacity
+                    : p.Load + "/" + p.Capacity;
                 if (count != row.Shown)
                 {
                     row.Shown = count;
                     row.Count.text = count;
                 }
-                var rb = HudFormat.Band(p.Load, p.Capacity, cfg.loadAmberAbove, cfg.loadRedAbove);
+                var rb = HudFormat.Band(p.Load + adding, p.Capacity, cfg.loadAmberAbove, cfg.loadRedAbove);
                 row.Count.color = !p.On || rb == LoadBand.Red ? ui.red : Color.white;
                 UIFactory.SetBar(row.Fill, p.On ? HudFormat.Fill(p.Load, p.Capacity) : 0f);
                 row.Fill.color = rb == LoadBand.Green ? row.Color : rb == LoadBand.Amber ? ui.accent : ui.red;

@@ -81,6 +81,8 @@
     "intervalJitter": 0.25,
     "maxActive": 5,
     "bundleChance": 0.35,
+    "conflictChance": 0.6,
+    "conflictTravelSec": 10,
     "urgencies": [
       { "id": "urgent",  "dueSec": 20, "points": 3, "costsHeart": true,  "weight": 1 },
       { "id": "normal",  "dueSec": 40, "points": 2, "costsHeart": false, "weight": 2 },

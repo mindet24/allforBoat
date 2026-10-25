@@ -212,6 +212,13 @@ namespace Trouble.Sim
         public int maxActive = 5;
         /// <summary>Chance that a request comes with a second one from the same person, at another urgency.</summary>
         public float bundleChance = 0.35f;
+        /// <summary>
+        /// Chance that a new request is picked to clash with its room (it would go over capacity with what is there),
+        /// among the clashes that can still be solved (<see cref="ConflictRules"/>). 0 = never steer (picks as before).
+        /// </summary>
+        public float conflictChance;
+        /// <summary>Seconds a clash allows for carrying the appliance to the room, on top of waiting for the rest.</summary>
+        public float conflictTravelSec = 10f;
         public List<UrgencyData> urgencies = new List<UrgencyData>();
         public List<PersonData> people = new List<PersonData>();
     }

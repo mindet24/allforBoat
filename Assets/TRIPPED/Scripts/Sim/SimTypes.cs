@@ -157,6 +157,8 @@ namespace Trouble.Sim
         public int Points { get; internal set; }
         public bool CostsHeart { get; internal set; }
         public int SpawnTick { get; internal set; }
+        /// <summary>Picked to clash with its room (day.conflictChance): it does not fit with what is there now.</summary>
+        public bool Conflict { get; internal set; }
         /// <summary>The appliance was not running in the room by <see cref="DueTicks"/>.</summary>
         public bool Missed { get; internal set; }
         /// <summary>Not done and not missed.</summary>
