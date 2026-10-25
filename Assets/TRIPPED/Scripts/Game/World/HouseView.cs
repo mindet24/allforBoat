@@ -14,6 +14,7 @@ namespace Trouble.Game
         private LevelController _controller;
         private HouseSim _sim;
         private TrippedViewConfig _config;
+        private float _overviewBoost;
         private readonly List<RoomView> _rooms = new List<RoomView>();
         private readonly Dictionary<string, SocketView> _sockets = new Dictionary<string, SocketView>();
         private readonly List<SocketView> _socketList = new List<SocketView>();
@@ -235,9 +236,15 @@ namespace Trouble.Game
             }
             SyncCables();
 
+            // Day mode overview (Tab): appliances grow and get a dark backing so they can be found at a glance. Not on
+            // the Title, which also holds the overview but suspends the keys.
+            var houseCam = _controller.HouseCam;
+            bool boost = _sim.IsDayMode && houseCam != null && houseCam.Overview && !_controller.KeysSuspended;
+            _overviewBoost = Mathf.MoveTowards(_overviewBoost, boost ? 1f : 0f,
+                Time.unscaledDeltaTime / Mathf.Max(0.01f, _config.overviewBoostSeconds));
             string selected = _controller.Selection;
             for (int i = 0; i < _appliances.Count; i++)
-                _appliances[i].Sync(_sim, selected != null && selected == _appliances[i].Appliance.Id, time);
+                _appliances[i].Sync(_sim, selected != null && selected == _appliances[i].Appliance.Id, time, _overviewBoost);
 
             _character.Sync(_sim, _controller.TickFraction, time);
             if (_partners.Count > 0)

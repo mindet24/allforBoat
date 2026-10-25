@@ -107,14 +107,51 @@ namespace Trouble.Game
             return sr;
         }
 
-        /// <summary>A 1-unit ring, <paramref name="thickness"/> of the radius wide, made once.</summary>
-        private static Sprite Ring(float thickness)
+        /// <summary>
+        /// Adds a flat disc in <paramref name="fill"/> with a <paramref name="rim"/> edge behind the parent, facing the
+        /// camera, <paramref name="diameter"/> metres wide and centred at <paramref name="centre"/>: a backing that
+        /// makes an appliance stand out from the room in the overview. Starts hidden; returns (disc, rim).
+        /// </summary>
+        public static (SpriteRenderer disc, SpriteRenderer rim) Halo(Transform parent, Vector3 centre, float diameter, Color fill,
+            Color rim, int sortingOrder)
         {
-            if (_ring != null) return _ring;
+            var disc = HaloPart(parent, "Halo", centre, diameter, Disc(), fill, sortingOrder);
+            var edge = HaloPart(parent, "HaloRim", centre + new Vector3(0f, 0f, -0.001f), diameter, Rim(), rim, sortingOrder);
+            return (disc, edge);
+        }
+
+        private static SpriteRenderer HaloPart(Transform parent, string name, Vector3 centre, float diameter, Sprite sprite, Color color, int order)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = centre;
+            go.transform.localScale = new Vector3(diameter, diameter, 1f);
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.color = color;
+            sr.sortingOrder = order;
+            sr.enabled = false;
+            return sr;
+        }
+
+        private static Sprite _disc;
+        private static Sprite _rim;
+
+        /// <summary>A 1-unit filled disc with a crisp edge, made once.</summary>
+        private static Sprite Disc() => _disc != null ? _disc : _disc = MakeRing(1f, "Disc");
+
+        /// <summary>A thin 1-unit ring for the halo edge, made once.</summary>
+        private static Sprite Rim() => _rim != null ? _rim : _rim = MakeRing(0.12f, "HaloRim");
+
+        /// <summary>A 1-unit ring, <paramref name="thickness"/> of the radius wide, made once (the first thickness wins).</summary>
+        private static Sprite Ring(float thickness) => _ring != null ? _ring : _ring = MakeRing(thickness, "FootBadge");
+
+        private static Sprite MakeRing(float thickness, string name)
+        {
             const int size = 128;
             float inner = 1f - Mathf.Clamp(thickness, 0.05f, 1f);
             float edge = 2f / size;
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "FootBadge" };
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = name };
             var px = new Color32[size * size];
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
@@ -126,8 +163,7 @@ namespace Trouble.Game
                 }
             tex.SetPixels32(px);
             tex.Apply();
-            _ring = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size, 0, SpriteMeshType.FullRect);
-            return _ring;
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size, 0, SpriteMeshType.FullRect);
         }
 
         /// <summary>A 1-unit radial gradient, made once.</summary>

@@ -17,6 +17,8 @@ namespace Trouble.Game
         private ApplianceState _app;
         private TrippedViewConfig _config;
         private SpriteRenderer _glow;
+        private SpriteRenderer _halo;
+        private SpriteRenderer _haloRim;
         private SpriteRenderer _outline;
         private SpriteRenderer _card;
         private TextMeshPro _label;
@@ -50,7 +52,7 @@ namespace Trouble.Game
         }
 
         /// <summary>Middle of the top edge of the drawn appliance, in the house's local space (for the "E" prompt).</summary>
-        public Vector3 TopPoint => transform.localPosition + new Vector3(0f, _height, 0f);
+        public Vector3 TopPoint => transform.localPosition + new Vector3(0f, _height * transform.localScale.y, 0f);
 
         /// <summary>Builds the sprite layers and click collider.</summary>
         public void Build(ApplianceState app, ApplianceDef def, TrippedViewConfig config, ArtLibrary art, bool showLoad = false)
@@ -103,6 +105,13 @@ namespace Trouble.Game
                 _label.sortingOrder = 3;
             }
             _glow.enabled = false;
+            if (showLoad)
+            {
+                // Day mode: the overview backing (hidden until Sync gets an overview boost).
+                float d = Mathf.Max(_width, height) * config.overviewHaloSize;
+                (_halo, _haloRim) = SpriteStyle.Halo(transform, new Vector3(0f, height * 0.5f, 0.03f), d, config.overviewHaloColor,
+                    config.overviewHaloRim, -1);
+            }
             // "last seen m:ss" under a ghost (V4); drawn above the Sight overlay (order 10) so it can be read.
             _seenText = Prims.Text(transform, "Seen", new Vector3(0f, -0.12f, -0.02f), new Vector2(1.4f, 0.22f), "", _config.roomNameText, 1.2f);
             _seenText.sortingOrder = 24;
@@ -113,9 +122,10 @@ namespace Trouble.Game
 
         /// <summary>
         /// Places and colours the appliance from what the player can see. Hidden when the player last saw it in
-        /// the tray (or its socket is gone).
+        /// the tray (or its socket is gone). <paramref name="overview"/> (0..1) grows it and shows its dark backing,
+        /// so it can be found at a glance in the overview.
         /// </summary>
-        public void Sync(HouseSim sim, bool selected, float time)
+        public void Sync(HouseSim sim, bool selected, float time, float overview = 0f)
         {
             string socketId = _app.SeenSocketId ?? "";
             string floorRoomId = _app.SeenFloorRoomId ?? "";
@@ -155,6 +165,22 @@ namespace Trouble.Game
             bool on = _app.SeenSwitchedOn;
             bool powered = _app.SeenPowered;
             float alpha = ghost ? _config.ghostAlpha : 1f;
+
+            float grow = Mathf.Lerp(1f, _config.overviewApplianceScale, overview);
+            if (!Mathf.Approximately(transform.localScale.x, grow)) transform.localScale = new Vector3(grow, grow, 1f);
+            if (_halo != null)
+            {
+                bool showHalo = overview > 0.01f && !ghost;
+                _halo.enabled = showHalo;
+                _haloRim.enabled = showHalo;
+                if (showHalo)
+                {
+                    var h = _config.overviewHaloColor;
+                    _halo.color = new Color(h.r, h.g, h.b, h.a * overview);
+                    var r = _config.overviewHaloRim;
+                    _haloRim.color = new Color(r.r, r.g, r.b, r.a * overview);
+                }
+            }
 
             Color cardColor = _hasArt ? Color.white : (on ? _config.applianceCard : _config.applianceOffCard);
             if (_hasArt && on && !powered && !ghost) cardColor = new Color(0.6f, 0.6f, 0.6f);

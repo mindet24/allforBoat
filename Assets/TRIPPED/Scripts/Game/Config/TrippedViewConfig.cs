@@ -210,6 +210,19 @@ namespace Trouble.Game
         [Tooltip("Ring thickness as a fraction of its radius.")]
         [Range(0.05f, 1f)] public float footBadgeThickness = 0.28f;
 
+        [Header("Overview (Tab): appliances stand out")]
+        [Tooltip("Appliances grow to this size in the overview, so they can be found at a glance (1 = no change).")]
+        public float overviewApplianceScale = 1.8f;
+        [Tooltip("Dark disc behind each appliance in the overview: the light appliance reads against it, and the disc " +
+                 "against the light rooms, in colour or grey.")]
+        public Color overviewHaloColor = new Color(0.12f, 0.16f, 0.27f, 0.9f);
+        [Tooltip("Edge of that disc (the power yellow).")]
+        public Color overviewHaloRim = Hex("#F6C933");
+        [Tooltip("Disc diameter as a multiple of the appliance's larger side.")]
+        public float overviewHaloSize = 1.35f;
+        [Tooltip("Seconds to grow into or out of the overview look.")]
+        public float overviewBoostSeconds = 0.25f;
+
         [Header("Pastel rooms")]
         [Tooltip("Colour the house kit's materials are tinted towards.")]
         public Color kitPastelTint = Hex("#FFE1EA");
