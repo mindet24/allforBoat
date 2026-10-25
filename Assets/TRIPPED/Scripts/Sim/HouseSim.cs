@@ -511,6 +511,7 @@ namespace Trouble.Sim
             });
             TripCount++;
             c.ResetWhileHot = false;
+            if (IsDayMode) PopNewestPlugs(c);
             TurnOff(c);
             if (IsDayMode)
             {
@@ -1468,6 +1469,7 @@ namespace Trouble.Sim
                 socket.OccupantId = app.Id;
                 app.SocketId = socket.Id;
                 app.Unplugged = false;
+                app.PluggedTick = Now;
                 Emit(new SimEvent { Type = SimEventType.PluggedIn, Appliance = app.Id, Socket = socket.Id });
                 reason = "";
                 return true;
@@ -1477,24 +1479,50 @@ namespace Trouble.Sim
             if (app.Unplugged)
             {
                 app.Unplugged = false;
+                app.PluggedTick = Now;
                 Emit(new SimEvent { Type = SimEventType.PluggedIn, Appliance = app.Id, Socket = at.Id });
             }
-            else if (FloorMode)
+            else Unplug(app);
+            reason = "";
+            return true;
+        }
+
+        /// <summary>
+        /// Day mode: pulls <paramref name="app"/> out of its socket. "floor" mode drops it on the floor in front of the
+        /// socket, "socket" mode leaves it beside the socket unplugged.
+        /// </summary>
+        private void Unplug(ApplianceState app)
+        {
+            var at = FindSocket(app.SocketId);
+            if (FloorMode)
             {
                 int x = Cm(SocketX(at));
                 Vacate(app);
                 app.FloorRoomId = at.RoomId;
                 app.FloorXCm = x;
                 app.FloorZCm = BackZCm;
-                Emit(new SimEvent { Type = SimEventType.Unplugged, Appliance = app.Id, Socket = at.Id });
             }
-            else
+            else app.Unplugged = true;
+            Emit(new SimEvent { Type = SimEventType.Unplugged, Appliance = app.Id, Socket = at.Id });
+        }
+
+        /// <summary>
+        /// Day mode, on a trip: the plugs that pushed the room over pop out, newest first, until what is left fits,
+        /// so resetting the breaker brings the power back instead of tripping again at once. The level's own
+        /// appliances (fridge) never pop.
+        /// </summary>
+        private void PopNewestPlugs(CircuitState c)
+        {
+            var plugged = new List<ApplianceState>();
+            foreach (var app in _appliances)
+                if (app.Powered && !app.Fixed && FindSocket(app.SocketId).CircuitId == c.Id) plugged.Add(app);
+            plugged.Sort((a, b) => a.PluggedTick != b.PluggedTick ? b.PluggedTick.CompareTo(a.PluggedTick) : string.CompareOrdinal(b.Id, a.Id));
+            int load = c.Load;
+            for (int i = 0; i < plugged.Count && load > c.Capacity; i++)
             {
-                app.Unplugged = true;
-                Emit(new SimEvent { Type = SimEventType.Unplugged, Appliance = app.Id, Socket = at.Id });
+                load -= plugged[i].Load;
+                Unplug(plugged[i]);
             }
-            reason = "";
-            return true;
         }
 
         /// <summary>Day mode: appliances are put down on the floor (rules placeMode "floor"), not beside a socket.</summary>

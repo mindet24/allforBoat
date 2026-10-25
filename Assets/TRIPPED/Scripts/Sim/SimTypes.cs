@@ -111,6 +111,8 @@ namespace Trouble.Sim
         public bool Powered { get; internal set; }
         /// <summary>Day mode: standing at its socket but not plugged in, so it draws nothing until F.</summary>
         public bool Unplugged { get; internal set; }
+        /// <summary>Day mode: tick it was last plugged in with F (0 = where the level put it).</summary>
+        public int PluggedTick { get; internal set; }
         /// <summary>Day mode, placeMode "floor": room it lies in on the floor, away from any socket. Empty = not on the floor.</summary>
         public string FloorRoomId { get; internal set; } = "";
         /// <summary>Day mode: x (centimetres) where it lies on the floor of <see cref="FloorRoomId"/>.</summary>
