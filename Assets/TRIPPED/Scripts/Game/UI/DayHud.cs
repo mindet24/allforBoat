@@ -593,7 +593,7 @@ namespace Trouble.Game
             public Color Color;
             public string Label;
             public bool Pulse;
-            public string Owner; // empty = no person dot (the breaker pin)
+            public string Owner; // null or empty = no person dot (the breaker pin)
         }
 
         private readonly List<Pin> _pins = new List<Pin>();
@@ -701,7 +701,8 @@ namespace Trouble.Game
                     pin.Icon.enabled = t.Icon != null;
                 }
                 if (pin.Label.text != t.Label) pin.Label.text = t.Label;
-                bool who = t.Owner.Length > 0;
+                // The breaker pin has no owner (null): no person dot.
+                bool who = !string.IsNullOrEmpty(t.Owner);
                 if (pin.Who.gameObject.activeSelf != who) pin.Who.gameObject.SetActive(who);
                 if (who && pin.ShownOwner != t.Owner)
                 {
