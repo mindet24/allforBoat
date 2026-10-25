@@ -185,16 +185,6 @@ namespace Trouble.Game
             return n;
         }
 
-        /// <summary>
-        /// How warm a room glows before it overloads: 0 below <paramref name="start"/> of its capacity, rising to 1 at
-        /// full capacity, so the player sees a room filling up before it starts to trip. 0 with no capacity.
-        /// </summary>
-        public static float HeatFraction(int load, int capacity, float start)
-        {
-            if (capacity <= 0 || start >= 1f) return 0f;
-            return Clamp01((load / (float)capacity - start) / (1f - start));
-        }
-
         private static float Clamp01(float v) => v < 0f ? 0f : v > 1f ? 1f : v;
     }
 }

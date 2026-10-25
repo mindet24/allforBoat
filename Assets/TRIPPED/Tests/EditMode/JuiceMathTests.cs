@@ -278,47 +278,5 @@ namespace Trouble.Tests
                 Assert.LessOrEqual(p, 1f);
             }
         }
-
-        [Test]
-        public void HeatFraction_BelowStart_Zero()
-        {
-            // Arrange / Act: 6 of 10 with the glow starting at 70%.
-            float heat = JuiceMath.HeatFraction(6, 10, 0.7f);
-
-            // Assert
-            Assert.AreEqual(0f, heat, 1e-4f);
-        }
-
-        [Test]
-        public void HeatFraction_Full_One()
-        {
-            // Arrange / Act
-            float full = JuiceMath.HeatFraction(10, 10, 0.7f);
-            float over = JuiceMath.HeatFraction(13, 10, 0.7f);
-
-            // Assert
-            Assert.AreEqual(1f, full, 1e-4f);
-            Assert.AreEqual(1f, over, 1e-4f);
-        }
-
-        [Test]
-        public void HeatFraction_Between_Linear()
-        {
-            // Arrange / Act: 85% is halfway from 70% to 100%.
-            float heat = JuiceMath.HeatFraction(17, 20, 0.7f);
-
-            // Assert
-            Assert.AreEqual(0.5f, heat, 1e-4f);
-        }
-
-        [Test]
-        public void HeatFraction_NoCapacity_Zero()
-        {
-            // Arrange / Act
-            float heat = JuiceMath.HeatFraction(3, 0, 0.7f);
-
-            // Assert
-            Assert.AreEqual(0f, heat, 1e-4f);
-        }
     }
 }

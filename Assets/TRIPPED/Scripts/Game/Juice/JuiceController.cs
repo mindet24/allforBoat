@@ -601,16 +601,7 @@ namespace Trouble.Game
                 }
                 else
                 {
-                    // Filling up: a steady warm glow from heatStart of capacity, so the overload is seen coming.
-                    float heat = running && c != null && c.IsOn ? JuiceMath.HeatFraction(c.Load, c.Capacity, _juice.heatStart) : 0f;
-                    bool warm = heat > 0f;
-                    if (warm)
-                    {
-                        var col = _juice.overloadColor;
-                        col.a = heat * _juice.heatAlphaMax;
-                        r.Red.color = col;
-                    }
-                    if (r.Red.enabled != warm) r.Red.enabled = warm;
+                    if (r.Red.enabled) r.Red.enabled = false;
                     r.SparkAccumulator = 0f;
                     if (r.Hum != null)
                     {

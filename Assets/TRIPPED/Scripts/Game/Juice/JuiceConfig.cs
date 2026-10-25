@@ -127,10 +127,6 @@ namespace Trouble.Game
         public float overloadPulseMaxHz = 9f;
         [Tooltip("Sparks per second at each busy socket of an overloaded room (scaled up toward the trip).")]
         public float overloadSparksPerSecond = 10f;
-        [Tooltip("A room starts to glow warm at this fraction of its capacity, before it overloads (1 = never).")]
-        [Range(0f, 1f)] public float heatStart = 0.7f;
-        [Tooltip("Alpha of that warm glow when the room is exactly full (steady, no pulse).")]
-        public float heatAlphaMax = 0.22f;
 
         [Header("Blackout")]
         [Tooltip("Family complaints when the house goes dark: delay before the first, gap between people (seconds).")]
