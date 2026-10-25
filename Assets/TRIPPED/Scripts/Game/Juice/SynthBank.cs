@@ -15,6 +15,12 @@ namespace Trouble.Game
         // Player
         public const string Step = "step";
         public const string Jump = "jump";
+        /// <summary>Looped while the character walks.</summary>
+        public const string Running = "running";
+        /// <summary>An appliance set down or landing from a throw.</summary>
+        public const string Drop = "drop";
+        /// <summary>Looped while an urgent request is about to run out.</summary>
+        public const string Clock = "clock";
         public const string Jetpack = "jetpack";
         public const string Pickup = "pickup";
         public const string PlugIn = "plug_in";
@@ -69,7 +75,7 @@ namespace Trouble.Game
         {
             string[] fixedNames =
             {
-                Step, Jump, Jetpack, Pickup, PlugIn, Reject,
+                Step, Jump, Running, Drop, Clock, Jetpack, Pickup, PlugIn, Reject,
                 RequestNewRelaxed, RequestNewNormal, RequestNewUrgent, RequestDone, RequestMissed, UrgentTick, HeartLost, ComboUp,
                 OverloadHum, Spark, Blackout, PowerUp, BreakerFlip, ToasterPop,
                 UiHover, UiClick, UiBack, UiPause, CountdownBeep, DayStart,
@@ -113,6 +119,9 @@ namespace Trouble.Game
             switch (name)
             {
                 case Step: return 0.09f;
+                case Running: return 0.52f;
+                case Drop: return 0.18f;
+                case Clock: return 1f;
                 case Jump: return 0.18f;
                 case Jetpack: return 0.16f;
                 case Pickup: return 0.2f;
@@ -177,6 +186,19 @@ namespace Trouble.Game
                     g.Thump(0, n, 120, 58, 42, 0.7);
                     g.Noise(0, n, 0.45, 70, 0.25);
                     g.Noise(slap, n, 0.8, 150, 0.9);
+                    break;
+                }
+                case Running:
+                {
+                    int half = n / 2;
+                    g.Thump(0, half, 140, 70, 30, 0.8); g.Thump(half, n, 130, 65, 30, 0.75);
+                    break;
+                }
+                case Drop: g.Thump(0, n, 180, 60, 18, 1); g.Noise(0, n / 3, 0.5, 30, 0.3); break;
+                case Clock:
+                {
+                    int half = n / 2;
+                    g.Tone(0, n / 20, 1800, Wave.Square, 0.4, 60); g.Tone(half, half + n / 20, 1500, Wave.Square, 0.4, 60);
                     break;
                 }
                 case Jump: g.Sweep(0, n, 240, 760, Wave.Triangle, 0.9, 6, true); g.Noise(0, n / 4, 0.4, 50, 0.3); break;

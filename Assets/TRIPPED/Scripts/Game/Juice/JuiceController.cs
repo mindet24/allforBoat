@@ -61,11 +61,13 @@ namespace Trouble.Game
         private bool _interactAccepted;
         private int _combo;
         private float _lastCompleteTime = -100f;
-        private float _stepTimer;
         private int _stepParity;
         private float _characterSquashAt = -100f;
+        private float _hopAt = -100f;
         private bool _wasAirborne;
         private bool _wasJumping;
+        private AudioSource _runLoop;
+        private AudioSource _clockLoop;
         private float _puffTimer;
         private float _lean;
         private bool _wasBlackout;
@@ -121,6 +123,7 @@ namespace Trouble.Game
             controller.TickEvents += OnTickEvents;
             controller.CommandAccepted += OnCommandAccepted;
             controller.CommandRefused += OnCommandRefused;
+            controller.Hopped += OnHopped;
         }
 
         // ---- level lifetime ----------------------------------------------------------------
@@ -238,6 +241,14 @@ namespace Trouble.Game
 
         // ---- events -------------------------------------------------------------------------
 
+        /// <summary>Space with stairs: a hop in place (not while one is under way), with the jump sound.</summary>
+        private void OnHopped()
+        {
+            if (Time.unscaledTime - _hopAt < _juice.hopSeconds) return;
+            _hopAt = Time.unscaledTime;
+            _feedback.Play(SynthBank.Jump);
+        }
+
         /// <summary>A jump with nowhere to land, or a drop with no room below, gets the reject buzz instead of a toast.</summary>
         private void OnCommandRefused(Command command, string reason)
         {
@@ -268,13 +279,13 @@ namespace Trouble.Game
                     var feet = HouseLayout.CharacterPoint(sim, 0f, _config.roomHeight, _config.jumpArc);
                     if (view != null)
                         view.FlyFrom(new Vector3(feet.x, feet.y + _config.playerWorldHeight, _config.dayFrontZ), Time.unscaledTime);
-                    _feedback.Play(SynthBank.Pickup);
+                    _feedback.Play(SynthBank.Drop);
                 }
                 else if (app != null && !app.Unplugged && app.SocketId.Length > 0) PlugJuice(sim, app);
                 else
                 {
-                    // Put down unplugged: a soft set-down, no sparks.
-                    _feedback.Play(SynthBank.Step);
+                    // Put down unplugged: a set-down, no sparks.
+                    _feedback.Play(SynthBank.Drop);
                     if (app != null) _applianceSquash[app.Id] = Time.unscaledTime;
                 }
             }
@@ -415,17 +426,19 @@ namespace Trouble.Game
         /// <summary>Once-per-tick sounds: urgent ticking and the end-of-day countdown.</summary>
         private void TickSounds(HouseSim sim)
         {
-            if (sim.Phase != LevelPhase.Running) return;
+            bool ticking = false, fast = false;
             int tps = sim.Rules.ticksPerSecond;
-            for (int r = 0; r < sim.Requests.Count; r++)
+            for (int r = 0; sim.Phase == LevelPhase.Running && r < sim.Requests.Count; r++)
             {
                 var req = sim.Requests[r];
                 if (!req.IsActive || req.ProgressTicks > 0 || DayRules.ParseUrgency(req.Urgency) != UrgencyLevel.Urgent) continue;
-                if (!JuiceMath.UrgentTickDue(sim.Now, req.DueTicks, tps, _juice.urgentTickSeconds, _juice.urgentFastTickSeconds)) continue;
-                bool fast = JuiceMath.UrgentTickFast(sim.Now, req.DueTicks, tps, _juice.urgentFastTickSeconds);
-                _feedback.Play(SynthBank.UrgentTick, fast ? _juice.urgentFastTickPitch : 1f, 1f);
-                break;
+                int dueIn = req.DueTicks - sim.Now;
+                if (dueIn <= 0 || dueIn > _juice.urgentTickSeconds * tps) continue;
+                ticking = true;
+                fast |= JuiceMath.UrgentTickFast(sim.Now, req.DueTicks, tps, _juice.urgentFastTickSeconds);
             }
+            SetLoop(ref _clockLoop, SynthBank.Clock, ticking, fast ? _juice.urgentFastTickPitch : 1f);
+            if (sim.Phase != LevelPhase.Running) return;
             int left = DayRules.TicksLeft(sim.DayLengthTicks, sim.Now);
             if (tps > 0 && left > 0 && left <= _juice.countdownSeconds * tps && left % tps == 0) _feedback.Play(SynthBank.CountdownBeep);
         }
@@ -656,18 +669,26 @@ namespace Trouble.Game
                     _characterSquashAt = Time.unscaledTime;
                 }
             }
-            bool moving = running && ch.WalkDir != 0 && !ch.IsAirborne;
-            if (!moving)
+            SetLoop(ref _runLoop, SynthBank.Running, running && ch.WalkDir != 0 && !ch.IsAirborne, 1f);
+        }
+
+        /// <summary>Starts or stops a looped bank sound (made on first use), at its configured volume.</summary>
+        private void SetLoop(ref AudioSource loop, string sound, bool on, float pitch)
+        {
+            if (!on)
             {
-                _stepTimer = 0f;
+                if (loop != null && loop.isPlaying) loop.Stop();
                 return;
             }
-            _stepTimer -= Time.unscaledDeltaTime;
-            if (_stepTimer > 0f) return;
-            _stepTimer = _juice.stepInterval;
-            _stepParity ^= 1;
-            float pitch = 1f + (_stepParity == 0 ? -_juice.stepPitchSpread : _juice.stepPitchSpread);
-            _feedback.Play(SynthBank.Step, pitch, 1f);
+            if (loop == null) loop = _feedback.MakeLoop(sound);
+            loop.mute = _feedback.Muted;
+            loop.volume = _feedback.VolumeFor(sound);
+            loop.pitch = pitch;
+            if (!loop.isPlaying)
+            {
+                loop.Play();
+                _feedback.LogPlay(sound);
+            }
         }
 
         private void UpdateAppliances(HouseSim sim, float now, bool running)
@@ -758,6 +779,16 @@ namespace Trouble.Game
 
             JuiceMath.Squash(now - _characterSquashAt, _juice.squashSeconds, _juice.squashAmount, out float sx, out float sy);
             character.localScale = new Vector3(sx, sy, 1f);
+
+            // The hop: a parabola over hopSeconds on top of where the house view put the character; squash on landing.
+            float hop = (now - _hopAt) / Mathf.Max(0.01f, _juice.hopSeconds);
+            if (hop >= 0f && hop < 1f) character.localPosition += new Vector3(0f, _juice.hopHeight * 4f * hop * (1f - hop), 0f);
+            else if (hop >= 1f && _hopAt > 0f)
+            {
+                _hopAt = -100f;
+                _characterSquashAt = now;
+                _feedback.Play(SynthBank.Step, _juice.landPitch, 1f);
+            }
 
             float bob = Mathf.Sin(now * _juice.carryBobHz * Mathf.PI * 2f) * _juice.carryBobHeight;
             if (_carrySprite != null) _carrySprite.localPosition = _carrySpriteBase + new Vector3(0f, bob, 0f);
@@ -887,6 +918,7 @@ namespace Trouble.Game
             _controller.TickEvents -= OnTickEvents;
             _controller.CommandAccepted -= OnCommandAccepted;
             _controller.CommandRefused -= OnCommandRefused;
+            _controller.Hopped -= OnHopped;
         }
     }
 }

@@ -20,6 +20,12 @@ MonoBehaviour:
   soundVolumes:
   - name: step
     volume: 0.2
+  - name: running
+    volume: 0.25
+  - name: drop
+    volume: 0.4
+  - name: clock
+    volume: 0.35
   - name: jetpack
     volume: 0.25
   - name: pickup
@@ -159,6 +165,8 @@ MonoBehaviour:
   leanDegrees: 8
   leanSpeed: 12
   landPitch: 0.8
+  hopHeight: 0.45
+  hopSeconds: 0.38
   jetpackPuffInterval: 0.14
   wobbleDegrees: 4
   wobbleHz: 7

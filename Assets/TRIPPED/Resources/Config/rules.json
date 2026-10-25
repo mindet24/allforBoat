@@ -10,7 +10,7 @@
     "stairsTicks": 20,
     "actionQueueSize": 3,
     "placeUnplugged": true,
-    "placeMode": "socket",
+    "placeMode": "floor",
     "throwMetres": 4.0,
     "depthWalkSpeed": 3.0,
     "walkDepthMetres": 2.0,

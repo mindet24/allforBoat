@@ -25,7 +25,7 @@ namespace Trouble.Game
         [Header("Sound volumes, by name (a name missing here plays at 0.5)")]
         public SoundVolume[] soundVolumes =
         {
-            new SoundVolume(SynthBank.Step, 0.2f), new SoundVolume(SynthBank.Jump, 0.3f), new SoundVolume(SynthBank.Jetpack, 0.25f),
+            new SoundVolume(SynthBank.Step, 0.2f), new SoundVolume(SynthBank.Jump, 0.3f), new SoundVolume(SynthBank.Running, 0.25f), new SoundVolume(SynthBank.Drop, 0.4f), new SoundVolume(SynthBank.Clock, 0.35f), new SoundVolume(SynthBank.Jetpack, 0.25f),
             new SoundVolume(SynthBank.Pickup, 0.5f), new SoundVolume(SynthBank.PlugIn, 0.6f),
             new SoundVolume(SynthBank.Reject, 0.45f),
             new SoundVolume(SynthBank.RequestNewRelaxed, 0.4f), new SoundVolume(SynthBank.RequestNewNormal, 0.45f),
@@ -166,6 +166,9 @@ namespace Trouble.Game
         public float leanSpeed = 12f;
         [Tooltip("Pitch of the footstep played on landing.")]
         public float landPitch = 0.8f;
+        [Tooltip("Space with stairs: height (metres) and length (seconds) of the hop in place.")]
+        public float hopHeight = 0.45f;
+        public float hopSeconds = 0.38f;
         [Tooltip("Seconds between two jetpack puffs while Space is held.")]
         public float jetpackPuffInterval = 0.14f;
 
