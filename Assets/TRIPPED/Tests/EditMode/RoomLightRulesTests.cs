@@ -60,5 +60,46 @@ namespace Trouble.Tests
             Assert.AreEqual(1f, on, 1e-4f);
             Assert.AreEqual(0f, off, 1e-4f);
         }
+
+        [Test]
+        public void OverloadFlicker_NotOverloading_FullLight()
+        {
+            // Arrange / Act
+            float level = RoomLightRules.OverloadFlicker(0f, 1.234f, 0.75f, 5f, 18f);
+
+            // Assert
+            Assert.AreEqual(1f, level, 1e-4f);
+        }
+
+        [Test]
+        public void OverloadFlicker_NearTrip_DipsMoreOftenThanAtStart()
+        {
+            // Arrange: sample one second at a fine step.
+            int dipsStart = 0, dipsNearTrip = 0;
+
+            // Act
+            for (int i = 0; i < 200; i++)
+            {
+                float t = i * 0.005f;
+                if (RoomLightRules.OverloadFlicker(0.05f, t, 0.75f, 5f, 18f) < 1f) dipsStart++;
+                if (RoomLightRules.OverloadFlicker(0.95f, t, 0.75f, 5f, 18f) < 1f) dipsNearTrip++;
+            }
+
+            // Assert
+            Assert.Greater(dipsNearTrip, dipsStart);
+        }
+
+        [Test]
+        public void OverloadFlicker_SameInputs_SameResult()
+        {
+            // Arrange / Act
+            float a = RoomLightRules.OverloadFlicker(0.5f, 2.71f, 0.75f, 5f, 18f);
+            float b = RoomLightRules.OverloadFlicker(0.5f, 2.71f, 0.75f, 5f, 18f);
+
+            // Assert
+            Assert.AreEqual(a, b);
+            Assert.GreaterOrEqual(a, 1f - 0.75f);
+            Assert.LessOrEqual(a, 1f);
+        }
     }
 }

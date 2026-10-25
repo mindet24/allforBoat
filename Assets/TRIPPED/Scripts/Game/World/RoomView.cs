@@ -140,6 +140,14 @@ namespace Trouble.Game
                 _lightChanged = now;
             }
             float level = RoomLightRules.Level(lit, now - _lightChanged, _config.roomLightFadeIn, _config.roomLightFlicker);
+            // Overloading: the light stutters harder as the breaker nears its trip.
+            var circuit = sim?.FindCircuit(_room.Id);
+            if (lit && circuit != null && circuit.Overloading && sim.Phase == LevelPhase.Running)
+            {
+                float overload = sim.Rules.overTripTicks > 0 ? circuit.OverTicks / (float)sim.Rules.overTripTicks : 1f;
+                level *= RoomLightRules.OverloadFlicker(overload, now, _config.roomLightOverloadDip,
+                    _config.roomLightOverloadHzMin, _config.roomLightOverloadHzMax);
+            }
             float intensity = _config.roomLightIntensity * level;
             if (!Mathf.Approximately(_light.intensity, intensity)) _light.intensity = intensity;
             bool enabled = intensity > 0.001f;

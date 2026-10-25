@@ -94,7 +94,7 @@
     ]
   },
   "rulesOverride": [
-    { "key": "overTripTicks", "value": "30" },
+    { "key": "overTripTicks", "value": "15" },
     { "key": "counterAfterTrip", "value": "reset" },
     { "key": "sightDepth", "value": "99" },
     { "key": "sightThroughStairs", "value": "true" }

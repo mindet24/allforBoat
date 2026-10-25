@@ -181,6 +181,11 @@ namespace Trouble.Game
         public float roomLightFadeIn = 0.4f;
         [Tooltip("Seconds of flicker when the breaker goes OFF.")]
         public float roomLightFlicker = 0.35f;
+        [Tooltip("Overloading room: how far its light dips at the deepest stutter (0 = steady).")]
+        [Range(0f, 1f)] public float roomLightOverloadDip = 0.75f;
+        [Tooltip("Stutters per second when the overload starts and just before it trips.")]
+        public float roomLightOverloadHzMin = 5f;
+        public float roomLightOverloadHzMax = 18f;
         [Tooltip("Soft shadows from each room's ceiling light. Costs GPU time (six shadow faces per room).")]
         public bool roomLightShadows = true;
         [Range(0f, 1f)] public float roomLightShadowStrength = 0.7f;

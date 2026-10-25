@@ -595,7 +595,16 @@ namespace Trouble.Game
                 }
                 else
                 {
-                    if (r.Red.enabled) r.Red.enabled = false;
+                    // Filling up: a steady warm glow from heatStart of capacity, so the overload is seen coming.
+                    float heat = running && c != null && c.IsOn ? JuiceMath.HeatFraction(c.Load, c.Capacity, _juice.heatStart) : 0f;
+                    bool warm = heat > 0f;
+                    if (warm)
+                    {
+                        var col = _juice.overloadColor;
+                        col.a = heat * _juice.heatAlphaMax;
+                        r.Red.color = col;
+                    }
+                    if (r.Red.enabled != warm) r.Red.enabled = warm;
                     r.SparkAccumulator = 0f;
                     if (r.Hum != null)
                     {
@@ -634,10 +643,44 @@ namespace Trouble.Game
                 bool show = alpha > 0.001f;
                 if (r.Dark.enabled != show) r.Dark.enabled = show;
             }
+            UpdateFlashlight(sim, dark);
             float factor = dark ? _juice.blackoutLightFactor
                 : relighting && _rooms.Count > 0 ? Mathf.Lerp(_juice.blackoutLightFactor, 1f, lit / (float)_rooms.Count)
                 : 1f;
             SetLights(factor);
+        }
+
+        private Light _flashlight;
+
+        /// <summary>
+        /// While the house is dark the player carries a flashlight: a spot light at chest height, pointing ahead the
+        /// way they face and a little down, so the way to the breaker panel is lit and the rest stays dark.
+        /// </summary>
+        private void UpdateFlashlight(HouseSim sim, bool dark)
+        {
+            if (!dark)
+            {
+                if (_flashlight != null && _flashlight.enabled) _flashlight.enabled = false;
+                return;
+            }
+            if (_flashlight == null)
+            {
+                var go = new GameObject("Flashlight");
+                go.transform.SetParent(_house.transform, false);
+                _flashlight = go.AddComponent<Light>();
+                _flashlight.type = LightType.Spot;
+                _flashlight.shadows = LightShadows.None;
+            }
+            _flashlight.color = _juice.flashlightColor;
+            _flashlight.intensity = _juice.flashlightIntensity;
+            _flashlight.range = _juice.flashlightRange;
+            _flashlight.spotAngle = _juice.flashlightAngle;
+            if (!_flashlight.enabled) _flashlight.enabled = true;
+            var ch = sim.Character;
+            var p = CharacterPoint(sim);
+            var t = _flashlight.transform;
+            t.localPosition = new Vector3(p.x, p.y + _juice.flashlightHeight, _config.dayFrontZ + ch.ZCm * 0.01f - 0.2f);
+            t.localRotation = Quaternion.LookRotation(new Vector3(ch.Facing >= 0 ? 1f : -1f, -0.3f, 0.35f));
         }
 
         private void UpdateFootsteps(HouseSim sim, bool running)

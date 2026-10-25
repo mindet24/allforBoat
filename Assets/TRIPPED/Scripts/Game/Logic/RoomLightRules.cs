@@ -32,5 +32,23 @@ namespace Trouble.Game
             if (t < 0.75f) return 0.3f;
             return 0f;
         }
+
+        /// <summary>
+        /// Brightness multiplier of an overloading room's light: it stutters, more often and deeper as the breaker
+        /// nears its trip (<paramref name="overload"/> 0..1). Each step of <paramref name="hz"/> (eased from
+        /// <paramref name="hzMin"/> to <paramref name="hzMax"/>) either holds full light or dips by up to
+        /// <paramref name="depth"/>. 1 when not overloading. Same inputs, same result.
+        /// </summary>
+        public static float OverloadFlicker(float overload, float time, float depth, float hzMin, float hzMax)
+        {
+            if (overload <= 0f || depth <= 0f) return 1f;
+            float o = Mathf.Clamp01(overload);
+            float hz = Mathf.Lerp(hzMin, hzMax, o);
+            int step = Mathf.FloorToInt(time * hz);
+            // Cheap hash of the step: 0..1, stable for the whole step.
+            float noise = Mathf.Abs(Mathf.Sin(step * 12.9898f) * 43758.547f) % 1f;
+            bool dip = noise < Mathf.Lerp(0.25f, 0.7f, o);
+            return dip ? 1f - depth * Mathf.Lerp(0.4f, 1f, o) : 1f;
+        }
     }
 }

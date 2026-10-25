@@ -127,8 +127,19 @@ namespace Trouble.Game
         public float overloadPulseMaxHz = 9f;
         [Tooltip("Sparks per second at each busy socket of an overloaded room (scaled up toward the trip).")]
         public float overloadSparksPerSecond = 10f;
+        [Tooltip("A room starts to glow warm at this fraction of its capacity, before it overloads (1 = never).")]
+        [Range(0f, 1f)] public float heatStart = 0.7f;
+        [Tooltip("Alpha of that warm glow when the room is exactly full (steady, no pulse).")]
+        public float heatAlphaMax = 0.22f;
 
         [Header("Blackout")]
+        [Tooltip("Flashlight the player carries while the house is dark: a spot light ahead of them.")]
+        public float flashlightIntensity = 8f;
+        public float flashlightRange = 7f;
+        public float flashlightAngle = 55f;
+        public Color flashlightColor = new Color(1f, 0.92f, 0.75f, 1f);
+        [Tooltip("Height of the light above the feet (metres).")]
+        public float flashlightHeight = 1.1f;
         [Tooltip("Scene lights are multiplied by this while the house is dark.")]
         public float blackoutLightFactor = 0.25f;
         [Tooltip("Alpha of the dark overlay drawn on every room in a blackout (on top of the house overlay).")]
