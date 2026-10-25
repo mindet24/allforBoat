@@ -232,35 +232,35 @@ namespace Trouble.Game
         [Tooltip("Colour the house kit's materials are tinted towards.")]
         public Color kitPastelTint = Hex("#FFE1EA");
         [Tooltip("How far the kit's colours move to white before the tint (0 = the model's own colours).")]
-        [Range(0f, 1f)] public float kitPastel = 0.35f;
+        [Range(0f, 1f)] public float kitPastel = 0.45f;
         [Tooltip("How far the kit's colours move to grey (their own brightness), so the rooms sit behind the sprites " +
                  "people use (0 = keep the colour).")]
-        [Range(0f, 1f)] public float kitDesaturate = 0.45f;
+        [Range(0f, 1f)] public float kitDesaturate = 0.2f;
 
         [Header("Post-processing (PostFx)")]
         [Tooltip("Bloom, tonemapping, colour grading and vignette on the house camera.")]
         public bool postProcessing = true;
         [Tooltip("SMAA anti-aliasing on the house camera.")]
         public bool smaa = true;
-        public float bloomIntensity = 0.6f;
+        public float bloomIntensity = 1.1f;
         [Tooltip("Brightness above which pixels glow.")]
-        public float bloomThreshold = 0.9f;
-        [Range(0f, 1f)] public float bloomScatter = 0.65f;
+        public float bloomThreshold = 0.72f;
+        [Range(0f, 1f)] public float bloomScatter = 0.8f;
         [Tooltip("Exposure in EV, applied after tonemapping darkens the image.")]
-        public float postExposure = 0.6f;
-        [Range(-100f, 100f)] public float contrast = 8f;
-        [Range(-100f, 100f)] public float saturation = 12f;
+        public float postExposure = 0.75f;
+        [Range(-100f, 100f)] public float contrast = -6f;
+        [Range(-100f, 100f)] public float saturation = 18f;
         [Tooltip("Tint over the whole image; a light warm colour gives the cosy home look.")]
-        public Color colorFilter = Hex("#FFF4E6");
-        [Range(0f, 1f)] public float vignetteIntensity = 0.28f;
+        public Color colorFilter = Hex("#FFF0F3");
+        [Range(0f, 1f)] public float vignetteIntensity = 0.12f;
         [Tooltip("How much of the post-processing shows while playing (the Title shows all of it): lower keeps the " +
                  "house readable.")]
-        [Range(0f, 1f)] public float gameplayPostFxWeight = 0.35f;
+        [Range(0f, 1f)] public float gameplayPostFxWeight = 0.85f;
 
         [Tooltip("Directional (sun) light intensity, applied at boot. Lower = the room lights matter more.")]
-        public float sunIntensity = 0.55f;
+        public float sunIntensity = 0.8f;
         [Tooltip("Ambient light intensity, applied at boot.")]
-        public float ambientIntensity = 0.65f;
+        public float ambientIntensity = 0.9f;
         [Tooltip("Zoom per wheel notch.")]
         public float zoomStep = 0.15f;
         public float zoomSmoothTime = 0.15f;

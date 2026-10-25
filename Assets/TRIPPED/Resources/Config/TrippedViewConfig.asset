@@ -95,8 +95,8 @@ MonoBehaviour:
   roomLightDepth: 0.35
   roomLightFadeIn: 0.4
   roomLightFlicker: 0.35
-  sunIntensity: 0.55
-  ambientIntensity: 0.65
+  sunIntensity: 0.8
+  ambientIntensity: 0.9
   zoomStep: 0.15
   zoomSmoothTime: 0.15
   homeMargin: 0.1
