@@ -237,6 +237,20 @@ namespace Trouble.Game
                  "people use (0 = keep the colour).")]
         [Range(0f, 1f)] public float kitDesaturate = 0.2f;
 
+        [Header("Toon shading (house kit, TRIPPED/ToonLit)")]
+        [Tooltip("Draw the house kit cel-shaded instead of with URP Lit.")]
+        public bool toonShading = true;
+        [Tooltip("The shaded band leans towards this colour instead of going grey.")]
+        public Color toonShadowColor = Hex("#B8A8DC");
+        [Tooltip("Where light turns to shade (N.L, -1..1); lower = more of each face lit.")]
+        [Range(-1f, 1f)] public float toonShadeThreshold = 0.1f;
+        [Tooltip("Width of the soft edge between the bands.")]
+        [Range(0.001f, 1f)] public float toonShadeSoftness = 0.08f;
+        public Color toonRimColor = Hex("#FFF3EA");
+        [Range(0f, 1f)] public float toonRimStrength = 0.3f;
+        [Tooltip("Sky light added to every face (light probes / ambient).")]
+        [Range(0f, 2f)] public float toonAmbient = 1.1f;
+
         [Header("Post-processing (PostFx)")]
         [Tooltip("Bloom, tonemapping, colour grading and vignette on the house camera.")]
         public bool postProcessing = true;

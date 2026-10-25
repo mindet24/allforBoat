@@ -100,12 +100,14 @@ namespace Trouble.Game
 
         /// <summary>
         /// Moves every material under <paramref name="root"/> toward grey, then toward white and the config's pastel
-        /// tint, so the smooth 3D rooms match the soft colours of the pixel-art characters and sit behind them. Each
-        /// source material is copied once. Runs before the see-through fader reads the materials.
+        /// tint, so the smooth 3D rooms match the soft colours of the pixel-art characters and sit behind them; with
+        /// toonShading the copy is drawn with TRIPPED/ToonLit (cel bands, pastel shade, rim). Each source material is
+        /// copied once. Runs before the see-through fader reads the materials.
         /// </summary>
         public static void Pastel(Transform root, TrippedViewConfig config)
         {
-            if (config.kitPastel <= 0f && config.kitDesaturate <= 0f) return;
+            var toon = config.toonShading ? Resources.Load<Shader>("Shaders/ToonLit") : null;
+            if (config.kitPastel <= 0f && config.kitDesaturate <= 0f && toon == null) return;
             var copies = new Dictionary<Material, Material>();
             foreach (var r in root.GetComponentsInChildren<Renderer>(true))
             {
@@ -116,7 +118,9 @@ namespace Trouble.Game
                     if (m == null || !m.HasProperty(PastelColorId)) continue;
                     if (!copies.TryGetValue(m, out var copy))
                     {
-                        copy = new Material(m) { name = m.name + " (pastel)" };
+                        // Glass and cut-outs keep Lit (ToonLit is opaque until the fader fades it).
+                        bool solid = !(m.HasProperty(SurfaceId) && m.GetFloat(SurfaceId) > 0.5f) && !(m.HasProperty(AlphaClipId) && m.GetFloat(AlphaClipId) > 0.5f);
+                        copy = toon != null && solid ? Toon(m, toon, config) : new Material(m) { name = m.name + " (pastel)" };
                         var c = m.GetColor(PastelColorId);
                         var grey = Color.Lerp(c, new Color(c.grayscale, c.grayscale, c.grayscale), config.kitDesaturate);
                         var soft = Color.Lerp(grey, Color.white, config.kitPastel) * config.kitPastelTint;
@@ -131,6 +135,31 @@ namespace Trouble.Game
         }
 
         private static readonly int PastelColorId = Shader.PropertyToID("_BaseColor");
+        private static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
+        private static readonly int CullId = Shader.PropertyToID("_Cull");
+        private static readonly int SurfaceId = Shader.PropertyToID("_Surface");
+        private static readonly int AlphaClipId = Shader.PropertyToID("_AlphaClip");
+
+        /// <summary>A ToonLit copy of <paramref name="source"/>: its texture, tiling, culling and queue, the config's cel look.</summary>
+        private static Material Toon(Material source, Shader toon, TrippedViewConfig config)
+        {
+            var m = new Material(toon) { name = source.name + " (toon)" };
+            if (source.HasProperty(BaseMapId))
+            {
+                m.SetTexture(BaseMapId, source.GetTexture(BaseMapId));
+                m.SetTextureScale(BaseMapId, source.GetTextureScale(BaseMapId));
+                m.SetTextureOffset(BaseMapId, source.GetTextureOffset(BaseMapId));
+            }
+            if (source.HasProperty(CullId)) m.SetFloat(CullId, source.GetFloat(CullId));
+            m.SetColor("_ShadowColor", config.toonShadowColor);
+            m.SetFloat("_ShadeThreshold", config.toonShadeThreshold);
+            m.SetFloat("_ShadeSoftness", config.toonShadeSoftness);
+            m.SetColor("_RimColor", config.toonRimColor);
+            m.SetFloat("_RimStrength", config.toonRimStrength);
+            m.SetFloat("_AmbientStrength", config.toonAmbient);
+            m.renderQueue = source.renderQueue;
+            return m;
+        }
 
         /// <summary>The x, y rect covered by every renderer under <paramref name="root"/>, in the house's local space.</summary>
         private Rect FrontRect(Transform root)
