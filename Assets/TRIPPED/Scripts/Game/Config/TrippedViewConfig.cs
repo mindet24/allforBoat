@@ -403,6 +403,14 @@ namespace Trouble.Game
         public float familyHopHeight = 0.08f;
         [Tooltip("Speed of the waiting hop.")]
         public float familyHopSpeed = 5f;
+        [Tooltip("Blackout: the bubble over each family member's head (a symbol, not a word).")]
+        public string familyDarkEmote = "!?";
+        public Color familyDarkEmoteColor = Hex("#E8443A");
+        [Tooltip("Blackout: bubble diameter (metres) and how far each person shakes sideways (metres).")]
+        public float familyDarkBubbleSize = 0.42f;
+        public float familyDarkShake = 0.035f;
+        [Tooltip("Blackout: shakes per second.")]
+        public float familyDarkShakeHz = 14f;
         [Tooltip("Resources path of the breaker panel sprite (bottom-centre pivot, 1 unit tall).")]
         public string panelArtPath = "Art/Props/panel";
         [Tooltip("Height the panel sprite is drawn at, metres.")]

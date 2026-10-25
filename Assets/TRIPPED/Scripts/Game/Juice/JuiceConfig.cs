@@ -133,6 +133,11 @@ namespace Trouble.Game
         public float heatAlphaMax = 0.22f;
 
         [Header("Blackout")]
+        [Tooltip("Family complaints when the house goes dark: delay before the first, gap between people (seconds).")]
+        public float familyVoiceDelay = 0.35f;
+        public float familyVoiceGap = 0.28f;
+        [Tooltip("Pitch of each person's complaint, in the day's people order.")]
+        public float[] familyVoicePitches = { 1.15f, 0.85f, 1.35f, 0.95f };
         [Tooltip("Flashlight the player carries while the house is dark: a spot light ahead of them.")]
         public float flashlightIntensity = 8f;
         public float flashlightRange = 7f;

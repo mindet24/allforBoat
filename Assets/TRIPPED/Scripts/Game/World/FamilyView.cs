@@ -7,8 +7,9 @@ namespace Trouble.Game
     /// <summary>
     /// Day mode: the family (Mom, Dad, Daughter, Grandma) standing in the house, drawn from family_{name}.png. Each
     /// person waits in the room of their request (<see cref="FamilyRules"/>) and hops while they wait; when they move
-    /// room they fade out and back in at the new spot. Drawn behind the player and the appliances. People without
-    /// art are not drawn.
+    /// room they fade out and back in at the new spot. In a blackout everyone stops hopping, shakes and shows a
+    /// "!?" bubble, so the dark reads as trouble for the whole family. Drawn behind the player and the appliances.
+    /// People without art are not drawn.
     /// </summary>
     public sealed class FamilyView : MonoBehaviour
     {
@@ -20,6 +21,10 @@ namespace Trouble.Game
             public SpriteRenderer Shadow;
             public SpriteRenderer Badge;
             public Color BadgeColor;
+            public Transform Bubble;
+            public SpriteRenderer BubbleDisc;
+            public SpriteRenderer BubbleRim;
+            public TMPro.TextMeshPro BubbleText;
             public string Room;
             public Vector2 Spot;
             public float Alpha;
@@ -63,9 +68,25 @@ namespace Trouble.Game
                 var shadow = SpriteStyle.BlobShadow(go.transform, height * config.blobShadowWidth, config);
                 var color = personColor(person.name);
                 var badge = SpriteStyle.FootBadge(go.transform, height * config.footBadgeWidth, color, config);
-                _members.Add(new Member { Name = person.name, Rooms = person.rooms, Sprite = sr, Shadow = shadow, Badge = badge, BadgeColor = color });
+                var member = new Member { Name = person.name, Rooms = person.rooms, Sprite = sr, Shadow = shadow, Badge = badge, BadgeColor = color };
+                MakeBubble(member, go.transform, height);
+                _members.Add(member);
                 if (_members.Count == _targets.Length) break;
             }
+        }
+
+        /// <summary>The blackout bubble over the head: a white disc, dark rim and the emote, hidden until a blackout.</summary>
+        private void MakeBubble(Member m, Transform root, float height)
+        {
+            var bubble = new GameObject("DarkBubble").transform;
+            bubble.SetParent(root, false);
+            bubble.localPosition = new Vector3(0f, height + _config.familyDarkBubbleSize * 0.6f, -0.02f);
+            m.Bubble = bubble;
+            (m.BubbleDisc, m.BubbleRim) = SpriteStyle.Halo(bubble, Vector3.zero, _config.familyDarkBubbleSize, Color.white,
+                _config.spriteOutlineColor, 0);
+            m.BubbleText = Prims.Text(bubble, "Emote", new Vector3(0f, 0f, -0.01f),
+                Vector2.one * _config.familyDarkBubbleSize * 0.8f, _config.familyDarkEmote, _config.familyDarkEmoteColor, 3f);
+            bubble.gameObject.SetActive(false);
         }
 
         /// <summary>Places and animates everyone for this frame, keeping them out from behind <paramref name="appliances"/>.</summary>
@@ -84,6 +105,7 @@ namespace Trouble.Game
             }
 
             _placed.Clear();
+            bool dark = DayRules.IsBlackout(sim);
             float dt = Time.unscaledDeltaTime;
             float fade = dt / Mathf.Max(0.01f, _config.familyFadeTime);
             for (int i = 0; i < _members.Count; i++)
@@ -96,6 +118,7 @@ namespace Trouble.Game
                     m.Sprite.enabled = false;
                     if (m.Shadow != null) m.Shadow.enabled = false;
                     if (m.Badge != null) m.Badge.enabled = false;
+                    if (m.Bubble.gameObject.activeSelf) m.Bubble.gameObject.SetActive(false);
                     continue;
                 }
                 _placed.TryGetValue(target, out int slot);
@@ -131,10 +154,24 @@ namespace Trouble.Game
                 }
 
                 bool waiting = FamilyRules.IsWaiting(m.Name, requests);
-                float hop = waiting ? Mathf.Abs(Mathf.Sin((time + i * 0.37f) * _config.familyHopSpeed)) * _config.familyHopHeight : 0f;
+                // Blackout: no hopping, a nervous shake instead.
+                float hop = waiting && !dark ? Mathf.Abs(Mathf.Sin((time + i * 0.37f) * _config.familyHopSpeed)) * _config.familyHopHeight : 0f;
+                float shake = dark ? Mathf.Sin((time + i * 0.21f) * _config.familyDarkShakeHz * Mathf.PI * 2f) * _config.familyDarkShake : 0f;
                 float fz = _config.dayFrontZ + _config.familyDepth;
-                m.Sprite.transform.parent.localPosition = new Vector3(m.Spot.x, m.Spot.y + hop, fz);
-                m.Sprite.sortingOrder = HouseLayout.DepthSortingOrder(fz);
+                m.Sprite.transform.parent.localPosition = new Vector3(m.Spot.x + shake, m.Spot.y + hop, fz);
+                int order = HouseLayout.DepthSortingOrder(fz);
+                m.Sprite.sortingOrder = order;
+                bool bubble = dark && m.Alpha > 0.5f;
+                if (m.Bubble.gameObject.activeSelf != bubble) m.Bubble.gameObject.SetActive(bubble);
+                if (bubble)
+                {
+                    m.BubbleDisc.enabled = m.BubbleRim.enabled = true;
+                    m.BubbleDisc.sortingOrder = order + 1;
+                    m.BubbleRim.sortingOrder = order + 2;
+                    m.BubbleText.sortingOrder = order + 3;
+                    float pop = 1f + 0.08f * Mathf.Sin((time + i * 0.5f) * 6f);
+                    m.Bubble.localScale = new Vector3(pop, pop, 1f);
+                }
                 var c = m.Sprite.color;
                 if (!Mathf.Approximately(c.a, m.Alpha)) m.Sprite.color = new Color(c.r, c.g, c.b, m.Alpha);
                 m.Sprite.enabled = m.Alpha > 0.001f;

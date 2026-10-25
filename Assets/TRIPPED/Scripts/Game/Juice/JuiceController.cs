@@ -412,8 +412,14 @@ namespace Trouble.Game
             for (int i = 0; i < _scratchSounds.Count; i++) _feedback.Play(_scratchSounds[i], pitch, 1f);
         }
 
+        private readonly List<float> _voiceAt = new List<float>();
+
         private void StartBlackout(HouseSim sim, string circuit)
         {
+            // The family complains, one after another (a little apart so the voices do not stack).
+            _voiceAt.Clear();
+            int people = sim.Level.day?.people?.Count ?? 0;
+            for (int p = 0; p < people && p < 4; p++) _voiceAt.Add(Time.unscaledTime + _juice.familyVoiceDelay + p * _juice.familyVoiceGap);
             if (_shake != null) _shake.Kick(_juice.blackoutShake);
             if (_screen != null) _screen.Flash(_juice.flashColor);
             StartSlowMo();
@@ -644,6 +650,7 @@ namespace Trouble.Game
                 if (r.Dark.enabled != show) r.Dark.enabled = show;
             }
             UpdateFlashlight(sim, dark);
+            UpdateVoices(now, dark);
             float factor = dark ? _juice.blackoutLightFactor
                 : relighting && _rooms.Count > 0 ? Mathf.Lerp(_juice.blackoutLightFactor, 1f, lit / (float)_rooms.Count)
                 : 1f;
@@ -651,6 +658,25 @@ namespace Trouble.Game
         }
 
         private Light _flashlight;
+
+        /// <summary>Plays the staggered family complaints queued by a blackout; a relight cancels the rest.</summary>
+        private void UpdateVoices(float now, bool dark)
+        {
+            if (!dark)
+            {
+                _voiceAt.Clear();
+                return;
+            }
+            for (int i = 0; i < _voiceAt.Count; i++)
+            {
+                if (_voiceAt[i] < 0f || now < _voiceAt[i]) continue;
+                _voiceAt[i] = -1f;
+                // Each person a different pitch and word, so it reads as several voices.
+                var pitches = _juice.familyVoicePitches;
+                float pitch = pitches != null && pitches.Length > 0 ? pitches[i % pitches.Length] : 1f;
+                _feedback.Play(i % 2 == 0 ? SynthBank.VoiceAngry : SynthBank.VoiceHey, pitch, 1f);
+            }
+        }
 
         /// <summary>
         /// While the house is dark the player carries a flashlight: a spot light at chest height, pointing ahead the
