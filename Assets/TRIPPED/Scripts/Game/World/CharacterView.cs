@@ -14,8 +14,6 @@ namespace Trouble.Game
     /// </summary>
     public sealed class CharacterView : MonoBehaviour
     {
-        /// <summary>Day mode sorting order: above appliance sprites (0..3) and family (-2), below room overlays (10).</summary>
-        private const int DaySortingOrder = 9;
         private TrippedViewConfig _config;
         private ArtLibrary _art;
         private SpriteRenderer _sprite;
@@ -50,7 +48,8 @@ namespace Trouble.Game
         }
 
         /// <summary>Builds the sprite and the queue label.</summary>
-        public void Build(TrippedViewConfig config, ArtLibrary art)
+        /// <param name="character">Art id (<see cref="PlayerCharacter"/>); null = the local player's pick.</param>
+        public void Build(TrippedViewConfig config, ArtLibrary art, string character = null)
         {
             _config = config;
             _art = art;
@@ -62,8 +61,11 @@ namespace Trouble.Game
             // Other levels: drawn before appliances and socket faces so gameplay objects stay readable in front of it
             // (day mode draws it on top, see Sync).
             _sprite.sortingOrder = -1;
-            _rig = RigView.TryCreate(transform, RigConfig.LoadOrDefault(), config.playerWorldHeight, -1);
+            _rig = RigView.TryCreate(transform, RigConfig.LoadOrDefault(), config.playerWorldHeight, -1, character ?? PlayerCharacter.Selected);
             if (_rig != null) _sprite.enabled = false;
+            if (_rig != null) _rig.AddOutline(config);
+            else SpriteStyle.Outline(_sprite, config);
+            SpriteStyle.BlobShadow(transform, config.playerWorldHeight * config.blobShadowWidth, config);
             _queueText = Prims.Text(transform, "Queue", new Vector3(0f, config.playerWorldHeight + 0.35f, 0f),
                 new Vector2(2.4f, 0.6f), "", config.roomNameText, 1.6f, TextAlignmentOptions.Bottom, false);
             _queueText.textWrappingMode = TextWrappingModes.Normal;
@@ -78,7 +80,7 @@ namespace Trouble.Game
             _flame.drawMode = SpriteDrawMode.Sliced;
             _flame.size = config.jetpackFlameSize;
             _flame.color = config.jetpackFlameColor;
-            _flame.sortingOrder = DaySortingOrder - 1;
+            _flame.sortingOrder = -2;
             flame.SetActive(false);
 
             // What the character carries (day mode): a small card above the head.
@@ -137,11 +139,12 @@ namespace Trouble.Game
                 if (!Mathf.Approximately(lp.z, wantZ)) _carrySprite.transform.localPosition = new Vector3(lp.x, lp.y, wantZ);
             }
             _lastX = p.x;
-            // Day mode: the player is drawn over the appliance and family sprites standing at the same depth (but
-            // under a dark room's overlay); other levels keep it behind gameplay objects.
-            int order = day ? DaySortingOrder : -1;
+            // Day mode: drawn by depth with the family and the appliances (farther back = behind); other levels keep it
+            // behind gameplay objects.
+            int order = day ? HouseLayout.DepthSortingOrder(z) : -1;
             if (_sprite.sortingOrder != order) _sprite.sortingOrder = order;
             if (_rig != null) _rig.SortingOrder = order;
+            if (_flame != null) _flame.sortingOrder = order - 1;
 
             bool walking = day ? ch.WalkDir != 0 && !ch.IsAirborne : ch.IsWalking;
             bool flame = day && ch.Thrusting && sim.Phase == LevelPhase.Running;

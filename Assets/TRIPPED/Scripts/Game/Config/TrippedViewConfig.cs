@@ -181,6 +181,51 @@ namespace Trouble.Game
         public float roomLightFadeIn = 0.4f;
         [Tooltip("Seconds of flicker when the breaker goes OFF.")]
         public float roomLightFlicker = 0.35f;
+        [Tooltip("Soft shadows from each room's ceiling light. Costs GPU time (six shadow faces per room).")]
+        public bool roomLightShadows = true;
+        [Range(0f, 1f)] public float roomLightShadowStrength = 0.7f;
+
+        [Tooltip("Soft shadows from the sun (directional light). Distance is the URP asset's shadow distance.")]
+        public bool sunShadows = true;
+        [Range(0f, 1f)] public float sunShadowStrength = 0.6f;
+
+        [Header("Sprites in the 3D house (SpriteStyle)")]
+        [Tooltip("Thin outline around characters, family and appliances.")]
+        public bool spriteOutline = true;
+        public Color spriteOutlineColor = Color.white;
+        [Tooltip("Outline width, metres in the world.")]
+        public float spriteOutlineMetres = 0.012f;
+        [Tooltip("Soft oval shadow on the floor under the feet.")]
+        public bool blobShadows = true;
+        [Range(0f, 1f)] public float blobShadowAlpha = 0.35f;
+        [Tooltip("Oval depth as a fraction of its width.")]
+        public float blobShadowDepth = 0.45f;
+        [Tooltip("Oval width as a fraction of the sprite's height (sprites are about square).")]
+        public float blobShadowWidth = 0.55f;
+
+        [Header("Pastel rooms")]
+        [Tooltip("Colour the house kit's materials are tinted towards.")]
+        public Color kitPastelTint = Hex("#FFE1EA");
+        [Tooltip("How far the kit's colours move to white before the tint (0 = the model's own colours).")]
+        [Range(0f, 1f)] public float kitPastel = 0.35f;
+
+        [Header("Post-processing (PostFx)")]
+        [Tooltip("Bloom, tonemapping, colour grading and vignette on the house camera.")]
+        public bool postProcessing = true;
+        [Tooltip("SMAA anti-aliasing on the house camera.")]
+        public bool smaa = true;
+        public float bloomIntensity = 0.6f;
+        [Tooltip("Brightness above which pixels glow.")]
+        public float bloomThreshold = 0.9f;
+        [Range(0f, 1f)] public float bloomScatter = 0.65f;
+        [Tooltip("Exposure in EV, applied after tonemapping darkens the image.")]
+        public float postExposure = 0.6f;
+        [Range(-100f, 100f)] public float contrast = 8f;
+        [Range(-100f, 100f)] public float saturation = 12f;
+        [Tooltip("Tint over the whole image; a light warm colour gives the cosy home look.")]
+        public Color colorFilter = Hex("#FFF4E6");
+        [Range(0f, 1f)] public float vignetteIntensity = 0.28f;
+
         [Tooltip("Directional (sun) light intensity, applied at boot. Lower = the room lights matter more.")]
         public float sunIntensity = 0.55f;
         [Tooltip("Ambient light intensity, applied at boot.")]
@@ -249,7 +294,7 @@ namespace Trouble.Game
         public Color jetpackFlameColor = Hex("#FF8A1EE6");
         public Vector2 jetpackFlameSize = new Vector2(0.28f, 0.45f);
         [Tooltip("Day mode: opacity of a wall, floor or piece of furniture while it stands between the camera and a character or appliance.")]
-        [Range(0f, 1f)] public float occluderAlpha = 0.25f;
+        [Range(0f, 1f)] public float occluderAlpha = 0.5f;
         [Tooltip("How fast such a piece fades out and back in, opacity per second.")]
         public float occluderFadeSpeed = 4f;
         [Tooltip("House meshes whose name contains any of these never fade (the floor slabs hold the house together; a room below seen through the one above reads as broken).")]
@@ -309,6 +354,14 @@ namespace Trouble.Game
         public Color dayStairsColor = Hex("#9C6B43");
         [Tooltip("Day mode: height of one step of the stairs, metres (the step count follows from the floor height).")]
         public float dayStairsRise = 0.25f;
+        [Tooltip("Day mode: staircase model drawn for each flight instead of the step blocks (null = blocks). It is turned and stretched so its steps run from the flight's bottom to its top.")]
+        public GameObject dayStairsModel;
+        [Tooltip("Name of the model part that holds the steps (fitted to the flight; railings and the rest follow). Empty = the whole model.")]
+        public string dayStairsStepsPart = "schody na 1 pietro";
+        [Tooltip("Model space: the direction the steps climb (the model's -z climbs = (0, 0, -1)).")]
+        public Vector3 dayStairsModelClimb = new Vector3(0f, 0f, -1f);
+        [Tooltip("Day mode: the upper floor gets an opening over the flight from this far along it (0 = the bottom, 1 = the top), so the head never goes through the slab.")]
+        [Range(0f, 1f)] public float dayStairsOpeningFrom = 0.35f;
         [Tooltip("Day mode: how far behind the player and the appliances the family stands, metres.")]
         public float familyDepth = 0.1f;
         [Tooltip("Half the width of a family member, metres: they step aside until this much is clear of every appliance.")]

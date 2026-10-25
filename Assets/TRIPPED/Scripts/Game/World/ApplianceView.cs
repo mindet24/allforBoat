@@ -13,6 +13,7 @@ namespace Trouble.Game
     /// </summary>
     public sealed class ApplianceView : MonoBehaviour
     {
+        private UnityEngine.Rendering.SortingGroup _depthGroup;
         private ApplianceState _app;
         private TrippedViewConfig _config;
         private SpriteRenderer _glow;
@@ -69,6 +70,8 @@ namespace Trouble.Game
                 _width = height * aspect;
                 _glow = MakeSprite("Glow", sprite, 0, new Vector3(0f, -height * 0.04f, 0.02f), Vector3.one * height * 1.1f);
                 _card = MakeSprite("Sprite", sprite, 2, Vector3.zero, Vector3.one * height);
+                SpriteStyle.Outline(_card, config);
+                SpriteStyle.BlobShadow(transform, _width * 0.9f, config);
                 if (showLoad)
                 {
                     // Day mode: the load the appliance draws, on a small badge at its top right.
@@ -130,6 +133,12 @@ namespace Trouble.Game
             float depth = socket != null ? sim.Rules.walkDepthMetres : _app.SeenFloorZ;
             float z = sim.IsDayMode ? _config.dayFrontZ + depth + _height * 0.02f : _config.roomDepth - _config.applianceInset;
             var landed = new Vector3(x, HouseLayout.FloorY(room.Floor, _config.roomHeight), z);
+            if (sim.IsDayMode)
+            {
+                // Its layers (glow, card, label) sort as one, by depth with the characters.
+                if (_depthGroup == null) _depthGroup = gameObject.AddComponent<UnityEngine.Rendering.SortingGroup>();
+                _depthGroup.sortingOrder = HouseLayout.DepthSortingOrder(z);
+            }
             float flight = (time - _flyStart) / Mathf.Max(0.01f, _config.throwFlightSeconds);
             transform.localPosition = flight < 1f
                 ? Vector3.Lerp(_flyFrom, landed, flight) + Vector3.up * (4f * flight * (1f - flight) * _config.throwArcHeight)

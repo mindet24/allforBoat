@@ -98,6 +98,39 @@ namespace Trouble.Game
             Extent = FrontRect(transform);
         }
 
+        /// <summary>
+        /// Moves every material under <paramref name="root"/> toward white and the config's pastel tint, so the smooth
+        /// 3D rooms match the soft colours of the pixel-art characters. Each source material is copied once.
+        /// Runs before the see-through fader reads the materials.
+        /// </summary>
+        public static void Pastel(Transform root, TrippedViewConfig config)
+        {
+            if (config.kitPastel <= 0f) return;
+            var copies = new Dictionary<Material, Material>();
+            foreach (var r in root.GetComponentsInChildren<Renderer>(true))
+            {
+                var mats = r.sharedMaterials;
+                for (int i = 0; i < mats.Length; i++)
+                {
+                    var m = mats[i];
+                    if (m == null || !m.HasProperty(PastelColorId)) continue;
+                    if (!copies.TryGetValue(m, out var copy))
+                    {
+                        copy = new Material(m) { name = m.name + " (pastel)" };
+                        var c = m.GetColor(PastelColorId);
+                        var soft = Color.Lerp(c, Color.white, config.kitPastel) * config.kitPastelTint;
+                        soft.a = c.a;
+                        copy.SetColor(PastelColorId, soft);
+                        copies[m] = copy;
+                    }
+                    mats[i] = copy;
+                }
+                r.sharedMaterials = mats;
+            }
+        }
+
+        private static readonly int PastelColorId = Shader.PropertyToID("_BaseColor");
+
         /// <summary>The x, y rect covered by every renderer under <paramref name="root"/>, in the house's local space.</summary>
         private Rect FrontRect(Transform root)
         {

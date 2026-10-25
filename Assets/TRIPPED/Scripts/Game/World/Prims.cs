@@ -150,7 +150,10 @@ namespace Trouble.Game
             var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
             _cube = cube.GetComponent<MeshFilter>().sharedMesh;
             _quad = quad.GetComponent<MeshFilter>().sharedMesh;
-            _baseMaterial = cube.GetComponent<MeshRenderer>().sharedMaterial;
+            // A primitive's default material is the built-in one, which URP cannot draw in a build (magenta): prefer
+            // the URP Lit material shipped in Resources.
+            var shipped = Resources.Load<Material>("Materials/PrimLit");
+            _baseMaterial = shipped != null ? shipped : cube.GetComponent<MeshRenderer>().sharedMaterial;
             Object.DestroyImmediate(cube);
             Object.DestroyImmediate(quad);
         }

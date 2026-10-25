@@ -145,12 +145,28 @@ MonoBehaviour:
     height: 0.66
   overviewMargin: 0.04
   jumpArc: 0.8
-  occluderAlpha: 0.25
+  jetpackFlameColor: {r: 1, g: 0.5411765, b: 0.11764706, a: 0.9019608}
+  jetpackFlameSize: {x: 0.28, y: 0.45}
+  occluderAlpha: 0.5
   occluderFadeSpeed: 4
   neverFadeParts:
   - Floor
   - Foundation
   characterFollowSpeed: 6
+  walkLeftKey: 15
+  walkLeftAltKey: 61
+  walkRightKey: 18
+  walkRightAltKey: 62
+  walkInKey: 37
+  walkInAltKey: 63
+  walkOutKey: 33
+  walkOutAltKey: 64
+  startKey: 1
+  pauseKey: 30
+  restartKey: 32
+  downModifierKey: 51
+  followKey: 20
+  homeKey: 68
   interactKey: 19
   plugKey: 20
   throwHoldSeconds: 0.35
@@ -164,6 +180,12 @@ MonoBehaviour:
   promptSize: {x: 0.5, y: 0.42}
   promptGap: 0.12
   dayFrontZ: -0.2
+  dayStairsColor: {r: 0.6117647, g: 0.41960785, b: 0.2627451, a: 1}
+  dayStairsRise: 0.25
+  dayStairsModel: {fileID: 919132149155446097, guid: e7df0cdeed932634dae430553271cd61, type: 3}
+  dayStairsStepsPart: schody na 1 pietro
+  dayStairsModelClimb: {x: 0, y: 0, z: -1}
+  dayStairsOpeningFrom: 0.35
   familyDepth: 0.1
   familyHalfWidth: 0.35
   familyFadeTime: 0.25
@@ -210,6 +232,7 @@ MonoBehaviour:
     model: {fileID: 919132149155446097, guid: 37454935d3f64f84a01f7b28a9a49f09, type: 3}
     hideParts: []
     hideWhenRescaled: []
+  randomPropChance: 0.6
   roomModelWidthTolerance: 0.1
   socketPlateScale: 1.5
   deadlineWarnSeconds: 5

@@ -190,6 +190,13 @@ namespace Trouble.Game
             return Mathf.Lerp(yFrom, yTo, t) + arc * 4f * t * (1f - t);
         }
 
+        /// <summary>
+        /// Day mode: sorting order for a character, family member or appliance standing <paramref name="z"/> metres into
+        /// the house, so whoever is farther back is drawn first (behind). Centimetre steps, always below the room
+        /// overlays (10) and labels; ties are broken by the caller's small depth offsets.
+        /// </summary>
+        public static int DepthSortingOrder(float z) => -Mathf.RoundToInt(z * 100f) - 20;
+
         /// <summary>Segment progress 0..1 with the fraction of the next tick added.</summary>
         public static float WalkProgress(int elapsedTicks, int segmentTicks, float tickFraction)
         {

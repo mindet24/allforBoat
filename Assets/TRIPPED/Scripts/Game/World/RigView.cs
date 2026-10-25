@@ -34,6 +34,7 @@ namespace Trouble.Game
         private Transform _lean, _body, _head, _armL, _armR, _legL, _legR;
         private Vector3 _legLHome, _legRHome, _leanHome;
         private readonly List<SpriteRenderer> _renderers = new List<SpriteRenderer>();
+        private readonly List<SpriteRenderer> _outlines = new List<SpriteRenderer>();
         private readonly List<Sprite> _created = new List<Sprite>();
         private RigAction _action;
         private float _actionStart;
@@ -47,12 +48,12 @@ namespace Trouble.Game
 
         /// <summary>
         /// Builds the rig under <paramref name="parent"/>, <paramref name="worldHeight"/> metres tall, drawn as one unit at
-        /// <paramref name="sortingOrder"/>. Null (and nothing built) when the rig art or player_rig.json is missing.
+        /// <paramref name="sortingOrder"/>. Null (and nothing built) when the rig art or {character}_rig.json is missing.
         /// </summary>
-        public static RigView TryCreate(Transform parent, RigConfig config, float worldHeight, int sortingOrder)
+        public static RigView TryCreate(Transform parent, RigConfig config, float worldHeight, int sortingOrder, string character = PlayerCharacter.Girl)
         {
             if (config == null || !config.useRig) return null;
-            var json = Resources.Load<TextAsset>(config.rigFolder + "/player_rig");
+            var json = Resources.Load<TextAsset>(config.rigFolder + "/" + character + "_rig");
             if (json == null) return null;
             var file = JsonUtility.FromJson<RigFile>(json.text);
             if (file == null || file.parts.Count == 0 || file.contentHeight <= 0) return null;
@@ -60,6 +61,7 @@ namespace Trouble.Game
             var go = new GameObject("Rig");
             go.transform.SetParent(parent, false);
             var view = go.AddComponent<RigView>();
+            view._character = character;
             if (!view.Build(file, config, worldHeight, sortingOrder))
             {
                 Destroy(go);
@@ -67,6 +69,8 @@ namespace Trouble.Game
             }
             return view;
         }
+
+        private string _character = PlayerCharacter.Girl;
 
         private bool Build(RigFile file, RigConfig config, float worldHeight, int sortingOrder)
         {
@@ -79,7 +83,7 @@ namespace Trouble.Game
             var sprites = new Dictionary<string, (Sprite sprite, int order)>();
             foreach (var part in file.parts)
             {
-                var tex = Resources.Load<Texture2D>(_config.rigFolder + "/player_" + part.name);
+                var tex = Resources.Load<Texture2D>(_config.rigFolder + "/" + _character + "_" + part.name);
                 if (tex == null) return false;
                 // The texture may be imported at another size than the canvas: scale the pivot with it.
                 float sx = tex.width / (float)file.canvas, sy = tex.height / (float)file.canvas;
@@ -177,11 +181,25 @@ namespace Trouble.Game
             _legR.localPosition = _legRHome + new Vector3(0f, pose.LegLiftR, 0f);
         }
 
-        /// <summary>Tints every part (for the Sight overlay or a fade). Alpha included.</summary>
+        /// <summary>Tints every part (for the Sight overlay or a fade). Alpha included; the outline only fades.</summary>
         public void SetColor(Color c)
         {
             for (int i = 0; i < _renderers.Count; i++)
                 if (_renderers[i].color != c) _renderers[i].color = c;
+            var fade = new Color(1f, 1f, 1f, c.a);
+            for (int i = 0; i < _outlines.Count; i++)
+                if (_outlines[i].color != fade) _outlines[i].color = fade;
+        }
+
+        /// <summary>Outlines the whole body: one silhouette per part, all sorted behind every part.</summary>
+        public void AddOutline(TrippedViewConfig config)
+        {
+            int behind = short.MinValue + 2;
+            foreach (var sr in _renderers)
+            {
+                var copy = SpriteStyle.Silhouette(sr, behind, config);
+                if (copy != null) _outlines.Add(copy);
+            }
         }
 
         private void OnDestroy()

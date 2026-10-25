@@ -17,6 +17,7 @@ namespace Trouble.Game
             public string Name;
             public List<string> Rooms;
             public SpriteRenderer Sprite;
+            public SpriteRenderer Shadow;
             public string Room;
             public Vector2 Spot;
             public float Alpha;
@@ -53,7 +54,9 @@ namespace Trouble.Game
                 sr.sprite = frames[0];
                 // Behind the player (-1) and every appliance and socket.
                 sr.sortingOrder = -2;
-                _members.Add(new Member { Name = person.name, Rooms = person.rooms, Sprite = sr });
+                SpriteStyle.Outline(sr, config);
+                var shadow = SpriteStyle.BlobShadow(go.transform, height * config.blobShadowWidth, config);
+                _members.Add(new Member { Name = person.name, Rooms = person.rooms, Sprite = sr, Shadow = shadow });
                 if (_members.Count == _targets.Length) break;
             }
         }
@@ -84,6 +87,7 @@ namespace Trouble.Game
                 if (roomState == null)
                 {
                     m.Sprite.enabled = false;
+                    if (m.Shadow != null) m.Shadow.enabled = false;
                     continue;
                 }
                 _placed.TryGetValue(target, out int slot);
@@ -120,10 +124,19 @@ namespace Trouble.Game
 
                 bool waiting = FamilyRules.IsWaiting(m.Name, requests);
                 float hop = waiting ? Mathf.Abs(Mathf.Sin((time + i * 0.37f) * _config.familyHopSpeed)) * _config.familyHopHeight : 0f;
-                m.Sprite.transform.parent.localPosition = new Vector3(m.Spot.x, m.Spot.y + hop, _config.dayFrontZ + _config.familyDepth);
+                float fz = _config.dayFrontZ + _config.familyDepth;
+                m.Sprite.transform.parent.localPosition = new Vector3(m.Spot.x, m.Spot.y + hop, fz);
+                m.Sprite.sortingOrder = HouseLayout.DepthSortingOrder(fz);
                 var c = m.Sprite.color;
                 if (!Mathf.Approximately(c.a, m.Alpha)) m.Sprite.color = new Color(c.r, c.g, c.b, m.Alpha);
                 m.Sprite.enabled = m.Alpha > 0.001f;
+                if (m.Shadow != null)
+                {
+                    // The shadow stays on the floor while the person hops, and fades with them.
+                    m.Shadow.transform.localPosition = new Vector3(0f, 0.01f - hop, 0f);
+                    m.Shadow.color = new Color(0f, 0f, 0f, _config.blobShadowAlpha * m.Alpha);
+                    m.Shadow.enabled = m.Sprite.enabled;
+                }
             }
         }
     }

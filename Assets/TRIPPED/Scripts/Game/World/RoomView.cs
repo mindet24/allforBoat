@@ -124,7 +124,8 @@ namespace Trouble.Game
             _light.color = config.roomLightColor;
             _light.range = Mathf.Max(config.roomLightRange, rect.width * 0.75f);
             _light.intensity = config.roomLightIntensity;
-            _light.shadows = LightShadows.None;
+            _light.shadows = config.roomLightShadows ? LightShadows.Soft : LightShadows.None;
+            _light.shadowStrength = config.roomLightShadowStrength;
         }
 
         /// <summary>Turns the ceiling light on or off with the room's power, with the fade and flicker of the rules.</summary>

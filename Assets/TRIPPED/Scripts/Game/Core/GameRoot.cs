@@ -52,6 +52,7 @@ namespace Trouble.Game
             var houseCamera = cam.GetComponent<HouseCamera>();
             if (houseCamera == null) houseCamera = cam.gameObject.AddComponent<HouseCamera>();
             houseCamera.Setup(config);
+            PostFx.Apply(cam, config);
 
             Controller = gameObject.AddComponent<LevelController>();
             Controller.Setup(config, houseCamera);
@@ -88,7 +89,12 @@ namespace Trouble.Game
                 RenderSettings.ambientGroundColor *= config.ambientIntensity;
             }
             foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None))
-                if (l.type == LightType.Directional) l.intensity = config.sunIntensity;
+                if (l.type == LightType.Directional)
+                {
+                    l.intensity = config.sunIntensity;
+                    l.shadows = config.sunShadows ? LightShadows.Soft : LightShadows.None;
+                    l.shadowStrength = config.sunShadowStrength;
+                }
         }
 
         /// <summary>The level to open at once, or 0 to show the Title.</summary>
