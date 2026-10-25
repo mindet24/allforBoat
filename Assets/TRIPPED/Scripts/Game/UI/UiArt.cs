@@ -185,6 +185,29 @@ namespace Trouble.Game
         }
 
         /// <summary>A 1×64 vertical gradient texture (top colour at the top), for full-screen menu backdrops.</summary>
+        /// <summary>
+        /// A vertical three-stop gradient, eased between stops: <paramref name="bottom"/> rising to
+        /// <paramref name="mid"/> at height <paramref name="midAt"/> (0..1), then to <paramref name="top"/>.
+        /// For an anime sky: pale horizon, clear blue, deep blue overhead.
+        /// </summary>
+        public static Sprite Gradient(Color top, Color mid, Color bottom, float midAt)
+        {
+            const int h = 128;
+            var tex = NewTexture(1, h, "UiGradient3");
+            var px = new Color[h];
+            float m = Mathf.Clamp(midAt, 0.01f, 0.99f);
+            for (int y = 0; y < h; y++)
+            {
+                float t = y / (h - 1f);
+                px[y] = t < m
+                    ? Color.Lerp(bottom, mid, Mathf.SmoothStep(0f, 1f, t / m))
+                    : Color.Lerp(mid, top, Mathf.SmoothStep(0f, 1f, (t - m) / (1f - m)));
+            }
+            tex.SetPixels(px);
+            tex.Apply(false, true);
+            return Sprite.Create(tex, new Rect(0, 0, 1, h), new Vector2(0.5f, 0.5f), 100f);
+        }
+
         public static Sprite Gradient(Color top, Color bottom)
         {
             var tex = NewTexture(1, 64, "UiGradient");

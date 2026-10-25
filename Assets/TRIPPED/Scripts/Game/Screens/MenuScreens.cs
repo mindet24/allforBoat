@@ -87,7 +87,7 @@ namespace Trouble.Game
             _actions = actions;
             UiArt.Configure(_ui);
             UiIcons.Configure(_ui);
-            _sky = UiArt.Gradient(_ui.backdropTop, _ui.backdropBottom);
+            _sky = _ui.SkyGradient();
             BuildTitle(canvas);
             BuildHowTo(canvas);
             BuildSettings(canvas);

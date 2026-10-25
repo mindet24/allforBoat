@@ -156,17 +156,15 @@ namespace Trouble.Game
             LowPoly.Place(transform, "Bin", LowPoly.Prism(), new Vector3(R - 1.2f, g, 1.2f), new Vector3(0.6f, 0.85f, 0.6f), Hex("#4F6B5A"));
             Prims.Box(transform, "Bin lid", new Vector3(R - 1.2f, g + 0.9f, 1.2f), new Vector3(0.66f, 0.08f, 0.66f), Hex("#3D5547"));
 
-            // Clouds: clusters of white facets, drifting.
-            for (int i = 0; i < 18; i++)
+            // Clouds: soft painted puffs (the same as the game's sky), drifting.
+            for (int i = 0; i < 12; i++)
             {
                 var cloud = new GameObject("Cloud").transform;
                 cloud.SetParent(transform, false);
-                cloud.localPosition = new Vector3(Mathf.Lerp(_left, _right, (i + 0.3f * (i % 2)) / 18f), g + 13f + (i % 3) * 1.6f, 6f + (i % 4) * 4f);
-                for (int k = 0; k < 4; k++)
-                {
-                    float s = 1.6f + (k == 1 ? 0.9f : 0f) + (i % 2) * 0.3f;
-                    LowPoly.PlaceUnlit(cloud, "Puff", LowPoly.Blob(), new Vector3((k - 1.5f) * 1.1f, k == 1 || k == 2 ? 0.45f : 0f, 0f), new Vector3(s, s * 0.8f, s));
-                }
+                cloud.localPosition = new Vector3(Mathf.Lerp(_left, _right, (i + 0.3f * (i % 2)) / 12f), g + 13f + (i % 3) * 1.8f, 6f + (i % 4) * 4f);
+                cloud.localScale = Vector3.one * (1.5f + (i % 3) * 0.45f);
+                var sr = cloud.gameObject.AddComponent<SpriteRenderer>();
+                sr.sprite = SceneryArt.Cloud(i % 4);
                 _clouds.Add(new Drift { T = cloud, Speed = 0.35f + (i % 3) * 0.15f });
             }
         }

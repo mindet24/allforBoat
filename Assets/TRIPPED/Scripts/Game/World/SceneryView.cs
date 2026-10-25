@@ -48,14 +48,14 @@ namespace Trouble.Game
             float l = house.xMin, r = house.xMax, mid = house.center.x;
             _span = new Rect(l - 70f, g, house.width + 140f, 30f);
 
-            _sky = Sprite("Sky", UiArt.Gradient(ui.backdropTop, ui.backdropBottom), Vector3.zero, Vector3.one);
+            _sky = Sprite("Sky", ui.SkyGradient(), Vector3.zero, Vector3.one);
             Sprite("Sun", SceneryArt.Sun(), new Vector3(r + 14f, g + 26f, SkyZ - 4f), Vector3.one * 9f);
 
             for (int i = 0; i < 9; i++)
             {
                 float x = Mathf.Lerp(_span.xMin, _span.xMax, (i + 0.37f * (i % 3)) / 9f);
                 float z = 40f + (i % 3) * 5f;
-                var c = Sprite("Cloud", SceneryArt.Cloud(i % 4), new Vector3(x, g + 17f + (i * 7 % 5) * 2.2f, z), Vector3.one * (4f + (i % 3) * 1.2f));
+                var c = Sprite("Cloud", SceneryArt.Cloud(i % 4), new Vector3(x, g + 17f + (i * 7 % 5) * 2.2f, z), Vector3.one * (5f + (i % 3) * 1.5f));
                 _clouds.Add(new Drifter { T = c.transform, Speed = 0.25f + (i % 4) * 0.12f });
             }
 

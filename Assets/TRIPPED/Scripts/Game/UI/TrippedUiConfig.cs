@@ -35,9 +35,15 @@ namespace Trouble.Game
         public Color bad = TrippedViewConfig.Hex("#E8423F");
         public Color coin = TrippedViewConfig.Hex("#F6C933");
         public Color coinRim = TrippedViewConfig.Hex("#D9901A");
-        [Tooltip("Menu sky gradient (top, bottom).")]
-        public Color backdropTop = TrippedViewConfig.Hex("#3A8FE0");
-        public Color backdropBottom = TrippedViewConfig.Hex("#BFE6FB");
+        [Tooltip("Sky gradient behind the menus and the house: deep blue at the top, a clear mid blue, pale at the horizon.")]
+        public Color backdropTop = TrippedViewConfig.Hex("#1F6FE8");
+        public Color backdropMid = TrippedViewConfig.Hex("#56AEF5");
+        public Color backdropBottom = TrippedViewConfig.Hex("#DDF3FF");
+        [Tooltip("Height (0 bottom, 1 top) where the sky reaches the mid blue; lower = more deep blue.")]
+        [Range(0.05f, 0.95f)] public float backdropMidAt = 0.38f;
+
+        /// <summary>The three-stop sky gradient sprite (<see cref="UiArt.Gradient(Color, Color, Color, float)"/>).</summary>
+        public Sprite SkyGradient() => UiArt.Gradient(backdropTop, backdropMid, backdropBottom, backdropMidAt);
         public Color grass = TrippedViewConfig.Hex("#6DB24A");
         public Color dirt = TrippedViewConfig.Hex("#7A4A2A");
         public Color dim = new Color(0.06f, 0.08f, 0.16f, 0.72f);

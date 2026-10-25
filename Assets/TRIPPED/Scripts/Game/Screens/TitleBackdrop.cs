@@ -118,7 +118,7 @@ namespace Trouble.Game
             var b = house != null ? house.Bounds : new Rect(0, 0, 17, 12);
             float ground = HouseLayout.FloorY(1, _config.roomHeight);
             if (_white == null) _white = Sprite.Create(Texture2D.whiteTexture, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 4f);
-            if (_gradient == null) _gradient = UiArt.Gradient(_ui.backdropTop, _ui.backdropBottom);
+            if (_gradient == null) _gradient = _ui.SkyGradient();
             // A day-mode house brings its own neighbourhood (SceneryView); other houses get the plain sky and earth.
             if (house != null && house.GetComponentInChildren<SceneryView>() != null) return;
             var white = _white;

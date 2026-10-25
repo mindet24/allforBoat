@@ -70,17 +70,33 @@ namespace Trouble.Game
             return list;
         }
 
-        /// <summary>A fluffy cloud (pivot centre). <paramref name="variant"/> picks the shape.</summary>
+        /// <summary>
+        /// A soft, fluffy cumulus (pivot centre): no outline, its edge feathers into the sky, the top is bright white
+        /// and the flat-ish underside a cool lavender-blue. <paramref name="variant"/> picks the shape.
+        /// </summary>
         public static Sprite Cloud(int variant)
         {
-            const int w = 320, h = 140;
-            var blobs = RandomBlobs(11 + variant * 7, 6, w, h, 28f, 52f, 8f);
+            const int w = 384, h = 200;
+            const float feather = 16f;      // pixels the edge takes to fade out
+            const float baseY = 30f;        // the underside: everything below it fades away
+            var blobs = RandomBlobs(11 + variant * 7, 9, w, h - feather, 30f, 62f, baseY);
             var white = Color.white;
-            var shadow = Hex("#C9DCF2");
+            var under = Hex("#C8D6F4");
+            var deep = Hex("#B3BEE8");
             return Paint("cloud" + variant, w, h, new Vector2(0.5f, 0.5f), (x, y) =>
             {
-                float d = Mathf.Max(Blobs(x, y, blobs), 12f - y);
-                return Shade(d, y / (float)h, white, white, shadow, Hex("#B4CBE6"), 3f);
+                float d = Blobs(x, y, blobs);
+                float edge = Mathf.Clamp01((feather - d) / (2f * feather));
+                float bottom = Mathf.Clamp01((y - baseY + feather) / (2f * feather));
+                float a = Mathf.SmoothStep(0f, 1f, edge) * Mathf.SmoothStep(0f, 1f, bottom);
+                if (a <= 0f) return Color.clear;
+                // Light from above: white on top and deep inside each puff, cool shade towards the underside.
+                float t = Mathf.Clamp01((y - baseY) / (h * 0.55f));
+                float inner = Mathf.Clamp01(-d / 40f);
+                var c = Color.Lerp(deep, under, Mathf.SmoothStep(0f, 1f, t * 1.5f));
+                c = Color.Lerp(c, white, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t * 1.2f + inner * 0.5f)));
+                c.a = a;
+                return c;
             });
         }
 
