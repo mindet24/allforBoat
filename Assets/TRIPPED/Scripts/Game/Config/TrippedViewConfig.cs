@@ -241,29 +241,29 @@ namespace Trouble.Game
         [Tooltip("Draw the house kit cel-shaded instead of with URP Lit.")]
         public bool toonShading = true;
         [Tooltip("The shaded band leans towards this colour instead of going grey.")]
-        public Color toonShadowColor = Hex("#B8A8DC");
+        public Color toonShadowColor = Hex("#9E8FDB");
         [Tooltip("Where light turns to shade (N.L, -1..1); lower = more of each face lit.")]
-        [Range(-1f, 1f)] public float toonShadeThreshold = 0.1f;
+        [Range(-1f, 1f)] public float toonShadeThreshold = 0.3f;
         [Tooltip("Width of the soft edge between the bands.")]
         [Range(0.001f, 1f)] public float toonShadeSoftness = 0.08f;
         public Color toonRimColor = Hex("#FFF3EA");
-        [Range(0f, 1f)] public float toonRimStrength = 0.3f;
+        [Range(0f, 1f)] public float toonRimStrength = 0.35f;
         [Tooltip("Sky light added to every face (light probes / ambient).")]
-        [Range(0f, 2f)] public float toonAmbient = 1.1f;
+        [Range(0f, 2f)] public float toonAmbient = 0.9f;
 
         [Header("Post-processing (PostFx)")]
         [Tooltip("Bloom, tonemapping, colour grading and vignette on the house camera.")]
         public bool postProcessing = true;
         [Tooltip("SMAA anti-aliasing on the house camera.")]
         public bool smaa = true;
-        public float bloomIntensity = 1.1f;
+        public float bloomIntensity = 0.8f;
         [Tooltip("Brightness above which pixels glow.")]
-        public float bloomThreshold = 0.72f;
-        [Range(0f, 1f)] public float bloomScatter = 0.8f;
+        public float bloomThreshold = 0.9f;
+        [Range(0f, 1f)] public float bloomScatter = 0.75f;
         [Tooltip("Exposure in EV, applied after tonemapping darkens the image.")]
-        public float postExposure = 0.75f;
-        [Range(-100f, 100f)] public float contrast = -6f;
-        [Range(-100f, 100f)] public float saturation = 18f;
+        public float postExposure = 0.35f;
+        [Range(-100f, 100f)] public float contrast = 6f;
+        [Range(-100f, 100f)] public float saturation = 28f;
         [Tooltip("Tint over the whole image; a light warm colour gives the cosy home look.")]
         public Color colorFilter = Hex("#FFF0F3");
         [Range(0f, 1f)] public float vignetteIntensity = 0.12f;
