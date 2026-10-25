@@ -30,6 +30,7 @@ namespace Trouble.Game
         private readonly Dictionary<string, string> _buffers = new Dictionary<string, string>();
         private Vector2 _scroll;
         private bool _open;
+        private bool _holdingKeys;
         private bool _showWiring;
         private string _message = "";
         private string _jumpText = "100";
@@ -81,7 +82,7 @@ namespace Trouble.Game
             else
             {
                 GUI.FocusControl("");
-                _controller.KeysSuspended = false;
+                HoldKeys(false);
             }
         }
 
@@ -107,7 +108,18 @@ namespace Trouble.Game
             if (kb != null && kb.f1Key.wasPressedThisFrame) SetOpen(!_open);
             if (_open && _blockerRect != null)
                 _blockerRect.sizeDelta = new Vector2(PanelWidth * Scale(), Screen.height);
-            if (!_open) _controller.KeysSuspended = false;
+            if (!_open) HoldKeys(false);
+        }
+
+        /// <summary>
+        /// Suspends the game keys while a panel field has focus, and only ever releases what it suspended itself:
+        /// writing false every frame used to undo the Title's own suspension (the game took keys behind the menu).
+        /// </summary>
+        private void HoldKeys(bool hold)
+        {
+            if (hold == _holdingKeys) return;
+            _holdingKeys = hold;
+            _controller.KeysSuspended = hold;
         }
 
         private void OnLevelLoaded(int level)
@@ -160,7 +172,7 @@ namespace Trouble.Game
             GUI.matrix = saved;
 
             if (Event.current.type == EventType.Repaint)
-                _controller.KeysSuspended = GUI.GetNameOfFocusedControl().StartsWith("tp_");
+                HoldKeys(GUI.GetNameOfFocusedControl().StartsWith("tp_"));
         }
 
         private void DrawContents()
