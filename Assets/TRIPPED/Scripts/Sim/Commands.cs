@@ -48,8 +48,10 @@ namespace Trouble.Sim
         public readonly bool Append;
         /// <summary>CancelAction only: position in the queue.</summary>
         public readonly int Index;
+        /// <summary>Day mode, co-op: which keyboard player this is for (0 = the first; see <see cref="HouseSim.AddPlayer"/>).</summary>
+        public readonly int Player;
 
-        public Command(CommandType type, string a = "", string b = "", bool on = false, bool append = false, int index = 0)
+        public Command(CommandType type, string a = "", string b = "", bool on = false, bool append = false, int index = 0, int player = 0)
         {
             Type = type;
             A = a ?? "";
@@ -57,7 +59,11 @@ namespace Trouble.Sim
             On = on;
             Append = append;
             Index = index;
+            Player = player;
         }
+
+        /// <summary>The same command for keyboard player <paramref name="player"/>.</summary>
+        public Command ForPlayer(int player) => new Command(Type, A, B, On, Append, Index, player);
 
         public static Command Plug(string appliance, string socket, bool append = false) => new Command(CommandType.Plug, appliance, socket, append: append);
         public static Command Unplug(string appliance, bool append = false) => new Command(CommandType.Unplug, appliance, append: append);

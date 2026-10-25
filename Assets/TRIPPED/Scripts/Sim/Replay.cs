@@ -42,7 +42,7 @@ namespace Trouble.Sim
             while (next < indexed.Count && indexed[next].cmd.tick < 0)
             {
                 var data = indexed[next++].cmd;
-                if (!sim.Submit(ToCommand(data), out var reason)) result.SetupRejections.Add($"{data.cmd} {data.a} {data.b}: {reason}");
+                if (!sim.Submit(ToCommand(data).ForPlayer(data.player), out var reason)) result.SetupRejections.Add($"{data.cmd} {data.a} {data.b}: {reason}");
             }
 
             sim.Start();
@@ -50,7 +50,7 @@ namespace Trouble.Sim
             while (sim.Phase == LevelPhase.Running && safety-- > 0)
             {
                 while (next < indexed.Count && indexed[next].cmd.tick <= sim.Now)
-                    sim.Submit(ToCommand(indexed[next++].cmd), out _);
+                    { var data = indexed[next++].cmd; sim.Submit(ToCommand(data).ForPlayer(data.player), out _); }
                 beforeEachTick?.Invoke(sim);
                 foreach (var e in sim.Step()) result.Events.Add(e);
             }
@@ -117,7 +117,7 @@ namespace Trouble.Sim
         /// <summary>The scripted form of a sim command, as given at <paramref name="tick"/> (-1 = planning).</summary>
         public static CommandData ToData(Command c, int tick)
         {
-            var d = new CommandData { tick = tick, a = c.A, b = c.B, replace = !c.Append };
+            var d = new CommandData { tick = tick, a = c.A, b = c.B, replace = !c.Append, player = c.Player };
             switch (c.Type)
             {
                 case CommandType.Plug: d.cmd = "plug"; break;

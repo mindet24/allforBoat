@@ -92,6 +92,40 @@ namespace Trouble.Game
         /// <summary>Raised when the sim refused a player command at once, with the reason (also when no toast was shown).</summary>
         public event Action<Command, string> CommandRefused;
 
+        /// <summary>Day mode with stairs: Space was pressed while the day runs (a hop in place, view only).</summary>
+        public event Action Hopped;
+
+        /// <summary>
+        /// Co-op: the art id of each keyboard player (index = sim player). Empty or short = the local pick for the
+        /// local player and the other character for the rest.
+        /// </summary>
+        public string[] PlayerArt { get; set; } = new string[0];
+
+        /// <summary>Co-op: keyboard players in the next day level (1 = single player).</summary>
+        public int Players { get; set; } = 1;
+
+        /// <summary>Co-op: which sim player this machine controls and follows (0 = the host).</summary>
+        public int LocalPlayer { get; set; }
+
+        /// <summary>
+        /// Co-op guest: the host's clock drives the sim (<see cref="StepTicks"/>), not this machine's; start and pause
+        /// keys do nothing here.
+        /// </summary>
+        public bool ExternalClock { get; set; }
+
+        /// <summary>Co-op guest: where player commands go instead of the local sim (they come back from the host).</summary>
+        public Func<Command, bool> CommandRouter { get; set; }
+
+        private float _externalSince;
+
+        /// <summary>The art id for sim player <paramref name="player"/>.</summary>
+        public string ArtFor(int player)
+        {
+            if (player >= 0 && player < PlayerArt.Length && !string.IsNullOrEmpty(PlayerArt[player])) return PlayerArt[player];
+            bool local = Sim == null || player == Sim.ViewPlayer;
+            return local ? PlayerCharacter.Selected : PlayerCharacter.Selected == PlayerCharacter.Boy ? PlayerCharacter.Girl : PlayerCharacter.Boy;
+        }
+
         /// <summary>Raised when Esc is pressed while no appliance is selected (the screen flow goes to Level Select).</summary>
         public event Action EscapePressed;
 
@@ -136,6 +170,9 @@ namespace Trouble.Game
             }
 
             TearDown();
+            if (sim.IsDayMode)
+                for (int p = 1; p < Players; p++) sim.AddPlayer();
+            sim.ViewPlayer = Mathf.Clamp(LocalPlayer, 0, sim.Characters.Count - 1);
             Sim = sim;
             LevelIndex = n;
             Holding = Held.None;
@@ -194,7 +231,8 @@ namespace Trouble.Game
         /// </summary>
         public void StartOrTogglePause()
         {
-            if (Sim == null) return;
+            // A co-op guest follows the host's start and pauses (they arrive over the network).
+            if (Sim == null || ExternalClock) return;
             switch (Sim.Phase)
             {
                 case LevelPhase.Planning:
@@ -219,6 +257,7 @@ namespace Trouble.Game
         public bool Submit(Command command, bool quiet = false)
         {
             if (Sim == null) return false;
+            if (CommandRouter != null) return CommandRouter(command);
             if (Sim.Submit(command, out var reason))
             {
                 CommandAccepted?.Invoke(command);
@@ -270,10 +309,12 @@ namespace Trouble.Game
         {
             var kb = Keyboard.current;
             if (kb == null) return;
-            // While the day runs Space jumps (rules verticalMove "jump") or flies ("jetpack": HandleJetpack); with stairs
-            // (the default) it pauses like everywhere else. P always pauses.
-            bool spaceMoves = Sim.IsDayMode && Sim.Phase == LevelPhase.Running && !Sim.UsesStairs;
-            if (KeyDown(kb, _config.pauseKey) || (KeyDown(kb, _config.startKey) && !spaceMoves)) StartOrTogglePause();
+            // While the day runs Space jumps (rules verticalMove "jump"), flies ("jetpack": HandleJetpack) or, with stairs
+            // (the default), hops in place. P always pauses.
+            bool dayRunning = Sim.IsDayMode && Sim.Phase == LevelPhase.Running;
+            bool spaceMoves = dayRunning && !Sim.UsesStairs;
+            if (KeyDown(kb, _config.pauseKey) || (KeyDown(kb, _config.startKey) && !dayRunning)) StartOrTogglePause();
+            else if (dayRunning && Sim.UsesStairs && KeyDown(kb, _config.startKey)) Hopped?.Invoke();
             else if (spaceMoves && Sim.UsesJetpack) HandleJetpack(kb);
             else if (spaceMoves && KeyDown(kb, _config.startKey)) Submit(Command.Jump(KeyHeld(kb, _config.downModifierKey) ? -1 : 1), quiet: true);
             if (KeyDown(kb, _config.restartKey))
@@ -378,6 +419,13 @@ namespace Trouble.Game
             // Paused or over: TickFraction stays where it was, so what glides between ticks holds still there.
             if (Sim.Phase != LevelPhase.Running) return;
             float tickSeconds = 1f / Mathf.Max(1, Sim.Rules.ticksPerSecond);
+            if (ExternalClock)
+            {
+                // The host's ticks arrive over the network: glide on from the last one until the next.
+                _externalSince += Time.unscaledDeltaTime;
+                TickFraction = Mathf.Clamp01(_externalSince / tickSeconds);
+                return;
+            }
             _accumulator += Time.unscaledDeltaTime * Mathf.Max(0f, TimeScale);
             int steps = 0;
             int maxSteps = Mathf.Max(1, _config.maxStepsPerFrame);
@@ -406,6 +454,8 @@ namespace Trouble.Game
                 done++;
             }
             _accumulator = 0f;
+            _externalSince = 0f;
+            TickFraction = 0f;
             return done;
         }
 

@@ -18,6 +18,8 @@ namespace Trouble.Game
         Pause,
         Settings,
         Credits,
+        /// <summary>After Play: pick a character, see the room code, join a friend, Ready.</summary>
+        Lobby,
     }
 
     /// <summary>The pure rules of the screen flow.</summary>
@@ -38,6 +40,7 @@ namespace Trouble.Game
                 case ScreenId.HowTo: return ScreenId.Title;
                 case ScreenId.Settings: return ScreenId.Title;
                 case ScreenId.Credits: return ScreenId.Title;
+                case ScreenId.Lobby: return ScreenId.Title;
                 default: return ScreenId.Title;
             }
         }
@@ -47,7 +50,8 @@ namespace Trouble.Game
 
         /// <summary>True if the screen shows the demo house behind it (Title, How to Play, Settings, Credits).</summary>
         public static bool UsesHouseBackdrop(ScreenId screen) =>
-            screen == ScreenId.Title || screen == ScreenId.HowTo || screen == ScreenId.Settings || screen == ScreenId.Credits;
+            screen == ScreenId.Title || screen == ScreenId.HowTo || screen == ScreenId.Settings || screen == ScreenId.Credits
+            || screen == ScreenId.Lobby;
 
         /// <summary>True if winning <paramref name="level"/> ends the game (there is no level after it).</summary>
         public static bool IsLastLevel(int level, Func<int, bool> exists) => !exists(level + 1);
@@ -67,6 +71,8 @@ namespace Trouble.Game
         private LevelController _controller;
         private TrippedViewConfig _config;
         private MenuScreens _menus;
+        private LobbyScreen _lobby;
+        private NetRoom _room;
         private Progress _progress;
         private int _shownFrame = -1;
         private float _endAt = -1f;
@@ -106,7 +112,7 @@ namespace Trouble.Game
             _menus = new MenuScreens(config, _ui, new HudText(controller.Loader.Strings));
             _menus.Build(canvas, new MenuActions
             {
-                Play = StartDemo,
+                Play = ShowLobby,
                 HowTo = ShowHowTo,
                 Settings = ShowSettings,
                 Credits = ShowCredits,
@@ -120,6 +126,23 @@ namespace Trouble.Game
                 MainMenu = ShowTitle,
             });
 
+            _room = gameObject.AddComponent<NetRoom>();
+            _room.Setup(controller, StartDemo);
+            _lobby = new LobbyScreen(config, _ui);
+            _lobby.Build(canvas, new LobbyActions
+            {
+                Ready = () => _room.Ready(),
+                Back = ShowTitle,
+                Join = code => _room.Join(code),
+                Rename = name => _room.Rename(name),
+                PickCharacter = id =>
+                {
+                    PlayerCharacter.Selected = id;
+                    _room.PickChanged();
+                },
+            });
+            _room.Changed += () => _lobby.SetRoom(_room.Name, _room.Code, _room.Status);
+
             controller.LevelLoaded += OnLevelLoaded;
             controller.TickEvents += OnTickEvents;
             controller.EscapePressed += OnEscapeInLevel;
@@ -127,6 +150,15 @@ namespace Trouble.Game
 
         /// <summary>Opens the Title screen (the level, if any, is removed).</summary>
         public void ShowTitle() => Show(ScreenId.Title);
+
+        /// <summary>Opens the lobby (after Play): a room is made if there is none yet.</summary>
+        public void ShowLobby()
+        {
+            if (string.IsNullOrEmpty(_room.Code)) _room.Create(string.IsNullOrEmpty(_room.Name) ? "My Room" : _room.Name);
+            _lobby.ShowSelected(PlayerCharacter.Selected);
+            _lobby.SetRoom(_room.Name, _room.Code, _room.Status);
+            Show(ScreenId.Lobby);
+        }
 
         /// <summary>Opens How to Play.</summary>
         public void ShowHowTo() => Show(ScreenId.HowTo);
@@ -217,6 +249,7 @@ namespace Trouble.Game
             _menus.HowTo.SetActive(screen == ScreenId.HowTo);
             _menus.Settings.SetActive(screen == ScreenId.Settings);
             _menus.Credits.SetActive(screen == ScreenId.Credits);
+            _lobby.Root.SetActive(screen == ScreenId.Lobby);
             _menus.Select.SetActive(screen == ScreenId.LevelSelect);
             _menus.End.SetActive(screen == ScreenId.End);
             _menus.Pause.SetActive(false);
@@ -264,6 +297,7 @@ namespace Trouble.Game
             _menus.Select.SetActive(false);
             _menus.End.SetActive(false);
             _menus.Pause.SetActive(false);
+            _lobby.Root.SetActive(false);
         }
 
         private void OnTickEvents(IReadOnlyList<SimEvent> events)

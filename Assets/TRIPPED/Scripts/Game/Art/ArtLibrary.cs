@@ -67,7 +67,7 @@ namespace Trouble.Game
         public Sprite[] FamilyFrames(string owner) =>
             string.IsNullOrEmpty(owner) ? null : LoadStripAt(_config.characterArtFolder + "/family_" + owner.ToLowerInvariant());
 
-        private Sprite[] LoadStrip(string state) => LoadStripAt(_config.characterArtFolder + "/player_" + state);
+        private Sprite[] LoadStrip(string state) => LoadStripAt(_config.characterArtFolder + "/" + PlayerCharacter.Selected + "_" + state);
 
         private Sprite[] LoadStripAt(string path)
         {
@@ -81,7 +81,7 @@ namespace Trouble.Game
                 frames = new Sprite[count];
                 for (int i = 0; i < count; i++)
                 {
-                    frames[i] = Sprite.Create(tex, new Rect(i * h, 0, h, h), new Vector2(0.5f, 0f), h);
+                    frames[i] = Sprite.Create(tex, new Rect(i * h, 0, h, h), new Vector2(0.5f, 0f), h, 0, SpriteMeshType.FullRect);
                     _created.Add(frames[i]);
                 }
             }

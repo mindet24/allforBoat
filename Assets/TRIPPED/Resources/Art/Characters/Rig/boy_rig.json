@@ -1,0 +1,48 @@
+{
+  "canvas": 512,
+  "contentHeight": 481,
+  "parts": [
+    {
+      "name": "head",
+      "pivotX": 256,
+      "pivotY": 334,
+      "order": 3,
+      "pixels": 104272
+    },
+    {
+      "name": "body",
+      "pivotX": 256,
+      "pivotY": 231,
+      "order": 1,
+      "pixels": 45527
+    },
+    {
+      "name": "armL",
+      "pivotX": 227,
+      "pivotY": 312,
+      "order": 2,
+      "pixels": 24645
+    },
+    {
+      "name": "armR",
+      "pivotX": 282,
+      "pivotY": 312,
+      "order": 2,
+      "pixels": 14731
+    },
+    {
+      "name": "legL",
+      "pivotX": 242,
+      "pivotY": 231,
+      "order": 0,
+      "pixels": 96758
+    },
+    {
+      "name": "legR",
+      "pivotX": 270,
+      "pivotY": 231,
+      "order": 0,
+      "pixels": 83833
+    }
+  ]
+}

@@ -153,6 +153,8 @@ namespace Trouble.Sim
         public string b = "";
         /// <summary>true = clears the character's queue first (a plain click). false = joins the end (Shift+click), the default for scripts.</summary>
         public bool replace;
+        /// <summary>Co-op: the keyboard player it was for (0 = the first).</summary>
+        public int player;
     }
 
     /// <summary>An extra run that the Level Editor's Run Sim checks, with the result it expects.</summary>

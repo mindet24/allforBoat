@@ -119,7 +119,48 @@ namespace Trouble.Sim
         public IReadOnlyList<ApplianceState> Appliances => _appliances;
         public IReadOnlyList<RequestState> Requests => _requests;
         public IReadOnlyList<RoutineState> Routines => _routines;
-        public CharacterState Character { get; } = new CharacterState();
+        /// <summary>
+        /// The character the sim is working on: while a command or a tick is applied, the player it is for; otherwise
+        /// the one the view follows (<see cref="ViewPlayer"/>). Single player: always the only character.
+        /// </summary>
+        public CharacterState Character => _active ?? _characters[Math.Min(ViewPlayer, _characters.Count - 1)];
+
+        /// <summary>Every keyboard player, in player order (index 0 = the first). One unless <see cref="AddPlayer"/> was used.</summary>
+        public IReadOnlyList<CharacterState> Characters => _characters;
+
+        /// <summary>
+        /// Which player <see cref="Character"/> shows outside the sim's own work (the local player's view in co-op). It
+        /// never changes game state: commands and ticks always use their own player.
+        /// </summary>
+        public int ViewPlayer { get; set; }
+
+        private readonly List<CharacterState> _characters = new List<CharacterState> { new CharacterState() };
+        private CharacterState _active;
+
+        /// <summary>
+        /// Day mode co-op: adds a keyboard player standing where the first one starts; returns its index (for
+        /// <see cref="Command.ForPlayer"/>). Call before <see cref="Start"/>.
+        /// </summary>
+        public int AddPlayer()
+        {
+            var first = _characters[0];
+            var ch = new CharacterState
+            {
+                RoomId = first.RoomId, FromRoomId = first.FromRoomId, ToRoomId = first.ToRoomId,
+                XCm = first.XCm, PrevXCm = first.PrevXCm, ZCm = first.ZCm, PrevZCm = first.PrevZCm,
+            };
+            _characters.Add(ch);
+            return _characters.Count - 1;
+        }
+
+        /// <summary>Runs <paramref name="work"/> with <see cref="Character"/> = player <paramref name="player"/>.</summary>
+        private T As<T>(int player, Func<T> work)
+        {
+            var before = _active;
+            _active = _characters[Math.Max(0, Math.Min(player, _characters.Count - 1))];
+            try { return work(); }
+            finally { _active = before; }
+        }
 
         public string PanelRoomId { get; private set; }
         /// <summary>Total load of every circuit whose breaker is ON.</summary>
@@ -181,7 +222,9 @@ namespace Trouble.Sim
         /// <returns>false if the command was refused now; state did not change.</returns>
         public bool Submit(Command command, out string reason)
         {
-            bool accepted = SubmitInternal(command, out reason);
+            string why = "";
+            bool accepted = As(command.Player, () => SubmitInternal(command, out why));
+            reason = why;
             if (accepted) _recorded.Add(Replay.ToData(command, Phase == LevelPhase.Planning ? -1 : Now));
             return accepted;
         }
@@ -273,6 +316,8 @@ namespace Trouble.Sim
             _events.AddRange(_pending);
             _pending.Clear();
             _inStep = true;
+            // Everything in a tick works on the first player unless it says otherwise (CharacterTick does each).
+            _active = _characters[0];
             try
             {
                 StepInternal();
@@ -280,6 +325,7 @@ namespace Trouble.Sim
             finally
             {
                 _inStep = false;
+                _active = null;
             }
             return _events;
         }
@@ -1130,7 +1176,12 @@ namespace Trouble.Sim
         {
             if (IsDayMode)
             {
-                KeyboardTick();
+                for (int i = 0; i < _characters.Count; i++)
+                {
+                    _active = _characters[i];
+                    KeyboardTick();
+                }
+                _active = _characters[0];
                 return;
             }
             var ch = Character;
