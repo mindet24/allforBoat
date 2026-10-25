@@ -61,6 +61,8 @@ namespace Trouble.Game
         [Header("Fonts (OFL, Resources/Fonts)")]
         public string displayFont = "Fonts/LilitaOne-Regular";
         public string handFont = "Fonts/PatrickHand-Regular";
+        [Tooltip("Thai glyphs for every font (a rounded, cute Thai face; SIL OFL). Resources path, empty = none.")]
+        public string thaiFont = "Fonts/Mali-Bold";
         [Tooltip("Outline width of the display font on the logo and big titles (TMP units).")]
         public float logoOutline = 0.28f;
         [Tooltip("Corner radius of panels and buttons, in sprite pixels (the sprite is 128 px).")]
@@ -190,6 +192,10 @@ namespace Trouble.Game
         [Tooltip("Title: the game's own house is shown in this part of the screen (viewport units). Off = a flat backdrop.")]
         public bool titleHouseBackdrop = true;
         public Rect titleHouseArea = new Rect(0.38f, 0.03f, 0.6f, 0.8f);
+        [Tooltip("Title: the camera angle on the diorama (x = degrees looking down, y = degrees turned; 0 = straight on).")]
+        public Vector2 titleIsoAngle = new Vector2(12f, 0f);
+        [Tooltip("Title: how much farther out than the plain fit of the house the view sits (room for the land around it).")]
+        public float titleIsoZoom = 1.08f;
         public float noteSize = 40f;
 
         [Header("Settings")]

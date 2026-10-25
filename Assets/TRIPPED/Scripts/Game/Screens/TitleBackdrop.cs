@@ -44,6 +44,8 @@ namespace Trouble.Game
                 cam.Cam.backgroundColor = _ui.backdropBottom;
             }
             BuildWorld();
+            SetFader(false);
+            BuildDiorama();
             Active = true;
         }
 
@@ -65,6 +67,45 @@ namespace Trouble.Game
             }
             if (_root != null) Destroy(_root);
             _root = null;
+            SetFader(true);
+            if (_diorama != null) Destroy(_diorama.gameObject);
+            _diorama = null;
+            var house = _controller != null ? _controller.House : null;
+            var painted = house != null ? house.GetComponentInChildren<SceneryView>(true) : null;
+            if (painted != null) painted.ShowPainted(true);
+            if (_controller != null && _controller.HouseCam != null)
+            {
+                _controller.HouseCam.OverviewAngle = null;
+                _controller.HouseCam.OverviewZoom = 1f;
+            }
+        }
+
+        private TitleDiorama _diorama;
+
+        /// <summary>The Title's isometric low-poly diorama (day houses only): land, trees, fence, clouds.</summary>
+        private void BuildDiorama()
+        {
+            var house = _controller.House;
+            var painted = house != null ? house.GetComponentInChildren<SceneryView>(true) : null;
+            if (painted == null || _controller.Sim == null) return;
+            painted.ShowPainted(false);
+            var go = new GameObject("Title Diorama");
+            go.transform.SetParent(house.transform, false);
+            _diorama = go.AddComponent<TitleDiorama>();
+            _diorama.Build(house.Bounds, _controller.Sim.Rooms, _config.roomHeight);
+            var cam = _controller.HouseCam;
+            if (cam != null)
+            {
+                cam.OverviewAngle = new Vector2(_ui.titleIsoAngle.x, _ui.titleIsoAngle.y);
+                cam.OverviewZoom = _ui.titleIsoZoom;
+            }
+        }
+
+        /// <summary>The see-through fader is for play; the title shows the whole house solid.</summary>
+        private void SetFader(bool on)
+        {
+            var fader = _controller != null && _controller.House != null ? _controller.House.GetComponent<OccluderFader>() : null;
+            if (fader != null) fader.enabled = on;
         }
 
         private void BuildWorld()
@@ -76,8 +117,9 @@ namespace Trouble.Game
             float ground = HouseLayout.FloorY(1, _config.roomHeight);
             if (_white == null) _white = Sprite.Create(Texture2D.whiteTexture, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 4f);
             if (_gradient == null) _gradient = UiArt.Gradient(_ui.backdropTop, _ui.backdropBottom);
+            // A day-mode house brings its own neighbourhood (SceneryView); other houses get the plain sky and earth.
+            if (house != null && house.GetComponentInChildren<SceneryView>() != null) return;
             var white = _white;
-            // Earth behind the basement, grass on top of it: both behind the house (bigger z = farther away).
             Quad("Earth", white, _ui.dirt, new Rect(b.xMin - 60f, ground - 60f, b.width + 120f, 60f), 6f);
             Quad("Grass", white, _ui.grass, new Rect(b.xMin - 60f, ground - 0.15f, b.width + 120f, 0.45f), 5.9f);
             _sky = Quad("Sky", _gradient, Color.white, new Rect(0, 0, 1, 1), 30f);

@@ -27,6 +27,8 @@ namespace Trouble.Game
         private Transform _wireRoot;
         private Transform _cableRoot;
         private CharacterView _character;
+        private readonly List<CharacterView> _partners = new List<CharacterView>();
+        private readonly List<int> _partnerPlayers = new List<int>();
         private FamilyView _family;
         private Transform _socketRoot;
         private string _highlightedSocket;
@@ -62,6 +64,7 @@ namespace Trouble.Game
                 kitRoot = kitGo.transform;
                 var kitView = kitGo.AddComponent<HouseKitView>();
                 kitView.Build(_sim, config);
+                HouseKitView.Pastel(kitRoot, config);
                 // Frame what was really built: roof peak, chimney and foundation included.
                 var b = Bounds;
                 var e = kitView.Extent;
@@ -122,7 +125,20 @@ namespace Trouble.Game
             var chGo = new GameObject("Character");
             chGo.transform.SetParent(transform, false);
             _character = chGo.AddComponent<CharacterView>();
-            _character.Build(config, art);
+            _character.Build(config, art, controller.ArtFor(_sim.ViewPlayer));
+            var targets = new List<Transform> { chGo.transform };
+            // Co-op: one more view per other keyboard player.
+            for (int p = 0; p < _sim.Characters.Count; p++)
+            {
+                if (p == _sim.ViewPlayer) continue;
+                var pGo = new GameObject("Partner " + p);
+                pGo.transform.SetParent(transform, false);
+                var view = pGo.AddComponent<CharacterView>();
+                view.Build(config, art, controller.ArtFor(p));
+                _partners.Add(view);
+                _partnerPlayers.Add(p);
+                targets.Add(pGo.transform);
+            }
 
             if (_day)
             {
@@ -138,8 +154,13 @@ namespace Trouble.Game
 
                 // Walls, floors and furniture in front of the character, an appliance or a family member go see-through.
                 var cam = controller.HouseCam != null ? controller.HouseCam.Cam : Camera.main;
+                if (kitRoot != null && cam != null) BuildScenery(kitRoot, cam);
                 if (kitRoot != null && cam != null)
-                    gameObject.AddComponent<OccluderFader>().Build(kitRoot, new[] { chGo.transform, appRoot, familyGo.transform }, cam, config);
+                {
+                    targets.Add(appRoot);
+                    targets.Add(familyGo.transform);
+                    gameObject.AddComponent<OccluderFader>().Build(kitRoot, targets, cam, config);
+                }
             }
 
             LateUpdate();
@@ -219,6 +240,17 @@ namespace Trouble.Game
                 _appliances[i].Sync(_sim, selected != null && selected == _appliances[i].Appliance.Id, time);
 
             _character.Sync(_sim, _controller.TickFraction, time);
+            if (_partners.Count > 0)
+            {
+                // Each partner view reads the sim as if it were that player's (Character = that player).
+                int view = _sim.ViewPlayer;
+                for (int i = 0; i < _partners.Count; i++)
+                {
+                    _sim.ViewPlayer = _partnerPlayers[i];
+                    _partners[i].Sync(_sim, _controller.TickFraction, time);
+                }
+                _sim.ViewPlayer = view;
+            }
             if (_family != null) _family.Sync(_sim, time, _appliances);
             if (_prompts != null) _prompts.Sync(_sim);
         }
@@ -367,6 +399,12 @@ namespace Trouble.Game
                 var lower = _sim.FindRoom(door.LowerRoomId);
                 float yLow = HouseLayout.FloorY(lower.Floor, _config.roomHeight);
                 float bottom = door.BottomXCm / 100f, top = door.TopXCm / 100f;
+                if (parent != transform) CutFloorOpening(parent, door, yLow + _config.roomHeight, depth);
+                if (_config.dayStairsModel != null)
+                {
+                    PlaceStairsModel(root, door.Id, bottom, top, yLow, depth);
+                    continue;
+                }
                 int steps = Mathf.Max(3, Mathf.RoundToInt(_config.roomHeight / rise));
                 float run = (top - bottom) / steps;
                 for (int i = 0; i < steps; i++)
@@ -378,6 +416,129 @@ namespace Trouble.Game
                         new Vector3(Mathf.Abs(run), h, depth), _config.dayStairsColor);
                 }
             }
+        }
+
+        /// <summary>
+        /// The staircase model for one flight: turned so its steps climb from <paramref name="bottom"/> toward
+        /// <paramref name="top"/>, and stretched so the steps part spans that run, one floor of height and
+        /// <paramref name="depth"/> from the open front.
+        /// </summary>
+        private void PlaceStairsModel(Transform root, string id, float bottom, float top, float yLow, float depth)
+        {
+            float dir = Mathf.Sign(top - bottom);
+            var holder = new GameObject("Stairs " + id).transform;
+            holder.SetParent(root, false);
+            var pivot = new GameObject("Turn").transform;
+            pivot.SetParent(holder, false);
+            // Turn the model's climb direction onto world +x (or -x for a flight climbing left).
+            var climb = _config.dayStairsModelClimb;
+            climb.y = 0f;
+            pivot.localRotation = Quaternion.FromToRotation(climb.sqrMagnitude > 0f ? climb.normalized : Vector3.back, new Vector3(dir, 0f, 0f));
+            var model = Instantiate(_config.dayStairsModel, pivot, false);
+            model.name = _config.dayStairsModel.name;
+
+            // Fit in the holder's space (no scale yet): bounds of the steps part, or of the whole model.
+            Bounds fit = default;
+            bool any = false;
+            foreach (var r in model.GetComponentsInChildren<Renderer>())
+            {
+                if (!string.IsNullOrEmpty(_config.dayStairsStepsPart) && r.name != _config.dayStairsStepsPart) continue;
+                var bb = LocalBounds(holder, r.bounds);
+                if (!any) fit = bb;
+                else fit.Encapsulate(bb);
+                any = true;
+            }
+            if (!any)
+                foreach (var r in model.GetComponentsInChildren<Renderer>())
+                {
+                    if (!any) fit = LocalBounds(holder, r.bounds);
+                    else fit.Encapsulate(LocalBounds(holder, r.bounds));
+                    any = true;
+                }
+            if (!any) return;
+            var want = new Vector3(Mathf.Abs(top - bottom), _config.roomHeight, depth);
+            var k = new Vector3(want.x / Mathf.Max(0.01f, fit.size.x), want.y / Mathf.Max(0.01f, fit.size.y), want.z / Mathf.Max(0.01f, fit.size.z));
+            var wantMin = new Vector3(Mathf.Min(bottom, top), yLow, 0f);
+            holder.localScale = k;
+            holder.localPosition = wantMin - Vector3.Scale(fit.min, k);
+        }
+
+        /// <summary>A world-space box in <paramref name="space"/>'s local axes (no rotation between them).</summary>
+        private static Bounds LocalBounds(Transform space, Bounds world)
+        {
+            var b = new Bounds(space.InverseTransformPoint(world.min), Vector3.zero);
+            b.Encapsulate(space.InverseTransformPoint(world.max));
+            return b;
+        }
+
+        /// <summary>
+        /// Opens the upper floor over a flight: every floor slab of the kit at <paramref name="floorY"/> that covers
+        /// the opening is replaced by stretched copies of itself around it, so the climbing character's head goes up
+        /// through a stairwell, not through the boards.
+        /// </summary>
+        private void CutFloorOpening(Transform kit, DoorState door, float floorY, float depth)
+        {
+            float bottom = door.BottomXCm / 100f, top = door.TopXCm / 100f;
+            float from = Mathf.Lerp(bottom, top, _config.dayStairsOpeningFrom);
+            float x0 = Mathf.Min(from, top) - 0.05f, x1 = Mathf.Max(from, top) + 0.05f;
+            float z1 = depth + 0.1f;
+            var origin = transform.position;
+            foreach (var r in kit.GetComponentsInChildren<MeshRenderer>())
+            {
+                var b = r.bounds;
+                float bx0 = b.min.x - origin.x, bx1 = b.max.x - origin.x, bz0 = b.min.z - origin.z, bz1 = b.max.z - origin.z;
+                // Flat decor lying on that floor (rugs, mats) over the opening would cover it: hide it.
+                bool flat = b.size.y < 0.06f && Mathf.Abs(b.min.y - origin.y - floorY) < 0.1f;
+                if (flat && bx1 > x0 && bx0 < x1 && bz0 < z1)
+                {
+                    r.gameObject.SetActive(false);
+                    continue;
+                }
+                if (r.name.IndexOf("Floor", System.StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (Mathf.Abs(b.max.y - origin.y - floorY) > 0.2f || bx1 <= x0 || bx0 >= x1 || bz0 >= z1) continue;
+                float hx0 = Mathf.Max(x0, bx0), hx1 = Mathf.Min(x1, bx1);
+                // Left and right of the opening (full depth), then behind it.
+                if (hx0 - bx0 > 0.01f) FloorPiece(kit, r, new Rect(bx0, bz0, hx0 - bx0, bz1 - bz0));
+                if (bx1 - hx1 > 0.01f) FloorPiece(kit, r, new Rect(hx1, bz0, bx1 - hx1, bz1 - bz0));
+                if (bz1 - z1 > 0.01f) FloorPiece(kit, r, new Rect(hx0, z1, hx1 - hx0, bz1 - z1));
+                r.gameObject.SetActive(false);
+            }
+        }
+
+        /// <summary>A copy of floor slab <paramref name="slab"/> squeezed onto <paramref name="xz"/> (house x, z), same height.</summary>
+        private void FloorPiece(Transform kit, MeshRenderer slab, Rect xz)
+        {
+            var b = slab.bounds;
+            var origin = transform.position;
+            var k = new Vector3(xz.width / Mathf.Max(0.001f, b.size.x), 1f, xz.height / Mathf.Max(0.001f, b.size.z));
+            var wantMin = new Vector3(origin.x + xz.xMin, b.min.y, origin.z + xz.yMin);
+            var squeeze = new GameObject(slab.name + " piece").transform;
+            squeeze.SetParent(kit, true);
+            squeeze.position = wantMin - Vector3.Scale(b.min, k);
+            squeeze.localScale = k;
+            // The copy keeps the slab's own world pose inside the squeeze, which stretches it in house x and z.
+            var copy = Instantiate(slab.gameObject, squeeze, false);
+            copy.name = slab.name;
+            copy.transform.localPosition = slab.transform.position;
+            copy.transform.localRotation = slab.transform.rotation;
+            copy.transform.localScale = slab.transform.lossyScale;
+        }
+
+        /// <summary>Day mode: the neighbourhood around the house (sky, hills, trees, fence, soil under the ground).</summary>
+        private void BuildScenery(Transform kitRoot, Camera cam)
+        {
+            float basementMin = float.MaxValue, basementMax = float.MinValue;
+            foreach (var room in _sim.Rooms)
+            {
+                if (room.Floor != 0) continue;
+                basementMin = Mathf.Min(basementMin, room.X);
+                basementMax = Mathf.Max(basementMax, room.X + room.Width);
+            }
+            if (basementMin > basementMax) basementMin = basementMax = Bounds.center.x;
+            var go = new GameObject("Scenery");
+            go.transform.SetParent(transform, false);
+            go.AddComponent<SceneryView>().Build(Bounds, HouseLayout.FloorY(1, _config.roomHeight),
+                new Vector2(basementMin, basementMax), cam, TrippedUiConfig.LoadOrDefault(), kitRoot);
         }
 
         private void BuildWalls()

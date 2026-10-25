@@ -87,7 +87,7 @@ namespace Trouble.Game
                 root.GetComponentsInChildren(false, _sprites);
                 foreach (var s in _sprites)
                 {
-                    if (!s.enabled || s.sprite == null || s.color.a < 0.05f) continue;
+                    if (!s.enabled || s.sprite == null || s.color.a < 0.05f || SpriteStyle.IsDecoration(s)) continue;
                     var b = s.bounds;
                     // Down the middle of the sprite: low, middle and near the top (the head of a character).
                     for (int i = 0; i < 3; i++)
@@ -171,6 +171,17 @@ namespace Trouble.Game
             m.SetShaderPassEnabled("DepthOnly", false);
             m.SetShaderPassEnabled("ShadowCaster", false);
             m.renderQueue = (int)RenderQueue.Transparent;
+        }
+
+        /// <summary>Switched off (the title shows the whole house): everything goes back to solid at once.</summary>
+        private void OnDisable()
+        {
+            foreach (var o in _occluders)
+            {
+                if (o.Alpha >= 1f) continue;
+                o.Alpha = 1f;
+                Apply(o);
+            }
         }
 
         private void OnDestroy()

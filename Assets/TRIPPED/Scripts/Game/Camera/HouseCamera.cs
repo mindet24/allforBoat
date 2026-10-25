@@ -76,6 +76,15 @@ namespace Trouble.Game
         /// <summary>True while the overview key is held in day mode (the whole house is shown).</summary>
         public bool Overview { get; private set; }
 
+        /// <summary>
+        /// The overview's angle (x = degrees looking down, y = degrees turned), e.g. the Title's isometric view. Null =
+        /// straight on from the config's tilt.
+        /// </summary>
+        public Vector2? OverviewAngle { get; set; }
+
+        /// <summary>The overview's view height times this (an angled view needs more room around the house).</summary>
+        public float OverviewZoom { get; set; } = 1f;
+
         /// <summary>Test and capture hook: true forces the overview as if the key were held.</summary>
         public bool ForceOverview { get; set; }
 
@@ -421,7 +430,7 @@ namespace Trouble.Game
             pad.yMin -= _config.followBoundsPad;
             pad.yMax += _config.followBoundsPad;
             var overviewArea = AreaOverride ?? _config.overviewArea;
-            float overviewHeight = CameraMath.FitViewHeight(_bounds.size, aspect, overviewArea, _config.overviewMargin);
+            float overviewHeight = CameraMath.FitViewHeight(_bounds.size, aspect, overviewArea, _config.overviewMargin) * Mathf.Max(0.1f, OverviewZoom);
 
             if (Overview || _followPoint == null)
             {
@@ -448,8 +457,9 @@ namespace Trouble.Game
             _position.y = Mathf.SmoothDamp(_position.y, _targetPosition.y, ref _followVelY, Mathf.Max(0.01f, _config.followFloorSmoothTime), Mathf.Infinity, dt);
             // The overview always shows the house straight from the config's angle; the follow view uses the player's.
             float angleSmooth = Mathf.Max(0.01f, _config.cameraAngleSmoothTime);
-            _tilt = Mathf.SmoothDamp(_tilt, Overview ? _config.cameraTilt : _targetTilt, ref _tiltVelocity, angleSmooth, Mathf.Infinity, dt);
-            _yaw = Mathf.SmoothDamp(_yaw, Overview ? 0f : _targetYaw, ref _yawVelocity, angleSmooth, Mathf.Infinity, dt);
+            var overviewAngle = OverviewAngle ?? new Vector2(_config.cameraTilt, 0f);
+            _tilt = Mathf.SmoothDamp(_tilt, Overview ? overviewAngle.x : _targetTilt, ref _tiltVelocity, angleSmooth, Mathf.Infinity, dt);
+            _yaw = Mathf.SmoothDamp(_yaw, Overview ? overviewAngle.y : _targetYaw, ref _yawVelocity, angleSmooth, Mathf.Infinity, dt);
             Apply();
         }
 
