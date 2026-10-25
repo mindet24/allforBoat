@@ -14,6 +14,7 @@ namespace Trouble.Game
     {
         private static TMP_FontAsset _display;
         private static TMP_FontAsset _hand;
+        private static TMP_FontAsset _thai;
         private static bool _tried;
 
         /// <summary>The display font, or null (use TMP's default).</summary>
@@ -27,8 +28,12 @@ namespace Trouble.Game
             if (_tried) return;
             _tried = true;
             var ui = TrippedUiConfig.LoadOrDefault();
+            _thai = Make(ui.thaiFont);
             _display = Make(ui.displayFont);
             _hand = Make(ui.handFont);
+            // Thai text (the credits' names) falls back to the Thai font before TMP's default.
+            foreach (var f in new[] { _display, _hand })
+                if (f != null && _thai != null) f.fallbackFontAssetTable.Insert(0, _thai);
         }
 
         private static TMP_FontAsset Make(string path)
