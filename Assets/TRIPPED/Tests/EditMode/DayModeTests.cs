@@ -961,6 +961,37 @@ namespace Trouble.Tests
         }
 
         [Test]
+        public void RoomTrips_NewestPlugPopsOutUntilTheRoomFits()
+        {
+            // Arrange: kettle 6 then toaster 3 into a 6 room.
+            var sim = Overloaded(out _);
+
+            // Act
+            Run(sim, 40);
+
+            // Assert: the toaster (plugged last) is out, the kettle that fits on its own stays in.
+            Assert.IsTrue(string.IsNullOrEmpty(sim.FindAppliance("toaster").SocketId) || sim.FindAppliance("toaster").Unplugged);
+            Assert.AreEqual("A1", sim.FindAppliance("kettle").SocketId);
+            Assert.IsFalse(sim.FindAppliance("kettle").Unplugged);
+        }
+
+        [Test]
+        public void ResetAfterTrip_WithoutTouchingThePlugs_PowerStaysOn()
+        {
+            // Arrange: blackout, then straight to the panel.
+            var sim = Overloaded(out _);
+            Run(sim, 40);
+            WalkTo(sim, PanelX);
+
+            // Act
+            Submit(sim, Command.Interact());
+            Run(sim, 60);
+
+            // Assert
+            foreach (var c in sim.Circuits) Assert.IsTrue(c.IsOn, $"Circuit {c.Id} should stay on.");
+        }
+
+        [Test]
         public void RoomTripsOverCapacity_RoomLightGoesOut()
         {
             // Arrange
