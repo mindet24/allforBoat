@@ -161,8 +161,8 @@ namespace Trouble.Game
         public Vector2 resultPanelSize = new Vector2(820f, 640f);
 
         [Header("Toasts and prompts")]
-        [Tooltip("Top of the toast column in day mode, reference pixels from the top (under the blackout banner).")]
-        public float dayToastTop = 492f;
+        [Tooltip("Width of the Day-mode toasts in the bottom-right corner, above the timer (reference pixels).")]
+        public float dayToastWidth = 620f;
         public Vector2 startCardSize = new Vector2(760f, 300f);
         public Vector2 pauseButtonSize = new Vector2(84f, 80f);
 

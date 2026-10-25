@@ -87,7 +87,7 @@ namespace Trouble.Game
                 _tickets.Build(cx);
                 _status.Build(cx, _sim, () => { if (flow != null) flow.Pause(); });
                 _power.Build(cx, _sim);
-                _toasts.Build(root, config, _ui.dayToastTop);
+                _toasts.BuildCorner(root, config, _ui.dayToastWidth, _ui.edgeInset, _ui.edgeInset + _ui.timerSize.y + 12f);
                 _result.Build(root, controller, config, text, () => { if (flow != null) flow.ShowTitle(); });
                 if (controller.HouseCam != null) controller.HouseCam.FollowDay(_sim);
                 LateUpdate();
