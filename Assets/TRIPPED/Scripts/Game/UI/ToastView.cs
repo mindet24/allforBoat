@@ -56,8 +56,8 @@ namespace Trouble.Game
             _config = config;
             _corner = true;
             _width = width;
-            _height = 40f;
-            _fontMax = 19f;
+            _height = 62f;
+            _fontMax = 22f;
             _root = UIFactory.Anchored(canvas, "Toasts", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-right, bottom), new Vector2(_width, _height));
         }
 
@@ -76,9 +76,14 @@ namespace Trouble.Game
             var text = UIFactory.Rect(img.transform, "Text", 0, 0, _width, _height);
             var label = UIFactory.LabelOn(UIFactory.Stretch(text), message, _fontMax,
                 _config.textPrimary, _corner ? TextAlignmentOptions.MidlineLeft : TextAlignmentOptions.Center, true);
-            if (_corner) label.margin = new Vector4(14f, 0f, 10f, 0f);
+            if (_corner)
+            {
+                // Two lines rather than shrinking a long cause sentence to nothing.
+                label.margin = new Vector4(14f, 4f, 10f, 4f);
+                label.textWrappingMode = TextWrappingModes.Normal;
+            }
             label.enableAutoSizing = true;
-            label.fontSizeMin = _corner ? 12 : 16;
+            label.fontSizeMin = _corner ? 17 : 16;
             label.fontSizeMax = _fontMax;
             _toasts.Add(new Toast { Root = img.rectTransform, Background = img, Label = label, Expires = now + _config.toastSeconds });
             Layout();
