@@ -99,13 +99,13 @@ namespace Trouble.Game
         }
 
         /// <summary>
-        /// Moves every material under <paramref name="root"/> toward white and the config's pastel tint, so the smooth
-        /// 3D rooms match the soft colours of the pixel-art characters. Each source material is copied once.
-        /// Runs before the see-through fader reads the materials.
+        /// Moves every material under <paramref name="root"/> toward grey, then toward white and the config's pastel
+        /// tint, so the smooth 3D rooms match the soft colours of the pixel-art characters and sit behind them. Each
+        /// source material is copied once. Runs before the see-through fader reads the materials.
         /// </summary>
         public static void Pastel(Transform root, TrippedViewConfig config)
         {
-            if (config.kitPastel <= 0f) return;
+            if (config.kitPastel <= 0f && config.kitDesaturate <= 0f) return;
             var copies = new Dictionary<Material, Material>();
             foreach (var r in root.GetComponentsInChildren<Renderer>(true))
             {
@@ -118,7 +118,8 @@ namespace Trouble.Game
                     {
                         copy = new Material(m) { name = m.name + " (pastel)" };
                         var c = m.GetColor(PastelColorId);
-                        var soft = Color.Lerp(c, Color.white, config.kitPastel) * config.kitPastelTint;
+                        var grey = Color.Lerp(c, new Color(c.grayscale, c.grayscale, c.grayscale), config.kitDesaturate);
+                        var soft = Color.Lerp(grey, Color.white, config.kitPastel) * config.kitPastelTint;
                         soft.a = c.a;
                         copy.SetColor(PastelColorId, soft);
                         copies[m] = copy;

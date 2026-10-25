@@ -18,6 +18,8 @@ namespace Trouble.Game
             public List<string> Rooms;
             public SpriteRenderer Sprite;
             public SpriteRenderer Shadow;
+            public SpriteRenderer Badge;
+            public Color BadgeColor;
             public string Room;
             public Vector2 Spot;
             public float Alpha;
@@ -30,8 +32,11 @@ namespace Trouble.Game
         private readonly List<Vector2> _blocked = new List<Vector2>();
         private TrippedViewConfig _config;
 
-        /// <summary>Makes a sprite for each person of the day who has art.</summary>
-        public void Build(HouseSim sim, TrippedViewConfig config, ArtLibrary art)
+        /// <summary>
+        /// Makes a sprite for each person of the day who has art, with a ring on the floor in
+        /// <paramref name="personColor"/>(name), the colour of their request cards.
+        /// </summary>
+        public void Build(HouseSim sim, TrippedViewConfig config, ArtLibrary art, System.Func<string, Color> personColor)
         {
             _config = config;
             var people = sim.Level.day?.people;
@@ -56,7 +61,9 @@ namespace Trouble.Game
                 sr.sortingOrder = -2;
                 SpriteStyle.Outline(sr, config);
                 var shadow = SpriteStyle.BlobShadow(go.transform, height * config.blobShadowWidth, config);
-                _members.Add(new Member { Name = person.name, Rooms = person.rooms, Sprite = sr, Shadow = shadow });
+                var color = personColor(person.name);
+                var badge = SpriteStyle.FootBadge(go.transform, height * config.footBadgeWidth, color, config);
+                _members.Add(new Member { Name = person.name, Rooms = person.rooms, Sprite = sr, Shadow = shadow, Badge = badge, BadgeColor = color });
                 if (_members.Count == _targets.Length) break;
             }
         }
@@ -88,6 +95,7 @@ namespace Trouble.Game
                 {
                     m.Sprite.enabled = false;
                     if (m.Shadow != null) m.Shadow.enabled = false;
+                    if (m.Badge != null) m.Badge.enabled = false;
                     continue;
                 }
                 _placed.TryGetValue(target, out int slot);
@@ -136,6 +144,14 @@ namespace Trouble.Game
                     m.Shadow.transform.localPosition = new Vector3(0f, 0.01f - hop, 0f);
                     m.Shadow.color = new Color(0f, 0f, 0f, _config.blobShadowAlpha * m.Alpha);
                     m.Shadow.enabled = m.Sprite.enabled;
+                }
+                if (m.Badge != null)
+                {
+                    // The ring stays on the floor too.
+                    m.Badge.transform.localPosition = new Vector3(0f, 0.015f - hop, 0f);
+                    var b = m.BadgeColor;
+                    m.Badge.color = new Color(b.r, b.g, b.b, _config.footBadgeAlpha * m.Alpha);
+                    m.Badge.enabled = m.Sprite.enabled;
                 }
             }
         }

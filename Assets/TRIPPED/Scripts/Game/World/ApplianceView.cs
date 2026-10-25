@@ -74,11 +74,16 @@ namespace Trouble.Game
                 SpriteStyle.BlobShadow(transform, _width * 0.9f, config);
                 if (showLoad)
                 {
-                    // Day mode: the load the appliance draws, on a small badge at its top right.
-                    var badge = MakeSliced("LoadBadge", PlaceholderArt.WorldRounded, 3, new Vector2(0.34f, 0.26f),
-                        new Vector3(_width * 0.38f, height * 0.92f, -0.02f));
+                    // Day mode: the load the appliance draws, "⚡3" on a small badge at its top right (the bolt says
+                    // the number is power, not a socket or a count).
+                    var at = new Vector3(_width * 0.38f, height * 0.92f, -0.02f);
+                    var badge = MakeSliced("LoadBadge", PlaceholderArt.WorldRounded, 3, new Vector2(0.46f, 0.28f), at);
                     badge.color = config.applianceCard;
-                    _label = Prims.Text(transform, "Load", new Vector3(_width * 0.38f, height * 0.92f, -0.03f), new Vector2(0.3f, 0.22f),
+                    var bolt = UiIcons.Lightning;
+                    float boltScale = bolt != null && bolt.bounds.size.y > 0f ? 0.22f / bolt.bounds.size.y : 1f;
+                    var boltSr = MakeSprite("LoadBolt", bolt, 4, at + new Vector3(-0.11f, 0f, -0.01f), Vector3.one * boltScale);
+                    SpriteStyle.Outline(boltSr, config);
+                    _label = Prims.Text(transform, "Load", at + new Vector3(0.08f, 0f, -0.01f), new Vector2(0.22f, 0.22f),
                         app.Load.ToString(), config.worldText, 2.4f);
                     _label.sortingOrder = 4;
                 }

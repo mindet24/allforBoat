@@ -145,7 +145,7 @@ namespace Trouble.Game
                 var familyGo = new GameObject("Family");
                 familyGo.transform.SetParent(transform, false);
                 _family = familyGo.AddComponent<FamilyView>();
-                _family.Build(_sim, config, art);
+                _family.Build(_sim, config, art, TrippedUiConfig.LoadOrDefault().PersonColor);
 
                 var promptGo = new GameObject("Prompts");
                 promptGo.transform.SetParent(transform, false);

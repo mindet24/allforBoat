@@ -578,6 +578,9 @@ namespace Trouble.Game
             public Image Ring;
             public Image Icon;
             public TextMeshProUGUI Label;
+            public Image Who;
+            public TextMeshProUGUI WhoLetter;
+            public string ShownOwner = "";
             public RectTransform Arrow;
             public Image ArrowImage;
             public Sprite ShownSprite;
@@ -590,6 +593,7 @@ namespace Trouble.Game
             public Color Color;
             public string Label;
             public bool Pulse;
+            public string Owner; // empty = no person dot (the breaker pin)
         }
 
         private readonly List<Pin> _pins = new List<Pin>();
@@ -652,6 +656,7 @@ namespace Trouble.Game
                         Color = running ? ui.running : cfg.UrgencyColor(DayRules.ParseUrgency(r.Urgency)),
                         Label = running ? "ON" : secs + "s",
                         Pulse = !running && secs <= ui.ticketShakeBelowSeconds,
+                        Owner = r.Owner ?? "",
                     });
                 }
             }
@@ -696,6 +701,15 @@ namespace Trouble.Game
                     pin.Icon.enabled = t.Icon != null;
                 }
                 if (pin.Label.text != t.Label) pin.Label.text = t.Label;
+                bool who = t.Owner.Length > 0;
+                if (pin.Who.gameObject.activeSelf != who) pin.Who.gameObject.SetActive(who);
+                if (who && pin.ShownOwner != t.Owner)
+                {
+                    // Whose request, by the same colour as their ticket and foot ring (only redone when it changes).
+                    pin.ShownOwner = t.Owner;
+                    pin.Who.color = ui.PersonColor(t.Owner);
+                    pin.WhoLetter.text = t.Owner.Substring(0, 1).ToUpperInvariant();
+                }
                 pin.Arrow.gameObject.SetActive(!s.OnScreen);
                 if (!s.OnScreen)
                 {
@@ -759,6 +773,12 @@ namespace Trouble.Game
             pin.Label.enableAutoSizing = true;
             pin.Label.fontSizeMin = 10;
             pin.Label.fontSizeMax = 18;
+            float w = s.x * 0.4f;
+            var whoRt = UIFactory.Anchored(pin.Root, "Who", new Vector2(0f, 1f), new Vector2(0.5f, 0.5f), new Vector2(w * 0.3f, -w * 0.3f), new Vector2(w, w));
+            pin.Who = whoRt.gameObject.AddComponent<Image>();
+            pin.Who.sprite = PlaceholderArt.Circle;
+            pin.Who.raycastTarget = false;
+            pin.WhoLetter = UiKit.Fill(whoRt, "Letter", "", 18, Color.white);
             return pin;
         }
     }

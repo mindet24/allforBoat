@@ -160,16 +160,6 @@ namespace Trouble.Tests
         };
 
         [Test]
-        public void Total_DarkRoom_AddsCapacityButNoLoad()
-        {
-            // Act
-            var t = PowerPanelRules.Total(House());
-
-            // Assert
-            Assert.AreEqual(new Vector2Int(15, 20), t);
-        }
-
-        [Test]
         public void RowsToShow_Overview_ListsEveryRoom()
         {
             // Act / Assert

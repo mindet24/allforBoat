@@ -190,11 +190,11 @@ namespace Trouble.Game
         [Range(0f, 1f)] public float sunShadowStrength = 0.6f;
 
         [Header("Sprites in the 3D house (SpriteStyle)")]
-        [Tooltip("Thin outline around characters, family and appliances.")]
+        [Tooltip("Outline around characters, family and appliances: what can be used reads first (GDD v1.1 §3.3, §3.9).")]
         public bool spriteOutline = true;
-        public Color spriteOutlineColor = Color.white;
+        public Color spriteOutlineColor = Hex("#2B2B33");
         [Tooltip("Outline width, metres in the world.")]
-        public float spriteOutlineMetres = 0.012f;
+        public float spriteOutlineMetres = 0.022f;
         [Tooltip("Soft oval shadow on the floor under the feet.")]
         public bool blobShadows = true;
         [Range(0f, 1f)] public float blobShadowAlpha = 0.35f;
@@ -202,12 +202,22 @@ namespace Trouble.Game
         public float blobShadowDepth = 0.45f;
         [Tooltip("Oval width as a fraction of the sprite's height (sprites are about square).")]
         public float blobShadowWidth = 0.55f;
+        [Tooltip("Family: a ring on the floor under each person in their colour (TrippedUiConfig.personColors).")]
+        public bool footBadges = true;
+        [Range(0f, 1f)] public float footBadgeAlpha = 0.95f;
+        [Tooltip("Ring width as a fraction of the sprite's height.")]
+        public float footBadgeWidth = 0.6f;
+        [Tooltip("Ring thickness as a fraction of its radius.")]
+        [Range(0.05f, 1f)] public float footBadgeThickness = 0.28f;
 
         [Header("Pastel rooms")]
         [Tooltip("Colour the house kit's materials are tinted towards.")]
         public Color kitPastelTint = Hex("#FFE1EA");
         [Tooltip("How far the kit's colours move to white before the tint (0 = the model's own colours).")]
         [Range(0f, 1f)] public float kitPastel = 0.35f;
+        [Tooltip("How far the kit's colours move to grey (their own brightness), so the rooms sit behind the sprites " +
+                 "people use (0 = keep the colour).")]
+        [Range(0f, 1f)] public float kitDesaturate = 0.45f;
 
         [Header("Post-processing (PostFx)")]
         [Tooltip("Bloom, tonemapping, colour grading and vignette on the house camera.")]
@@ -225,6 +235,9 @@ namespace Trouble.Game
         [Tooltip("Tint over the whole image; a light warm colour gives the cosy home look.")]
         public Color colorFilter = Hex("#FFF4E6");
         [Range(0f, 1f)] public float vignetteIntensity = 0.28f;
+        [Tooltip("How much of the post-processing shows while playing (the Title shows all of it): lower keeps the " +
+                 "house readable.")]
+        [Range(0f, 1f)] public float gameplayPostFxWeight = 0.35f;
 
         [Tooltip("Directional (sun) light intensity, applied at boot. Lower = the room lights matter more.")]
         public float sunIntensity = 0.55f;

@@ -7,9 +7,9 @@ using UnityEngine.UI;
 namespace Trouble.Game
 {
     /// <summary>
-    /// The art sheet's power panel, top-right under the hearts: "⚡ Total Power used/total" with a bar (load of the
-    /// rooms that are ON against the sum of every room's capacity), then one row per room with its colour, name,
-    /// used/cap and a bar. While following, only the current room (highlighted) and any overloading room are listed;
+    /// The art sheet's power panel, top-right under the hearts: a "⚡ Room power" caption, then one row per room with
+    /// its colour, name, used/cap and a bar. There is no house total: breakers trip per room, so a total would only
+    /// compete with the number that matters. While following, only the current room (highlighted) and any overloading room are listed;
     /// the overview (Tab) lists every room. A red "⚠ Overload!" badge shows while any room is over capacity.
     /// </summary>
     public sealed class PowerPanel
@@ -29,18 +29,12 @@ namespace Trouble.Game
         private readonly List<RoomPower> _power = new List<RoomPower>();
         private DayHudContext _cx;
         private RectTransform _root;
-        private Image _totalFill;
-        private TextMeshProUGUI _total;
         private GameObject _badge;
-        private string _shownTotal = "";
         private int _shownRows = -1;
         private readonly Vector3[] _corners = new Vector3[4];
 
         /// <summary>Rows listed last frame (for checks).</summary>
         public int RowsShown { get; private set; }
-
-        /// <summary>The "used/total" text shown (for checks).</summary>
-        public string TotalText => _shownTotal;
 
         public void Build(DayHudContext cx, HouseSim sim)
         {
@@ -52,15 +46,9 @@ namespace Trouble.Game
             _root = (RectTransform)body.transform.parent;
             var t = body.transform;
 
-            UiKit.Icon(t, "Bolt", 12, 10, 62, 62, UiIcons.Lightning, Color.white);
-            UiKit.Text(t, "Caption", 84, 8, w - 100f, 28, cx.Text.Get("g7_total_power"), 24, ui.creamDark, TextAlignmentOptions.MidlineLeft);
-            _total = UiKit.Text(t, "Total", 84, 30, w - 100f, 48, "", 44, Color.white, TextAlignmentOptions.MidlineLeft);
-            var barBack = UIFactory.Panel(t, "Bar", 18, ui.powerHeaderHeight - 22f, w - 36f, 14, ui.navyLight, false, false);
-            barBack.sprite = UiArt.Pill;
-            barBack.type = Image.Type.Sliced;
-            _totalFill = UIFactory.Fill(UIFactory.Stretch(UIFactory.Rect(barBack.transform, "Fill", 0, 0, 0, 0)), ui.yellow, false, false);
-            _totalFill.sprite = UiArt.Pill;
-            _totalFill.type = Image.Type.Sliced;
+            float bolt = ui.powerHeaderHeight - 16f;
+            UiKit.Icon(t, "Bolt", 12, 8, bolt, bolt, UiIcons.Lightning, Color.white);
+            UiKit.Text(t, "Caption", 20 + bolt, 4, w - 36f - bolt, ui.powerHeaderHeight - 8f, cx.Text.Get("g7_room_power"), 28, ui.creamDark, TextAlignmentOptions.MidlineLeft);
 
             int i = 0;
             foreach (var room in sim.Rooms)
@@ -124,18 +112,6 @@ namespace Trouble.Game
                 var c = sim.FindCircuit(row.Id);
                 _power.Add(new RoomPower { Id = row.Id, Load = c.Load, Capacity = c.Capacity, On = c.IsOn, Overloading = c.Overloading });
             }
-            var total = PowerPanelRules.Total(_power);
-            string totalText = total.x + "/" + total.y;
-            if (totalText != _shownTotal)
-            {
-                _shownTotal = totalText;
-                _total.text = totalText;
-            }
-            float frac = HudFormat.Fill(total.x, total.y);
-            UIFactory.SetBar(_totalFill, frac);
-            var band = HudFormat.Band(total.x, total.y, cfg.loadAmberAbove, cfg.loadRedAbove);
-            _totalFill.color = band == LoadBand.Green ? ui.yellow : band == LoadBand.Amber ? ui.accent : ui.red;
-
             var cam = _cx.Controller.HouseCam;
             bool following = cam != null && cam.DayFollowing && !cam.Overview;
             var ch = sim.Character;

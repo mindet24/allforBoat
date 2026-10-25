@@ -46,6 +46,7 @@ namespace Trouble.Game
             BuildWorld();
             SetFader(false);
             BuildDiorama();
+            PostFx.SetWeight(1f);
             Active = true;
         }
 
@@ -68,6 +69,7 @@ namespace Trouble.Game
             if (_root != null) Destroy(_root);
             _root = null;
             SetFader(true);
+            PostFx.SetWeight(_config.gameplayPostFxWeight);
             if (_diorama != null) Destroy(_diorama.gameObject);
             _diorama = null;
             var house = _controller != null ? _controller.House : null;

@@ -168,7 +168,7 @@ namespace Trouble.Game
 
         [Header("Power panel (top-right, under the hearts)")]
         public float powerPanelWidth = 380f;
-        public float powerHeaderHeight = 96f;
+        public float powerHeaderHeight = 56f;
         public float powerRowHeight = 44f;
         public float powerPanelTop = 116f;
         [Tooltip("Room row bar colours cycle through these (the sheet's room colours); the bar turns amber/red as it fills.")]

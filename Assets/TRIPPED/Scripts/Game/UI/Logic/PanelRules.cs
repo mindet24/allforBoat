@@ -35,21 +35,6 @@ namespace Trouble.Game
     public static class PowerPanelRules
     {
         /// <summary>
-        /// House total: load summed over rooms whose breaker is ON, against the sum of every room's capacity
-        /// (a dark room adds nothing to the load but its capacity still counts).
-        /// </summary>
-        public static Vector2Int Total(IReadOnlyList<RoomPower> rooms)
-        {
-            int used = 0, cap = 0;
-            foreach (var r in rooms)
-            {
-                cap += Mathf.Max(0, r.Capacity);
-                if (r.On) used += Mathf.Max(0, r.Load);
-            }
-            return new Vector2Int(used, cap);
-        }
-
-        /// <summary>
         /// Which rooms to list: all of them in the overview (or when not following); while following only the
         /// current room, plus any room that is overloading (so a trip about to happen elsewhere is never hidden).
         /// </summary>

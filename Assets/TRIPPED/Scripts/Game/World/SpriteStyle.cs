@@ -13,14 +13,16 @@ namespace Trouble.Game
         private static readonly int SilhouetteId = Shader.PropertyToID("_Silhouette");
         private const string ShadowName = "BlobShadow";
         private const string OutlineName = "Outline";
+        private const string BadgeName = "FootBadge";
         private static Material _outline;
 
         /// <summary>
-        /// True for the shadows and rig outlines added here. They are decoration, not something to look at:
+        /// True for the shadows, foot badges and rig outlines added here. They are decoration, not something to look at:
         /// the see-through fader skips them, or a floor shadow in another room would fade the walls in between.
         /// </summary>
-        public static bool IsDecoration(SpriteRenderer sr) => sr.name == ShadowName || sr.name == OutlineName;
+        public static bool IsDecoration(SpriteRenderer sr) => sr.name == ShadowName || sr.name == OutlineName || sr.name == BadgeName;
         private static Sprite _blob;
+        private static Sprite _ring;
 
         /// <summary>
         /// Draws <paramref name="sr"/> with the outline material. The width is given in metres and turned into texels
@@ -83,6 +85,49 @@ namespace Trouble.Game
             sr.color = new Color(0f, 0f, 0f, config.blobShadowAlpha);
             sr.sortingOrder = short.MinValue + 1;
             return sr;
+        }
+
+        /// <summary>
+        /// Adds a ring in <paramref name="color"/> lying on the floor at the parent's origin (the feet),
+        /// <paramref name="width"/> metres wide, drawn just above the blob shadow: who someone is, readable by colour
+        /// alone (the same colour as their request cards).
+        /// </summary>
+        public static SpriteRenderer FootBadge(Transform parent, float width, Color color, TrippedViewConfig config)
+        {
+            if (config == null || !config.footBadges) return null;
+            var go = new GameObject(BadgeName);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = new Vector3(0f, 0.015f, 0f);
+            go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            go.transform.localScale = new Vector3(width, width * config.blobShadowDepth, 1f);
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = Ring(config.footBadgeThickness);
+            sr.color = new Color(color.r, color.g, color.b, config.footBadgeAlpha);
+            sr.sortingOrder = short.MinValue + 2;
+            return sr;
+        }
+
+        /// <summary>A 1-unit ring, <paramref name="thickness"/> of the radius wide, made once.</summary>
+        private static Sprite Ring(float thickness)
+        {
+            if (_ring != null) return _ring;
+            const int size = 128;
+            float inner = 1f - Mathf.Clamp(thickness, 0.05f, 1f);
+            float edge = 2f / size;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "FootBadge" };
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + 0.5f) / size * 2f - 1f, dy = (y + 0.5f) / size * 2f - 1f;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy);
+                    float a = Mathf.Clamp01((1f - d) / edge) * Mathf.Clamp01((d - inner) / edge);
+                    px[y * size + x] = new Color32(255, 255, 255, (byte)(255 * a));
+                }
+            tex.SetPixels32(px);
+            tex.Apply();
+            _ring = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size, 0, SpriteMeshType.FullRect);
+            return _ring;
         }
 
         /// <summary>A 1-unit radial gradient, made once.</summary>

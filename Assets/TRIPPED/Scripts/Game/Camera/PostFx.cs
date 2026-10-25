@@ -12,8 +12,21 @@ namespace Trouble.Game
     public static class PostFx
     {
         private const string VolumeName = "PostFxVolume";
+        private static Volume _volume;
 
-        /// <summary>Turns post-processing on for <paramref name="cam"/> and creates or refreshes the global Volume.</summary>
+        /// <summary>
+        /// How much of the effect shows: 1 on the Title, <see cref="TrippedViewConfig.gameplayPostFxWeight"/> while
+        /// playing. Does nothing before <see cref="Apply"/> or with post-processing off.
+        /// </summary>
+        public static void SetWeight(float weight)
+        {
+            if (_volume != null) _volume.weight = Mathf.Clamp01(weight);
+        }
+
+        /// <summary>
+        /// Turns post-processing on for <paramref name="cam"/> and creates or refreshes the global Volume, at the
+        /// gameplay weight (the Title raises it with <see cref="SetWeight"/>).
+        /// </summary>
         public static void Apply(Camera cam, TrippedViewConfig config)
         {
             var data = cam.GetUniversalAdditionalCameraData();
@@ -26,6 +39,8 @@ namespace Trouble.Game
             var volume = go.GetComponent<Volume>() ?? go.AddComponent<Volume>();
             volume.isGlobal = true;
             volume.priority = 10f;
+            volume.weight = config.gameplayPostFxWeight;
+            _volume = volume;
             var profile = ScriptableObject.CreateInstance<VolumeProfile>();
             volume.sharedProfile = profile;
 

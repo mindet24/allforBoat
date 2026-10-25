@@ -107,7 +107,7 @@ namespace Trouble.Game
             _timeFill.sprite = UiArt.Pill;
             _timeFill.type = Image.Type.Sliced;
 
-            // Key hints, bottom-centre, and the carry slot above them.
+            // Key hints, bottom-centre; the carry slot sits above the score coin, bottom-left, clear of the house.
             var hint = UiKit.Card(root, "KeyHints", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, inset), ui.keyHintSize, panel, ui, false);
             hint.sprite = UiArt.Pill;
             _hintRoot = (RectTransform)hint.transform.parent;
@@ -116,8 +116,8 @@ namespace Trouble.Game
             hintText.fontSizeMin = 14;
             hintText.fontSizeMax = 24;
 
-            var carry = UiKit.Card(root, "Carry", new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f),
-                new Vector2(0f, inset + ui.keyHintSize.y + 12f + ui.carrySize.y * 0.5f), ui.carrySize, ui.cream, ui);
+            var carry = UiKit.Card(root, "Carry", new Vector2(0f, 0f), new Vector2(0.5f, 0.5f),
+                new Vector2(inset + ui.carrySize.x * 0.5f, inset + ui.scoreSize.y + 16f + ui.carrySize.y * 0.5f), ui.carrySize, ui.cream, ui);
             _carryRoot = (RectTransform)carry.transform.parent;
             UiKit.Text(carry.transform, "Caption", 0, 4, ui.carrySize.x, 20, text.Get("g6_holding"), 15, ui.charcoalSoft);
             _carryIcon = UiKit.Icon(carry.transform, "Icon", (ui.carrySize.x - 72f) * 0.5f, 24, 72, 72, null, Color.white);
